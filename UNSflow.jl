@@ -15,7 +15,7 @@ export plot, scatter
 
 using Debug
 
-export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts
+export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll
 
 export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition
 
@@ -354,14 +354,161 @@ function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
 end
 
 
+function lautat(surf::TwoDSurf)
+    outfile = open("results.dat", "w")
 
+    dtstar = 0.015
+    dt = dtstar*surf.c/surf.uref
+    nsteps = 500
+    t = 0.
+
+    curfield = TwoDFlowField()
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+
+        kelv = KelvinCondition(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #Check for LEV and shed if yes
+
+        #Update rest of Fourier terms
+        #update_a2toan(surf)
+
+        #Calculate bound vortex strengths
+        #update_bv(surf)
+
+        #wakeroll(surf, curfield)
+
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
+
+    end
+    close(outfile)
+
+    #Plot flowfield viz and A0 history
+    view_vorts(surf, curfield)
+
+    data = readdlm("results.dat")
+    plot(data[:,1],data[:,5])
+end
+
+function lautat_wakeroll(surf::TwoDSurf)
+    outfile = open("results.dat", "w")
+
+    dtstar = 0.015
+    dt = dtstar*surf.c/surf.uref
+    nsteps = 500
+    t = 0.
+
+    curfield = TwoDFlowField()
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+
+        kelv = KelvinCondition(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #Check for LEV and shed if yes
+
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+
+        #Calculate bound vortex strengths
+        update_bv(surf)
+
+        wakeroll(surf, curfield, dt)
+
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
+
+    end
+    close(outfile)
+
+    #Plot flowfield viz and A0 history
+    view_vorts(surf, curfield)
+
+    data = readdlm("results.dat")
+    plot(data[:,1],data[:,5])
+end
+
+
+
+function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
+    #Clean induced velocities
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].vx = 0
+        curfield.tev[i].vz = 0
+    end
+
+    for i = 1:length(curfield.lev)
+        curfield.lev[i].vx = 0
+        curfield.lev[i].vz = 0
+    end
+
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev])
+
+    #Add the influence of velocities induced by bound vortices
+    utemp = zeros(length(curfield.tev)+length(curfield.lev))
+    wtemp = zeros(length(curfield.tev)+length(curfield.lev))
+    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev)])
+
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].vx += utemp[i]
+        curfield.tev[i].vz += wtemp[i]
+    end
+    for i = length(curfield.tev)+1:length(utemp)
+        curfield.lev[i-length(curfield.tev)].vx += utemp[i]
+        curfield.lev[i-length(curfield.tev)].vz += wtemp[i]
+    end
+
+    #Convect free vortices with their induced velocities
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].x += dt*curfield.tev[i].vx
+        curfield.tev[i].z += dt*curfield.tev[i].vz
+    end
+    for i = 1:length(curfield.lev)
+            curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].z += dt*curfield.lev[i].vz
+    end
+    return curfield
+end
 
 function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     ntev = length(field.tev)
     if ntev == 0
         xloc = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
         zloc = surf.bnd_z[surf.ndiv]
-    else
+        else
         xloc = surf.bnd_x[surf.ndiv]+(1./3.)*(field.tev[ntev].x - surf.bnd_x[surf.ndiv])
 
         zloc = surf.bnd_z[surf.ndiv]+(1./3.)*(field.tev[ntev].z - surf.bnd_z[surf.ndiv])

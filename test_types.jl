@@ -1,6 +1,6 @@
-# workspace()
-# include("UNSflow.jl")
-# using UNSflow
+workspace()
+include("UNSflow.jl")
+using UNSflow
 
 outfile = open("results.dat", "w")
 
@@ -11,7 +11,6 @@ full_kinem = KinemDef(alphadef, hdef, udef)
 surf = TwoDSurf(1., 1., "sd7003_fine.dat", 0.35, 70, 35, "Prescribed", full_kinem)
 #surf = TwoDSurf(1., 1., "FlatPlate", 0.35, 70, 35, "Prescribed", full_kinem)
 
-
 dtstar = 0.015
 dt = dtstar*surf.c/surf.uref
 nsteps = 500
@@ -20,9 +19,8 @@ t = 0.
 curfield = TwoDFlowField()
 
 #Intialise flowfield
-
 for istep = 1:nsteps
-    #Udpate current time
+        #Udpate current time
     t = t + dt
 
     #Update kinematic parameters
@@ -49,45 +47,11 @@ for istep = 1:nsteps
     #Calculate bound vortex strengths
     update_bv(surf)
 
-    #Calculate velocities induced by all free vortices by each other
-    for i = 1:length(curfield.tev)
-        curfield.tev[i].vx = 0
-        curfield.tev[i].vz = 0
-    end
-    for i = 1:length(curfield.lev)
-        curfield.lev[i].vx = 0
-        curfield.lev[i].vz = 0
-    end
-
-
-
-    mutual_ind([curfield.tev; curfield.lev])
-
-    #Add the influence of velocities induced by bound vortices
-    utemp = zeros(length(curfield.tev)+length(curfield.lev))
-    wtemp = zeros(length(curfield.tev)+length(curfield.lev))
-    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev)])
-
-    for i = 1:length(curfield.tev)
-        curfield.tev[i].vx += utemp[i]
-        curfield.tev[i].vz += wtemp[i]
-    end
-    for i = length(curfield.tev)+1:length(utemp)
-        curfield.lev[i-length(curfield.tev)].vx += utemp[i]
-        curfield.lev[i-length(curfield.tev)].vz += wtemp[i]
-    end
-
-    #Convect free vortices with their induced velocities
-    for i = 1:length(curfield.tev)
-        curfield.tev[i].x += dt*curfield.tev[i].vx
-        curfield.tev[i].z += dt*curfield.tev[i].vz
-    end
-    for i = 1:length(curfield.lev)
-        curfield.lev[i].x += dt*curfield.lev[i].vx
-        curfield.lev[i].z += dt*curfield.lev[i].vz
-    end
+    wakeroll(surf, curfield, dt)
 
     write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
 
 end
+
 close(outfile)
+

@@ -11,13 +11,16 @@ export secant_method
 #using Roots
 
 using PyPlot
-export plot, scatter
+export plot, scatter, figure
 
 using Debug
 
-export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll
+using NLSolve
+export nlsolve, not_in_place
 
-export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition
+export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll, ldvm
+
+export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition, KelvinKutta
 
 
 function camber_calc(x::Vector,airfoil::ASCIIString)
@@ -108,24 +111,6 @@ type KinemDef
 end
 
 
-# type Prescribed
-#     t :: Float64
-#     alpha_type :: ASCIIString
-#     alpha_amp :: Float64
-#     alpha_rate :: Float64
-#     h_type :: ASCIIString
-#     h_amp :: Float64
-#     h_rate :: Float64
-#     u_type :: ASCIIString
-#     u_amp :: Float64
-#     u_rate :: Float64
-
-#     function Prescribed(t, alpha_type, alpha_amp, alpha_rate, h_type, h_amp, h_rate, u_type, u_amp, u_rate)
-#         if alpha_type = "eld"
-
-
-# end
-
 immutable TwoDSurf
     c :: Float64
     uref :: Float64
@@ -152,6 +137,8 @@ immutable TwoDSurf
     a0prev :: Vector{Float64}
     aprev :: Vector{Float64}
     bv :: Vector{TwoDVort}
+    lespcrit :: Vector{Float64}
+    levflag :: Vector{Int8}
 
     function TwoDSurf(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef)
         theta = zeros(ndiv)
@@ -195,7 +182,9 @@ immutable TwoDSurf
         for i = 1:ndiv-1
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
-        new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv)
+        lespcrit = zeros(1)
+        levflag = [0]
+        new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
     end
 end
 
@@ -284,35 +273,6 @@ function trapz{T<:Real}(y::Vector{T}, x::Vector{T})
     r/2.0
 end
 
-   # a0 = zeros(1)
-   # aterm = zeros(ndiv)
-
-
-
-
-
-# type CurStep
-#     t :: Float64
-#     kinem :: KinemDef
-
-#     #constructor sets initial conditions
-
-
-# end
-
-
-    # Kinem :: KinemPar
-    # bnd_x :: Vector{Float64}
-    # bnd_z :: Vector{Float64}
-    # a0 :: Float64
-    # aterm :: Vector{Float64}
-    # bv :: BoundVort
-
-
-# function get_kinem(dynamics_type::ASCIIString, kinem_par::KinemDef)
-
-# end
-
 
 immutable KelvinCondition
     surf :: TwoDSurf
@@ -346,6 +306,45 @@ function call(kelv::KelvinCondition, tev_iter::Float64)
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
+
+immutable KelvinKutta
+    surf :: TwoDSurf
+    field :: TwoDFlowField
+end
+
+function call(kelv::KelvinKutta, v_iter::Array{Float64})
+    val = zeros(2)
+
+    #Update the TEV and LEV strengths
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    kelv.field.tev[ntev].s = v_iter[1]
+    kelv.field.lev[nlev].s = v_iter[2]
+
+    #Update incduced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field)
+
+    #Calculate downwash
+    update_downwash(kelv.surf)
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    val[1] = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.)
+
+    for iv = 1:ntev
+        val[1] = val[1] + kelv.field.tev[iv].s
+    end
+    for iv = 1:nlev
+        val[1] = val[1] + kelv.field.lev[iv].s
+    end
+
+    val[2] = kelv.surf.a0[1]-lesp_cond
+
+    #Add kelv_enforced if necessary - merging will be better
+    return val
+end
+
 
 function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev))
@@ -401,8 +400,10 @@ function lautat(surf::TwoDSurf)
     close(outfile)
 
     #Plot flowfield viz and A0 history
+    figure(0)
     view_vorts(surf, curfield)
 
+    figure(1)
     data = readdlm("results.dat")
     plot(data[:,1],data[:,5])
 end
@@ -454,12 +455,91 @@ function lautat_wakeroll(surf::TwoDSurf)
     close(outfile)
 
     #Plot flowfield viz and A0 history
+    figure(0)
     view_vorts(surf, curfield)
 
+    figure(1)
     data = readdlm("results.dat")
     plot(data[:,1],data[:,5])
 end
 
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
+    outfile = open("results.dat", "w")
+
+    dtstar = 0.015
+    dt = dtstar*surf.c/surf.uref
+    nsteps = 200
+    t = 0.
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+
+        kelv = KelvinCondition(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+
+        #Check for LESP condition
+        #Update values with converged value of shed tev
+        #Update incduced velocities on airfoil
+        update_indbound(kelv.surf, kelv.field)
+
+        #Calculate downwash
+        update_downwash(kelv.surf)
+
+        #Calculate first two fourier coefficients
+        update_a0anda1(kelv.surf)
+
+        lesp = surf.a0[1]
+
+        #2D iteration if LESP_crit is exceeded
+        if (abs(lesp)>surf.lespcrit[1])
+            if (lesp>0)
+                lesp_cond = surf.lespcrit[1]
+        else
+                lesp_cond = -surf.lespcrit[1]
+            end
+            #Add a TEV with dummy strength
+            place_tev(surf,curfield,dt)
+
+            #Add a LEV with dummy strength
+            place_lev(surf,curfield,dt)
+
+            kelvkutta = KelvinKutta(surf,curfield)
+            #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
+            (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = NLsolve.nlsolve(NLsolve.not_in_place(kelvkutta), [-0.01; 0.01])
+            surf.levflag[1] = 1
+        else
+            surf.levflag[1] = 0
+        end
+
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #Check for LEV and shed if yes
+
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+
+        #Calculate bound vortex strengths
+        update_bv(surf)
+
+        wakeroll(surf, curfield, dt)
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
+    end
+
+    close(outfile)
+end
 
 
 function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
@@ -514,6 +594,25 @@ function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
         zloc = surf.bnd_z[surf.ndiv]+(1./3.)*(field.tev[ntev].z - surf.bnd_z[surf.ndiv])
     end
     push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+    return field
+end
+
+function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
+    nlev = length(field.lev)
+
+    le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
+    le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
+
+    if (surf.levflag[1] == 0) then
+        xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
+        zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
+    else
+        xloc = surf.bnd_x[1]+(1./3.)*(field.lev[nlev].x - surf.bnd_x[1])
+        zloc = surf.bnd_z[1]+(1./3.)*(field.lev[nlev].z - surf.bnd_z[1])
+    end
+
+    push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+
     return field
 end
 

@@ -10,9 +10,15 @@ using Roots
 export secant_method
 #using Roots
 
-export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel
+using PyPlot
+export plot, scatter
+
+using Debug
+
+export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts
 
 export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition
+
 
 function camber_calc(x::Vector,airfoil::ASCIIString)
     #Determine camber and camber slope on airfoil from airfoil input file
@@ -266,7 +272,7 @@ end
 
 
 
-function trapz{T<:Real}(x::Vector{T}, y::Vector{T})
+function trapz{T<:Real}(y::Vector{T}, x::Vector{T})
     local len = length(y)
     if (len != length(x))
         error("Vectors must be of same length")
@@ -329,15 +335,26 @@ function call(kelv::KelvinCondition, tev_iter::Float64)
     update_a0anda1(kelv.surf)
 
     val = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.)
+
     for iv = 1:ntev
         val = val + kelv.field.tev[iv].s
     end
     for iv = 1:nlev
         val = val + kelv.field.lev[iv].s
     end
+
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
+
+function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
+    scatter(map(q->q.x, field.tev),map(q->q.z,field.tev))
+    scatter(map(q->q.x, field.lev),map(q->q.z,field.lev))
+    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv))
+end
+
+
+
 
 function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     ntev = length(field.tev)
@@ -428,7 +445,6 @@ end
 
 function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     #'s' stands for source and 't' for target
-    #Adds to the existing uind, wind values
     uind = zeros(length(t_x))
     wind = zeros(length(t_x))
 

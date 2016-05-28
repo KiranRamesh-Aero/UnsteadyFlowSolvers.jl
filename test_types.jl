@@ -1,24 +1,27 @@
-workspace()
-include("UNSflow.jl")
-using UNSflow
+# workspace()
+# include("UNSflow.jl")
+# using UNSflow
+
+outfile = open("results.dat", "w")
 
 alphadef = EldUpDef(45,0.2,0.8)
 hdef = ConstDef(0.)
 udef = ConstDef(1.)
 full_kinem = KinemDef(alphadef, hdef, udef)
 surf = TwoDSurf(1., 1., "sd7003_fine.dat", 0.35, 70, 35, "Prescribed", full_kinem)
+#surf = TwoDSurf(1., 1., "FlatPlate", 0.35, 70, 35, "Prescribed", full_kinem)
 
 
 dtstar = 0.015
 dt = dtstar*surf.c/surf.uref
-nsteps = 100
+nsteps = 500
 t = 0.
 
 curfield = TwoDFlowField()
 
 #Intialise flowfield
 
-for istep = 1:100
+for istep = 1:nsteps
     #Udpate current time
     t = t + dt
 
@@ -56,6 +59,8 @@ for istep = 1:100
         curfield.lev[i].vz = 0
     end
 
+
+
     mutual_ind([curfield.tev; curfield.lev])
 
     #Add the influence of velocities induced by bound vortices
@@ -82,5 +87,7 @@ for istep = 1:100
         curfield.lev[i].z += dt*curfield.lev[i].vz
     end
 
-end
+    write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
 
+end
+close(outfile)

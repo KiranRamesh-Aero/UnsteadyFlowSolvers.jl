@@ -6,8 +6,8 @@ export Spline1D, derivative, evaluate
 using ForwardDiff
 export derivative
 
-using Roots
-export secant_method
+#using Roots
+#export secant_method
 #using Roots
 
 using PyPlot
@@ -15,7 +15,7 @@ export plot, scatter, figure
 
 using Debug
 
-using NLSolve
+using NLsolve
 export nlsolve, not_in_place
 
 export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll, ldvm
@@ -339,6 +339,11 @@ function call(kelv::KelvinKutta, v_iter::Array{Float64})
         val[1] = val[1] + kelv.field.lev[iv].s
     end
 
+    if (kelv.surf.a0[1] > 0)
+        lesp_cond = kelv.surf.lespcrit[1]
+    else
+        lesp_cond = -kelv.surf.lespcrit[1]
+    end
     val[2] = kelv.surf.a0[1]-lesp_cond
 
     #Add kelv_enforced if necessary - merging will be better
@@ -379,7 +384,9 @@ function lautat(surf::TwoDSurf)
 
         kelv = KelvinCondition(surf,curfield)
         #Solve for TEV strength to satisfy Kelvin condition
-        curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+        #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+        soln = nlsolve(not_in_place(kelv), -0.01)
+        curfield.tev[length(curfield.tev)].s = soln.zeros
 
         #Update adot
         update_a2a3adot(surf,dt)
@@ -468,7 +475,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
 
     dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
-    nsteps = 200
+    nsteps = 500
     t = 0.
 
     #Intialise flowfield
@@ -504,11 +511,6 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
 
         #2D iteration if LESP_crit is exceeded
         if (abs(lesp)>surf.lespcrit[1])
-            if (lesp>0)
-                lesp_cond = surf.lespcrit[1]
-        else
-                lesp_cond = -surf.lespcrit[1]
-            end
             #Add a TEV with dummy strength
             place_tev(surf,curfield,dt)
 
@@ -517,7 +519,10 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
 
             kelvkutta = KelvinKutta(surf,curfield)
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
-            (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = NLsolve.nlsolve(NLsolve.not_in_place(kelvkutta), [-0.01; 0.01])
+
+            soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
+            (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero
+
             surf.levflag[1] = 1
         else
             surf.levflag[1] = 0

@@ -1,0 +1,38 @@
+workspace()
+include("../src/UNSflow.jl")
+using UNSflow
+
+
+alphadef = EldRampReturnDef(45,0.2,11)
+hdef = ConstDef(0.)
+udef = ConstDef(1.)
+full_kinem = KinemDef(alphadef, hdef, udef)
+
+pvt = 0.0 #leading edge
+
+surf = TwoDSurf(1., 1., "sd7003_fine.dat", pvt, 70, 35, "Prescribed", full_kinem)
+
+curfield = TwoDFlowField()
+
+nsteps =round(Int,7/0.015)+1
+
+lautat(surf, curfield, nsteps)
+
+#Present plots
+data = readdlm("results.dat")
+
+f = figure("pyplot_subplot_mixed", figsize=(5,5))
+ax = PyPlot.subplot(221)
+plot(data[:,1], data[:,5])
+xlabel('t*')
+ylabel('LESP', color='k')
+xli
+yticks
+for tl in ax[1, 1].get_yticklabels():
+    tl.set_color('k')
+ax2 = ax[1, 1].twinx()
+ax2.plot(data[:,1], data[:,2], 'r--')
+ax2.set_ylabel('alpha', color='r')
+for tl in ax2.get_yticklabels():
+    tl.set_color('r')
+plt.show()

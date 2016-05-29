@@ -16,9 +16,53 @@ immutable EldUpDef <: MotionDef
     a :: Float64
 end
 
+immutable EldRampReturnDef <:MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+end
+
 immutable ConstDef <: MotionDef
     amp :: Float64
 end
+
+
+function call(eld::EldUpDef, t)
+    sm = pi*pi*eld.K/(2*(eld.amp*pi/180)*(1 - eld.a))
+    t1 = 1.
+    t2 = t1 + ((eld.amp*pi/180)/(2*eld.K))
+    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp*pi/360)
+end
+
+function call(cons::ConstDef, t)
+    cons.amp
+end
+
+function call(eld::EldRampReturnDef, tt)
+    fr = eld.K/(pi*abs(eld.amp)*pi/180);
+    t1 = 1.
+    t2 = t1 + (1./(2*pi*fr));
+    t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
+    t4 = t3 + (1./(2*pi*fr));
+    t5 = t4+1.;
+
+    nstep = round(Int,t5/0.015) + 1
+    g = zeros(nstep)
+    t = zeros(nstep)
+    res = zeros(nstep)
+
+    for i = 1:nstep
+        t[i] = (i-1.)*0.015
+        g[i] = log((cosh(eld.a*(t[i] - t1))*cosh(eld.a*(t[i] - t4)))/(cosh(eld.a*(t[i] - t2))*cosh(eld.a*(t[i] - t3))))
+    end
+    maxg = maximum(g);
+    res = eld.amp*g*pi/(maxg*180);
+    res_spl = Spline1D(t, res)
+
+    evaluate(res_spl, tt), Dierckx.derivative(res_spl, tt)
+end
+
+
 
 type TwoDVort
     x :: Float64
@@ -98,12 +142,39 @@ immutable TwoDSurf
             cam, cam_slope = camber_calc(x, coord_file)
         end
 
-        kinem.alpha = kindef.alpha(0.)
-        kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
-        kinem.h = kindef.h(0.)*c
-        kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-        kinem.u = kindef.u(0.)*uref
-        kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha, kinem.alphadot = kindef.alpha(0.)
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        end
+
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            kinem.h, kinem.hdot = kindef.h(0.)
+            kinem.h = kinem.h*c
+            kinem.hdot = kinem.hdot*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        end
+
+        if (typeof(kindef.u) == EldUpDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+        elseif (typeof(kindef.u) == EldRampReturnDef)
+            kinem.u, kinem.udot = kindef.u(0.)
+            kinem.u = kinem.u*uref
+            kinem.udot = kinem.udot*uref*uref/c
+        elseif (typeof(kindef.u) == ConstDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = 0.
+        end
 
         for i = 1:ndiv
             bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
@@ -212,32 +283,3 @@ function call(kelv::KelvinKutta, v_iter::Array{Float64})
     return val
 end
 
-function call(eld::EldUpDef, t)
-    sm = pi*pi*eld.K/(2*(eld.amp*pi/180)*(1 - eld.a))
-    t1=1.
-    t2=t1 + ((eld.amp*pi/180)/(2*eld.K))
-    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp*pi/360)
-end
-
-function call(cons::ConstDef, t)
-    cons.amp
-end
-
-
-function eld_fn(t::Vector;K=0.2,amp=45,t1=1.,tf=1.,a=11.)
-    fr = K/(pi*abs(amp)*pi/180);
-    t2=t1+(1./(2*pi*fr));
-    t3 = t2+((1/(4*fr))-(1/(2*pi*fr)));
-    t4 = t3+(1./(2*pi*fr));
-    t5 = t4+tf;
-
-    nstep = length(t)
-    g = Array(Float64,nstep)
-    res = Array(Float64,nstep)
-
-    for i = 1:nstep
-        g[i] = log((cosh(a*(t[i] - t1))*cosh(a*(t[i] - t4)))/(cosh(a*(t[i] - t2))*cosh(a*(t[i] - t3))))
-    end
-    maxg = maximum(g);
-    return res = amp*g/maxg;
-end

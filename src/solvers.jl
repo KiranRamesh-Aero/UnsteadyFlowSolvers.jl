@@ -1,9 +1,8 @@
-function lautat(surf::TwoDSurf, curfield::TwoDFlowField)
+function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
     outfile = open("results.dat", "w")
 
     dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
-    nsteps = 500
     t = 0.
 
     #Intialise flowfield
@@ -39,7 +38,8 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField)
 
         #wakeroll(surf, curfield)
 
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
+        cl, cd, cm = calc_forces(surf)
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm)," "), "\n")
 
     end
     close(outfile)
@@ -48,20 +48,15 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField)
     figure(0)
     view_vorts(surf, curfield)
 
-    figure(1)
-    data = readdlm("results.dat")
-    plot(data[:,1],data[:,5])
 end
 
-function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField)
+function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
     outfile = open("results.dat", "w")
 
     dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
     nsteps = 500
     t = 0.
-
-
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -96,18 +91,16 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField)
 
         wakeroll(surf, curfield, dt)
 
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1])," "), "\n")
+        cl, cd, cm = calc_forces(surf)
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm)," "), "\n")
 
     end
     close(outfile)
 
-    #Plot flowfield viz and A0 history
+    #Plot flowfield viz
     figure(0)
     view_vorts(surf, curfield)
 
-    figure(1)
-    data = readdlm("results.dat")
-    plot(data[:,1],data[:,5])
 end
 
 function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
@@ -193,4 +186,9 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
     end
 
     close(outfile)
+
+    #Plot flowfield viz
+    figure(0)
+    view_vorts(surf, curfield)
+
 end

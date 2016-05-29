@@ -72,10 +72,12 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.u = surf.kinem.u*surf.uref
         surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == ConstDef)
-        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.u = surf.kindef.u(t)*uref
         surf.kinem.udot = 0.
     end
 
+    surf.kinem.u = surf.kindef.u(t)*surf.uref
+    surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     return surf
 end
 

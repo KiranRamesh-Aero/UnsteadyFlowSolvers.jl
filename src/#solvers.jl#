@@ -34,7 +34,6 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
         for ia = 1:3
             surf.aprev[ia] = surf.aterm[ia]
         end
-
         #Update rest of Fourier terms
         #update_a2toan(surf)
 

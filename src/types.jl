@@ -124,7 +124,7 @@ immutable TwoDSurf
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
 
-    function TwoDSurf(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef)
+    function TwoDSurf(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef,lespcrit=zeros(1))
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -153,6 +153,9 @@ immutable TwoDSurf
         end
 
         if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+          elseif (typeof(kindef.h) == EldUpIntDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == EldRampReturnDef)
@@ -193,7 +196,6 @@ immutable TwoDSurf
         for i = 1:ndiv-1
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
-        lespcrit = zeros(1)
         levflag = [0]
         new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
     end
@@ -204,6 +206,31 @@ end
 
 
 
+immutable EldUpIntDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+end
+
+function call(eld::EldUpIntDef, t)
+
+    dt = 0.015
+    sm = pi*pi*eld.K/(2*(30*pi/180)*(1 - eld.a))
+    t1 = 1.
+    t2 = t1 + ((30*pi/180)/(2*eld.K))
+
+    tmpt = 0
+    prev_h = 0
+    amp = 0
+    while tmpt <= t
+      hdot = ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(30*pi/360)
+      hdot = hdot*eld.h_amp/(30*pi/180)
+      amp = prev_h + hdot*dt
+      prev_h = amp
+      tmpt = tmpt + dt
+    end
+    amp
+end
 
 
 
@@ -282,4 +309,3 @@ function call(kelv::KelvinKutta, v_iter::Array{Float64})
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
-

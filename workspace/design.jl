@@ -9,31 +9,44 @@ immutable EldUpIntDef <: MotionDef
 end
 
 function call(eld::EldUpIntDef, t)
-	 	 	  
-    sm = pi*pi*eld.K/(2*(eld.amp*pi/180)*(1 - eld.a))
+
+    dt = 0.015
+    sm = pi*pi*eld.K/(2*(30*pi/180)*(1 - eld.a))
     t1 = 1.
-    t2 = t1 + ((eld.amp*pi/180)/(2*eld.K))
-    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp*pi/360)
+    t2 = t1 + ((30*pi/180)/(2*eld.K))
+
+    tmpt = 0
+    prev_h = 0
+    amp = 0
+    while tmpt <= t
+      hdot = ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(30*pi/360)
+      hdot = hdot*eld.h_amp/(30*pi/180)
+      amp = prev_h + hdot*dt
+      prev_h = amp
+      tmpt = tmpt + dt
+    end
+    amp
 end
 
+function lesp_design_max!(h_amp,lesp_diff)
+  println("ha",h_amp)
+  alphadef = EldUpDef(30,0.2,0.8)
+  hdef = EldUpIntDef(h_amp[1],0.2,0.8)
+  udef = ConstDef(1.)
+  full_kinem = KinemDef(alphadef, hdef, udef)
+  lespcrit = [20;]
+  pvt = 0.25
 
-function lesp_design_max(h_amp)
-alphadef = EldUpDef(30,0.2,0.8)
-hdef = EldUpIntDef(h_amp,0.2,0.8)
-udef = ConstDef(1.)
-full_kinem = KinemDef(alphadef, hdef, udef)
+  surf = TwoDSurf(1., 1., "sd7003_fine.dat", pvt, 70, 35, "Prescribed", full_kinem,lespcrit)
 
-pvt = 0.25
+  curfield = TwoDFlowField()
 
-surf = TwoDSurf(1., 1., "sd7003_fine.dat", pvt, 70, 35, "Prescribed", full_kinem)
+  nsteps =round(Int,3/0.015)+1
 
-curfield = TwoDFlowField()
+  ldvm(surf, curfield, nsteps)
 
-nsteps =round(Int,3/0.015)+1
+  data =  readdlm("results.dat")
 
-ldvm(surf, curfield, nsteps)
-
-data =  readdlm("results.dat")
-
-return maximum(data[:,5])
+  lesp_diff = maximum(data[:,5]) - 0.21
+  println("ld",lesp_diff)
 end

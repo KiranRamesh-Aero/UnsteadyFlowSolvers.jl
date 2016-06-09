@@ -113,12 +113,11 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
 
 end
 
-function ldvm(surf::TwoDSurf, curfield::TwoDFlowField)
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500)
     outfile = open("results.dat", "w")
 
     dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
-    nsteps = 500
     t = 0.
 
     #Intialise flowfield

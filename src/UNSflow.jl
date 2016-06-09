@@ -16,7 +16,7 @@ export nlsolve, not_in_place
 
 export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll, ldvm, calc_forces
 
-export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition, KelvinKutta, EldRampReturnDef
+export KinemPar, MotionDef, KinemDef, EldUpDef, ConstDef, TwoDSurf, TwoDVort, TwoDFlowField, KelvinCondition, KelvinKutta, EldRampReturnDef, EldUpIntDef
 
 include("types.jl")
 include("calculations.jl")

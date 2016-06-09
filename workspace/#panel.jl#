@@ -1,6 +1,6 @@
-#workspace()
-#include("../src/UNSflow.jl")
-#using UNSflow
+workspace()
+include("../src/UNSflow.jl")
+using UNSflow
 
 
 alphadef = EldRampReturnDef(25,0.11,11)

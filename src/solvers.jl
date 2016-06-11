@@ -157,10 +157,9 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
 
 end
 
-function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500)
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
     outfile = open("results.dat", "w")
 
-    dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
     t = 0.
 
@@ -181,9 +180,10 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500)
         kelv = KelvinCondition(surf,curfield)
         #Solve for TEV strength to satisfy Kelvin condition
         #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
-        soln = nlsolve(not_in_place(kelv), [-0.01])
-        curfield.tev[length(curfield.tev)].s = soln.zero[1]
-
+        if (length(curfield.tev) > 1)
+          soln = nlsolve(not_in_place(kelv), [-0.01])
+          curfield.tev[length(curfield.tev)].s = soln.zero[1]
+        end
         #Check for LESP condition
         #Update values with converged value of shed tev
         #Update incduced velocities on airfoil

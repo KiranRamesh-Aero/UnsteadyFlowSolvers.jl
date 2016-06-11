@@ -62,6 +62,27 @@ function call(eld::EldRampReturnDef, tt)
     evaluate(res_spl, tt), Dierckx.derivative(res_spl, tt)
 end
 
+immutable SinDef <: MotionDef
+  mean :: Float64
+  amp :: Float64
+  w :: Float64
+  phi :: Float64
+end
+
+immutable CosDef <: MotionDef
+  mean :: Float64
+  amp :: Float64
+  w :: Float64
+  phi :: Float64
+end
+
+function call(kin::SinDef, t)
+  (kin.mean) + (kin.amp)*sin(kin.w*t + kin.phi)
+end
+
+function call(kin::CosDef, t)
+  (kin.mean) + (kin.amp)*cos(kin.w*t + kin.phi)
+end
 
 
 type TwoDVort
@@ -150,7 +171,12 @@ immutable TwoDSurf
         elseif (typeof(kindef.alpha) == ConstDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = 0.
-            
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
         end
 
         if (typeof(kindef.h) == EldUpDef)
@@ -166,6 +192,12 @@ immutable TwoDSurf
         elseif (typeof(kindef.h) == ConstDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         end
 
         if (typeof(kindef.u) == EldUpDef)

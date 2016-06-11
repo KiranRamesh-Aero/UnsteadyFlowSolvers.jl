@@ -150,6 +150,7 @@ immutable TwoDSurf
         elseif (typeof(kindef.alpha) == ConstDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = 0.
+            
         end
 
         if (typeof(kindef.h) == EldUpDef)

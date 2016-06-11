@@ -1,3 +1,47 @@
+function lesp_design_max(h_amp::Float64)
+  alphadef = EldUpDef(30,0.2,0.8)
+  hdef = EldUpIntDef(h_amp,0.2,0.8)
+  udef = ConstDef(1.)
+  full_kinem = KinemDef(alphadef, hdef, udef)
+  lespcrit = [20;]
+  pvt = 0.25
+
+  surf = TwoDSurf(1., 1., "sd7003_fine.dat", pvt, 70, 35, "Prescribed", full_kinem,lespcrit)
+
+  curfield = TwoDFlowField()
+
+  nsteps =round(Int,2.2/0.015)+1
+
+  ldvm(surf, curfield, nsteps)
+
+  data =  readdlm("results.dat")
+
+  return maximum(data[:,5]) - 0.21
+end
+
+function design_solve()
+  iter_h = zeros(10)
+  ld = zeros(10)
+  iter_h[1] = 0.
+  iter_h[2] = 0.1
+  ld[1] = lesp_design_max(iter_h[1])
+  iter_max = 11
+  iter = 1
+  eps = 1e-08
+
+  while (ld[iter] > eps)
+    if (iter > iter_max)
+      error("Iteration has failed")
+    end
+    iter = iter + 1
+    ld[iter] = lesp_design_max(iter_h[iter])
+    dld = (ld[iter] - ld[iter-1])/(iter_h[iter] - iter_h[iter-1])
+    iter_h[iter+1] = iter_h[iter] - ld[iter]/dld
+  end
+  return iter_h[iter]
+end
+
+
 function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
     outfile = open("results.dat", "w")
 

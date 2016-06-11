@@ -224,7 +224,7 @@ function call(eld::EldUpIntDef, t)
     amp = 0
     while tmpt <= t
       hdot = ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(30*pi/360)
-      hdot = hdot*eld.h_amp/(30*pi/180)
+      hdot = hdot*eld.amp/(30*pi/180)
       amp = prev_h + hdot*dt
       prev_h = amp
       tmpt = tmpt + dt

@@ -28,10 +28,10 @@ end
 
 
 function call(eld::EldUpDef, t)
-    sm = pi*pi*eld.K/(2*(eld.amp*pi/180)*(1 - eld.a))
+    sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
     t1 = 1.
-    t2 = t1 + ((eld.amp*pi/180)/(2*eld.K))
-    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp*pi/360)
+    t2 = t1 + ((eld.amp)/(2*eld.K))
+    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
 end
 
 function call(cons::ConstDef, t)
@@ -39,7 +39,7 @@ function call(cons::ConstDef, t)
 end
 
 function call(eld::EldRampReturnDef, tt)
-    fr = eld.K/(pi*abs(eld.amp)*pi/180);
+    fr = eld.K/(pi*abs(eld.amp));
     t1 = 1.
     t2 = t1 + (1./(2*pi*fr));
     t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
@@ -49,17 +49,17 @@ function call(eld::EldRampReturnDef, tt)
     nstep = round(Int,t5/0.015) + 1
     g = zeros(nstep)
     t = zeros(nstep)
-    res = zeros(nstep)
 
     for i = 1:nstep
         t[i] = (i-1.)*0.015
         g[i] = log((cosh(eld.a*(t[i] - t1))*cosh(eld.a*(t[i] - t4)))/(cosh(eld.a*(t[i] - t2))*cosh(eld.a*(t[i] - t3))))
     end
     maxg = maximum(g);
-    res = eld.amp*g*pi/(maxg*180);
-    res_spl = Spline1D(t, res)
 
-    evaluate(res_spl, tt), Dierckx.derivative(res_spl, tt)
+    gg = log((cosh(eld.a*(tt - t1))*cosh(eld.a*(tt - t4)))/(cosh(eld.a*(tt - t2))*cosh(eld.a*(tt - t3))))
+
+    return eld.amp*gg/(maxg);
+
 end
 
 immutable SinDef <: MotionDef
@@ -248,19 +248,21 @@ end
 function call(eld::EldUpIntDef, t)
 
     dt = 0.015
-    sm = pi*pi*eld.K/(2*(30*pi/180)*(1 - eld.a))
+    nsteps = t/dt + 1
+    nsteps = round(Int,nsteps)
+    dt = t/(nsteps-1)
+    sm = pi*pi*eld.K/(2*eld.amp*(1 - eld.a))
     t1 = 1.
-    t2 = t1 + ((30*pi/180)/(2*eld.K))
+    t2 = t1 + ((eld.amp)/(2*eld.K))
 
-    tmpt = 0
+
     prev_h = 0
     amp = 0
-    while tmpt <= t
-      hdot = ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(30*pi/360)
-      hdot = hdot*eld.amp/(30*pi/180)
+    for i = 1:nsteps
+      tmpt = (i-1)*dt
+      hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
       amp = prev_h + hdot*dt
       prev_h = amp
-      tmpt = tmpt + dt
     end
     amp
 end

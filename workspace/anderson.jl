@@ -13,8 +13,8 @@ phi = 90*pi/180
 
 w = 2*k
 T = (2*pi/w)
-t_tot = 2*T
-dt = 0.015*0.2/k
+t_tot = 4*T
+dt = 0.015*0.2*4/k
 
 hdef = CosDef(0.,h_amp,w,0.)
 alphadef = CosDef(alpha_mean, alpha_amp, w, phi)
@@ -35,6 +35,6 @@ nsteps =round(Int,t_tot/dt)+1
 ldvm(surf, curfield, nsteps, dt)
 
 data = readdlm("results.dat")
-PyPlot.figure
-plot(data[:,1],data[:,6])
-PyPlot.axis([0, 2, -50, 50])
+#PyPlot.figure
+#plot(data[:,1],data[:,6])
+#PyPlot.axis([0, 2, -50, 50])

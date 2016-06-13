@@ -1,5 +1,5 @@
 function lesp_design_max(h_amp::Float64)
-  alphadef = EldUpDef(30,0.2,0.8)
+  alphadef = EldUpDef(30*pi/180,0.2,0.8)
   hdef = EldUpIntDef(h_amp,0.2,0.8)
   udef = ConstDef(1.)
   full_kinem = KinemDef(alphadef, hdef, udef)
@@ -10,7 +10,7 @@ function lesp_design_max(h_amp::Float64)
 
   curfield = TwoDFlowField()
 
-  nsteps =round(Int,1.5/0.015)+1
+  nsteps =round(Int,2.2/0.015)+1
 
   ldvm(surf, curfield, nsteps)
 

@@ -264,6 +264,9 @@ function call(eld::EldUpIntDef, t)
       amp = prev_h + hdot*dt
       prev_h = amp
     end
+    if (nsteps == 1)
+      amp = 0.
+    end  
     amp
 end
 

@@ -1,6 +1,6 @@
-#workspace()
-#include("../src/UNSflow.jl")
-#using UNSflow
+workspace()
+include("../src/UNSflow.jl")
+using UNSflow
 
 alphadef = EldRampReturnDef(25*pi/180,0.11,11)
 hdef = ConstDef(0.)
@@ -82,7 +82,7 @@ ylim(-10,30)
 yticks(-10:10:30, color="r")
 
 ax = subplot(224)
-plot(data[:,1], data[:,8], "k-")
+plot(data[:,1], cm, "k-")
 plot(comp[:,1]+0.1,-comp[:,7],"b--")
 plot(exp[:,1],-exp[:,5]*2,"g-.")
 xlabel("t*")

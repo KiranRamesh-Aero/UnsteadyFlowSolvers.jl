@@ -260,7 +260,11 @@ function call(eld::EldUpIntDef, t)
     amp = 0
     for i = 1:nsteps
       tmpt = (i-1)*dt
-      hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
+      if (eld.amp == 0.) 
+      	 hdot = 0.
+      else
+         hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
+      end
       amp = prev_h + hdot*dt
       prev_h = amp
     end

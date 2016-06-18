@@ -187,6 +187,7 @@ immutable TwoDSurf
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == EldRampReturnDef)
+
             kinem.h= kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == ConstDef)

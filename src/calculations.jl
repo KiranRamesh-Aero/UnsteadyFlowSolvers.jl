@@ -46,7 +46,8 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     elseif (typeof(surf.kindef.alpha) == EldRampReturnDef)
-        surf.kinem.alpha, surf.kinem.alphadot = surf.kindef.alpha(t)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     elseif (typeof(surf.kindef.alpha) == ConstDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = 0.
@@ -66,9 +67,8 @@ function update_kinem(surf::TwoDSurf, t)
             surf.kinem.hdot = EldUpDef(30,0.2,0.8)(t)*surf.kindef.h.amp*surf.uref
             #surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == EldRampReturnDef)
-        surf.kinem.h, surf.kinem.hdot = surf.kindef.h(t)
-        surf.kinem.h = surf.kinem.h*surf.c
-        surf.kinem.hdot = surf.kinem.hdot*surf.uref
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == ConstDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = 0.

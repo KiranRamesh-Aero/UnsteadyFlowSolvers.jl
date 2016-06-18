@@ -24,6 +24,9 @@ data = readdlm("results.dat")
 exp = readdlm("exp_25pr.dat")
 comp = readdlm("comp_25pr.dat")
 
+#Tranfer cm from LE to QC
+cm = transfer_cm(0.25,data[:,8],data[:,6],data[:,7],data[:,2],0.,1.)
+
 f = figure("pyplot_subplot_mixed", figsize=(15,8))
 
 ax = subplot(221)

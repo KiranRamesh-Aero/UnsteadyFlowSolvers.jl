@@ -29,7 +29,7 @@ function calc_forces(surf::TwoDSurf)
     return cl, cd, cm
 end
 
-function transfer_cm(xreq::Float64, cm::Vector{Float64}, cl::Vector{Float64}, cd::Vector{Float64},alpha::Float64,  x::Float64,c)
+function transfer_cm(xreq::Float64, cm::Vector{Float64}, cl::Vector{Float64}, cd::Vector{Float64},alpha::Vector{Float64},  x::Float64,c)
     for i=1:length(cm)
         cm[i] = cm[i]+cl[i]*(xreq-x)*c*cos(alpha)+cd[i]*(xreq-x)*c*sin(alpha)
     end

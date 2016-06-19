@@ -179,10 +179,9 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         kelv = KelvinCondition(surf,curfield)
         #Solve for TEV strength to satisfy Kelvin condition
         #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
-        if (length(curfield.tev) > 1)
-          soln = nlsolve(not_in_place(kelv), [-0.01])
-          curfield.tev[length(curfield.tev)].s = soln.zero[1]
-        end
+        soln = nlsolve(not_in_place(kelv), [-0.01])
+        curfield.tev[length(curfield.tev)].s = soln.zero[1]
+        
         #Check for LESP condition
         #Update values with converged value of shed tev
         #Update incduced velocities on airfoil

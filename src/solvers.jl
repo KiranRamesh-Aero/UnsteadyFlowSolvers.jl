@@ -238,9 +238,9 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     end
 
     close(outfile)
-
+    surf, curfield
     #Plot flowfield viz
-    figure(0)
-    view_vorts(surf, curfield)
+#    figure(0)
+#    view_vorts(surf, curfield)
 
 end

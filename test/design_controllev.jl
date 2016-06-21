@@ -17,7 +17,7 @@ function lesp_design_max(h_amp::Float64, alphadef::MotionDef)
 
   curfield = TwoDFlowField()
 
-  nsteps =round(Int,2.5/0.015)+1
+  nsteps =round(Int,1.5/0.015)+1
 
   ldvm(surf, curfield, nsteps)
 

@@ -49,5 +49,21 @@ function design_solve(alphadef::MotionDef)
 end
 
 
+
 alphadef = EldUpDef(30*pi/180,0.2,0.8)
-design_solve(alphadef)
+h_amp = design_solve(alphadef)
+
+hdef = EldUpIntDef(h_amp,alphadef.K*h_amp/alphadef.amp,alphadef.a)
+
+dt = 0.015
+nsteps =round(Int,3.5/dt)+1
+
+mat = zeros(nsteps,4)
+for i = 1:nsteps
+    t = (i-1)*dt
+    mat[i,1] = t
+    mat[i,2] = alphadef(t)*180/pi
+    mat[i,3] = hdef(t)
+    mat[i,4] = 1.
+end
+

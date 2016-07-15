@@ -113,6 +113,61 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
 
 end
 
+function theodorsen(surf::TwoDSurf, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
+    outfile = open("theo.dat", "w")
+    
+    dt = dtstar*surf.c/surf.uref
+    t = 0.
+    
+    theta_m = surf.kindef.alpha.amp
+    psi = surf.kindef.alpha.phi
+    alfa_m = surf.kindef.alpha.mean
+    h_m = surf.kindef.h.amp
+    if (surf.coord_file == "sd7003_fine.dat")
+        alfa_zl = -2*pi/180
+    else
+        alfa_zl = 0
+    end
+    k = surf.kindef.alpha.w/2
+    w = surf.kindef.alpha.w
+    
+    #define a
+    a = (surf.pvt-0.5*surf.c)/(0.5*surf.c);
+    
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        wt = w*t
+        C = besselh(1,2,k)./(besselh(1,2,k) + im*besselh(0,2,k));
+
+        #Update kinematic parameters (not required for calculation, only for output)
+        update_kinem(surf, t)
+
+        # steady-state Cl
+        Cl_ss = 2*pi*(alfa_m-alfa_zl);
+
+        # plunge contribution
+        Cl_pl_nc = 2*pi*k^2*h_m*exp(im*wt);
+        Cl_pl_c = -im*4*pi*k*C*h_m*exp(im*wt);
+        
+        # pitch contribution
+        Cl_pi_nc = (im*pi*k + pi*k^2*a)*theta_m*exp(im*(wt+psi));
+        Cl_pi_c = (1 + im*k*(0.5-a))*2*pi*C*theta_m*exp(im*(wt+psi));
+
+        #non-circ unsteady contributions
+        Cl_nc = Cl_pl_nc+Cl_pi_nc;
+        
+        # circulatory unsteady contributions
+        Cl_c = Cl_pl_c+Cl_pi_c;
+        
+        # total contributions
+        Cl_tot = Cl_ss + Cl_nc + Cl_c;
+
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, Cl_tot)," "), "\n")
+    end
+end
+    
 function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
     outfile = open("results.dat", "w")
 

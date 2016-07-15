@@ -1,19 +1,19 @@
-workspace()
-include("../src/UNSflow.jl")
-using UNSflow
+#workspace()
+#include("../src/UNSflow.jl")
+#using UNSflow
 #
 #Uncomment the lines above when running for the first time
 
 #This repeoduces results from Case 3A in Ramesh et al. (2014)
-alpha_mean = 4*pi/180.
-alpha_amp = 22.5*pi/180.
+alpha_mean = 0*pi/180.
+alpha_amp = 00*pi/180.
 k = 3.93
 h_amp = 0.05
-phi = 90*pi/180
+phi = 0*pi/180
 
 w = 2*k #Frequency
 T = (2*pi/w) #Period
-n_cyc = 5
+n_cyc = 2
 t_tot = n_cyc*T  #Desired total time
 dt = 0.015*0.2*4/k #time step calculation 
 
@@ -24,15 +24,19 @@ hdef = CosDef(0., h_amp, w, 0.)
 udef = ConstDef(1.)
 full_kinem = KinemDef(alphadef, hdef, udef)
 
-pvt = 0.75
+pvt = 0.2
 
-surf = TwoDSurf(1., 1., "sd7003_fine.dat", pvt, 70, 35, "Prescribed", full_kinem)
+lesp_crit = [50;]
+
+surf = TwoDSurf(1., 1., "FlatPlate", pvt, 70, 35, "Prescribed", full_kinem, lesp_crit)
+
+curfield = TwoDFlowField()
 
 nsteps =round(Int,t_tot/dt)+1
 
- theodorsen(surf, nsteps, dt)
+theodorsen(surf, nsteps, dt)
 
-
+ldvm(surf, curfield, nsteps, dt)
 
 # #Present plots
 # data = readdlm("theo.dat")

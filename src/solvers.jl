@@ -167,7 +167,84 @@ function theodorsen(surf::TwoDSurf, nsteps::Int64 = 500, dtstar::Float64 = 0.015
         write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, Cl_tot)," "), "\n")
     end
 end
+
+function theodorsen(surf::TwoDSurfwFlap, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
+    outfile = open("theo.dat", "w")
     
+    dt = dtstar*surf.c/surf.uref
+    t = 0.
+    
+    alpha_amp = surf.kindef.alpha.amp
+    if (typeof(surf.kindef.alpha) != ConstDef)
+        phi = surf.kindef.alpha.phi
+        alpha_mean = surf.kindef.alpha.mean
+    else
+        phi = 0
+        alpha_mean = 0
+    end
+    beta_amp = surf.kindef.n.amp
+    psi = surf.kindef.n.phi
+    h_amp = surf.kindef.h.amp
+    
+    if (surf.coord_file == "sd7003_fine.dat")
+        alfa_zl = -2*pi/180
+    else
+        alfa_zl = 0
+    end
+    k = surf.kindef.n.w/2
+    w = surf.kindef.n.w
+    
+    #define a and c
+    a = (surf.pvt-0.5*surf.c)/(0.5*surf.c);
+    c = (surf.x_b[1]-0.5*surf.c)/(0.5*surf.c);
+
+    #Define the required coefficients
+    T1 = -(2+c*c)*sqrt(1-c*c)/3 + c*acos(c)
+    T4 = c*sqrt(1-c*c) - acos(c)
+    T11 = (2-c)*sqrt(1-c*c) + (1-2*c)*acos(c)  
+    T12 = (2+c)*sqrt(1-c*c) + (1-2*c)*acos(c)
+    T2 = T4*(T11+T12)
+    T3 = -(1-c*c)*(5*c*c+4)/8 + c*(7+2*c*c)*sqrt(1-c*c)*acos(c)/4 - (1/8+c*c)*acos(c)*acos(c)
+    T5 = -(1-c*c)+2*c*sqrt(1-c*c)*acos(c)-acos(c)*acos(c)
+    T6 = T2
+    T7 = c*(7+2*c*c)*sqrt(1-c*c)/8 - (1/8+c*c)*acos(c)
+    T8 = -(1+2*c*c)*sqrt(1-c*c)/3 + c*acos(c)
+    T9 = ((1-c*c)^(3/2)/3 + a*T4)/2
+    T10 = sqrt(1-c*c) + acos(c)
+    T14 = 1/16 + a*c/2
+    T15 = T4 + T10
+    T16 = T1 - T8 -(c-a)*T4 + T11/2
+    T17 = -2*T9 - T1 + (a-1/2)*T4
+    T18 = T5 - T4*T10
+    T19 = T4*T11
+    T20 = T10 - 2*sqrt(1-c*c)
+    
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        wt = w*t
+        C = besselh(1,2,k)./(besselh(1,2,k) + im*besselh(0,2,k));
+
+        #Update kinematic parameters (not required for calculation, only for output)
+        update_kinem(surf, t)
+
+        # steady-state Cl
+        Cl_ss = 2*pi*(alpha_mean-alfa_zl);
+
+        #Formulae were derived in a julia notebook
+        Cl_h = 2*pi*h_amp*k*(-2*im*C+k)*exp(im*wt)
+        Cl_alpha = -pi*alpha_amp*(2*C*(im*k*(a-0.5)-1) - k*(a*k+im))*exp(im*(phi+wt))
+        Cl_beta = beta_amp*(C*(im*k*T11+2*T10) + k*(k*T1-im*T4))*exp(im*(wt+psi))
+        
+        # total contributions
+        Cl_tot = Cl_ss + Cl_h + Cl_alpha + Cl_beta
+
+        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, Cl_tot)," "), "\n")
+    end
+end
+
+
 function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
     outfile = open("results.dat", "w")
 

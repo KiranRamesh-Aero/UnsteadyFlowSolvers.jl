@@ -1,3 +1,5 @@
+# ---------------------------------------------------------------------------------------------
+# Function for calculating a_2 and a_3 fourier coefficients
 function update_a2a3adot(surf::TwoDSurf,dt)
     for ia = 2:3
         surf.aterm[ia] = trapz(surf.downwash.*cos(ia*surf.theta),surf.theta)
@@ -10,18 +12,56 @@ function update_a2a3adot(surf::TwoDSurf,dt)
     return surf
 end
 
+function update_a2a3adot(surf::TwoDSurfwFlap,dt)
+    for ia = 2:3
+        surf.aterm[ia] = trapz(surf.downwash.*cos(ia*surf.theta),surf.theta)
+        surf.aterm[ia] = 2.*surf.aterm[ia]/(surf.uref*pi)
+    end
+    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+    for ia = 1:3
+        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+    end
+    return surf
+end
+
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function for updating the induced velocities u, w: eqns (2.12), (2.13) in Ramesh et al.
 function update_indbound(surf::TwoDSurf, curfield::TwoDFlowField)
     surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev], surf.bnd_x, surf.bnd_z)
     return surf
 end
 
+function update_indbound(surf::TwoDSurfwFlap, curfield::TwoDFlowField)
+    surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev], surf.bnd_x, surf.bnd_z)
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function for updating the downwash W: eqn (2.5) in Ramesh et al.
 function update_downwash(surf::TwoDSurf)
     for ib = 1:surf.ndiv
         surf.downwash[ib] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.uind[ib]*sin(surf.kinem.alpha) + surf.kinem.hdot*cos(surf.kinem.alpha) - surf.wind[ib]*cos(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[ib] - surf.pvt*surf.c) + surf.cam_slope[ib]*(surf.uind[ib]*cos(surf.kinem.alpha) + surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
     end
     return surf
 end
+# ---------------------------------------------------------------------------------------------
 
+# Function for updating the downwash W: eqn (2.5) in Ramesh et al.
+# Additional terms: alphadot*eta and time derivative of eta to account for deformations
+# Added by Laura Merchant 2016
+function update_downwash(surf::TwoDSurfwFlap)
+    for ib = 1:surf.ndiv
+        surf.downwash[ib] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.uind[ib]*sin(surf.kinem.alpha) + surf.kinem.hdot*cos(surf.kinem.alpha) - surf.wind[ib]*cos(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[ib] - surf.pvt*surf.c) - surf.cam_tder[ib] + surf.cam_slope[ib]*(surf.uind[ib]*cos(surf.kinem.alpha) + surf.kinem.u*cos(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib] + surf.kinem.hdot*sin(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
+    end
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function for a_0 and a_1 fourier coefficients
 function update_a0anda1(surf::TwoDSurf)
     surf.a0[1] = trapz(surf.downwash,surf.theta)
     surf.aterm[1] = trapz(surf.downwash.*cos(surf.theta),surf.theta)
@@ -30,18 +70,38 @@ function update_a0anda1(surf::TwoDSurf)
     return surf
 end
 
+function update_a0anda1(surf::TwoDSurfwFlap)
+    surf.a0[1] = trapz(surf.downwash,surf.theta)
+    surf.aterm[1] = trapz(surf.downwash.*cos(surf.theta),surf.theta)
+    surf.a0[1] = -surf.a0[1]/(surf.uref*pi)
+    surf.aterm[1] = 2.*surf.aterm[1]/(surf.uref*pi)
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Function for calculating the fourier coefficients a_2 upwards to a_n 
 function update_a2toan(surf::TwoDSurf)
-
     for ia = 2:surf.naterm
         surf.aterm[ia] = trapz(surf.downwash.*cos(ia*surf.theta),surf.theta)
         surf.aterm[ia] = 2.*surf.aterm[ia]/(surf.uref*pi)
     end
     return surf
 end
+function update_a2toan(surf::TwoDSurfwFlap)
+    for ia = 2:surf.naterm
+        surf.aterm[ia] = trapz(surf.downwash.*cos(ia*surf.theta),surf.theta)
+        surf.aterm[ia] = 2.*surf.aterm[ia]/(surf.uref*pi)
+    end
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Function updating the dimensional kinematic parameters
 function update_kinem(surf::TwoDSurf, t)
-    #Dimensional values of kinemtic parameters
+
+    # Pitch kinematics
     if (typeof(surf.kindef.alpha) == EldUpDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
@@ -58,7 +118,9 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     end
-
+    # ---------------------------------------------------------------------------------------------
+    
+    # Plunge kinematics
     if (typeof(surf.kindef.h) == EldUpDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
@@ -79,7 +141,9 @@ function update_kinem(surf::TwoDSurf, t)
       surf.kinem.h = surf.kindef.h(t)*surf.c
       surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     end
+    # ---------------------------------------------------------------------------------------------
 
+    # Forward velocity
     if (typeof(surf.kindef.u) == EldUpDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
@@ -91,10 +155,97 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = 0.
     end
+    # ---------------------------------------------------------------------------------------------
+    return surf
+end
+# END kinem function
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function updating the kinematic parameters
+function update_kinem(surf::TwoDSurfwFlap, t)
+# Added by Laura Merchant 2016 
+    # ---------------------------------------------------------------------------------------------
+    # Pitch kinematics
+    if (typeof(surf.kindef.alpha) == EldUpDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldRampReturnDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == ConstDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = 0.
+    elseif (typeof(surf.kindef.alpha) == SinDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == CosDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    end
+
+    # ---------------------------------------------------------------------------------------------
+    # Plunge kinematics
+    if (typeof(surf.kindef.h) == EldUpDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldUpIntDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = EldUpDef(30,0.2,0.8)(t)*surf.kindef.h.amp*surf.uref
+        #surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldRampReturnDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == ConstDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = 0.
+    elseif (typeof(surf.kindef.h) == SinDef)
+      surf.kinem.h = surf.kindef.h(t)*surf.c
+      surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == CosDef)
+      surf.kinem.h = surf.kindef.h(t)*surf.c
+      surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    end
+
+    # ---------------------------------------------------------------------------------------------
+    # Velocity
+    if (typeof(surf.kindef.u) == EldUpDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == ConstDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = 0.
+    end
+    
+    # ---------------------------------------------------------------------------------------------
+    # Deformation kinematics
+    if (typeof(surf.kindef.n) == CosDef)
+        surf.kinem.n = surf.kindef.n(t)
+        surf.kinem.ndot = ForwardDiff.derivative(surf.kindef.n,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.n) == EldRampReturnDef)
+        surf.kinem.n = surf.kindef.n(t)
+        surf.kinem.ndot = ForwardDiff.derivative(surf.kindef.n,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.n) == ConstDef)
+        surf.kinem.n = surf.kindef.n(t)
+        surf.kinem.ndot = 0.
+    elseif (typeof(surf.kindef.n) == SinDef)
+        surf.kinem.n = surf.kindef.n(t)
+        surf.kinem.ndot = ForwardDiff.derivative(surf.kindef.n,t)*surf.uref/surf.c
+    end
 
     return surf
 end
+# END kinemwFlap function
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Updates the bound vorticity distribution: eqn (2.1) in Ramesh et al. (2013)
+# determines the strength of bound vortices
+# determines the x, z components of the bound vortices
 function update_bv(surf::TwoDSurf)
     gamma = zeros(surf.ndiv)
     for ib = 1:surf.ndiv
@@ -111,7 +262,26 @@ function update_bv(surf::TwoDSurf)
         surf.bv[ib-1].z = (surf.bnd_z[ib] + surf.bnd_z[ib-1])/2.
     end
 end
+function update_bv(surf::TwoDSurfwFlap)
+    gamma = zeros(surf.ndiv)
+    for ib = 1:surf.ndiv
+        gamma[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))
+        for ia = 1:surf.naterm
+            gamma[ib] = gamma[ib] + surf.aterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
+        end
+        gamma[ib] = gamma[ib]*surf.uref*surf.c
+    end
 
+    for ib = 2:surf.ndiv
+        surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
+        surf.bv[ib-1].x = (surf.bnd_x[ib] + surf.bnd_x[ib-1])/2.
+        surf.bv[ib-1].z = (surf.bnd_z[ib] + surf.bnd_z[ib-1])/2.
+    end
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Numerical integration method: Trapezoidal
 function trapz{T<:Real}(y::Vector{T}, x::Vector{T})
     local len = length(y)
     if (len != length(x))
@@ -123,7 +293,10 @@ function trapz{T<:Real}(y::Vector{T}, x::Vector{T})
     end
     r/2.0
 end
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Aerofoil camber calculation from coordinate file
 function camber_calc(x::Vector,airfoil::ASCIIString)
     #Determine camber and camber slope on airfoil from airfoil input file
 
@@ -157,7 +330,31 @@ function camber_calc(x::Vector,airfoil::ASCIIString)
     cam_slope[1:ndiv] = Dierckx.derivative(cam_spl,x);
     return cam, cam_slope
 end
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Updating the deformation of the aerofoil: camber, spatial and time derivatives (from flap)
+# Added by Laura Merchant 2016 
+function update_deform(surf::TwoDSurfwFlap, t)
+    ndiv = length(surf.x);
+
+    for i=1:ndiv
+        if surf.x[i] < surf.x_b[1]
+            surf.cam[i] = surf.cam_af[i];
+        else 
+            surf.cam[i] = surf.cam_af[i] + (surf.x_b[1]-surf.x[i])*tan(surf.kinem.n);
+            surf.cam_tder[i] = (surf.x_b[1]-surf.x[i])*surf.kinem.ndot*sec(surf.kinem.n)*sec(surf.kinem.n);
+        end
+    end  
+    
+    cam_spl = Spline1D(surf.x,surf.cam);
+    surf.cam_slope[1:surf.ndiv] = Dierckx.derivative(cam_spl,surf.x);
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function for calculating the wake rollup
 function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
     #Clean induced velocities
     for i = 1:length(curfield.tev)
@@ -199,6 +396,50 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
     return curfield
 end
 
+function wakeroll(surf::TwoDSurfwFlap, curfield::TwoDFlowField, dt)
+    #Clean induced velocities
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].vx = 0
+        curfield.tev[i].vz = 0
+    end
+
+    for i = 1:length(curfield.lev)
+        curfield.lev[i].vx = 0
+        curfield.lev[i].vz = 0
+    end
+
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev])
+
+    #Add the influence of velocities induced by bound vortices
+    utemp = zeros(length(curfield.tev)+length(curfield.lev))
+    wtemp = zeros(length(curfield.tev)+length(curfield.lev))
+    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev)])
+
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].vx += utemp[i]
+        curfield.tev[i].vz += wtemp[i]
+    end
+    for i = length(curfield.tev)+1:length(utemp)
+        curfield.lev[i-length(curfield.tev)].vx += utemp[i]
+        curfield.lev[i-length(curfield.tev)].vz += wtemp[i]
+    end
+
+    #Convect free vortices with their induced velocities
+    for i = 1:length(curfield.tev)
+        curfield.tev[i].x += dt*curfield.tev[i].vx
+        curfield.tev[i].z += dt*curfield.tev[i].vz
+    end
+    for i = 1:length(curfield.lev)
+            curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].z += dt*curfield.lev[i].vz
+    end
+    return curfield
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Places a trailing edge vortex
 function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     ntev = length(field.tev)
     if ntev == 0
@@ -212,7 +453,23 @@ function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
     return field
 end
+function place_tev(surf::TwoDSurfwFlap,field::TwoDFlowField,dt)
+    ntev = length(field.tev)
+    if ntev == 0
+        xloc = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
+        zloc = surf.bnd_z[surf.ndiv]
+        else
+        xloc = surf.bnd_x[surf.ndiv]+(1./3.)*(field.tev[ntev].x - surf.bnd_x[surf.ndiv])
 
+        zloc = surf.bnd_z[surf.ndiv]+(1./3.)*(field.tev[ntev].z - surf.bnd_z[surf.ndiv])
+    end
+    push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+    return field
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Places a leading edge vortex
 function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
     nlev = length(field.lev)
 
@@ -231,18 +488,28 @@ function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
 
     return field
 end
+function place_lev(surf::TwoDSurfwFlap,field::TwoDFlowField,dt)
+    nlev = length(field.lev)
 
-function start_bound(alpha,h,pvt,ndiv,c,x,cam)
-    bnd_x = Array(Float64,ndiv)
-    bnd_z = Array(Float64,ndiv)
+    le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
+    le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
 
-    for i = 1:ndiv
-        bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(alpha))) + (cam[i]*sin(alpha))
-        bnd_z[i] = h + ((pvt*c - x[i])*sin(alpha))+(cam[i]*cos(alpha))
+    if (surf.levflag[1] == 0) then
+        xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
+        zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
+    else
+        xloc = surf.bnd_x[1]+(1./3.)*(field.lev[nlev].x - surf.bnd_x[1])
+        zloc = surf.bnd_z[1]+(1./3.)*(field.lev[nlev].z - surf.bnd_z[1])
     end
-    return bnd_x, bnd_z
-end
 
+    push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+
+    return field
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Function determining the effects of interacting vorticies - velocities induced on each other - classical n-body problem
 function mutual_ind(vorts::Vector{TwoDVort})
     for i = 1:length(vorts)
         for j = i+1:length(vorts)
@@ -265,7 +532,8 @@ function mutual_ind(vorts::Vector{TwoDVort})
 end
 
 
-
+# ---------------------------------------------------------------------------------------------
+# Function for updating the positions of the bound vortices
 function update_boundpos(surf::TwoDSurf, dt::Float64)
     for i = 1:surf.ndiv
         surf.bnd_x[i] = surf.bnd_x[i] + dt*((surf.pvt*surf.c - surf.x[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + surf.cam[i]*cos(surf.kinem.alpha)*surf.kinem.alphadot)
@@ -273,7 +541,17 @@ function update_boundpos(surf::TwoDSurf, dt::Float64)
     end
     return surf
 end
+function update_boundpos(surf::TwoDSurfwFlap, dt::Float64)
+    for i = 1:surf.ndiv
+        surf.bnd_x[i] = surf.bnd_x[i] + dt*((surf.pvt*surf.c - surf.x[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + surf.cam[i]*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+        surf.bnd_z[i] = surf.bnd_z[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - surf.cam[i]*sin(surf.kinem.alpha)*surf.kinem.alphadot)
+    end
+    return surf
+end
+# ---------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------
+# Function to calculate induced velocities by a set of votices at a target location
 function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     #'s' stands for source and 't' for target
     uind = zeros(length(t_x))
@@ -290,3 +568,4 @@ function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     end
     return uind, wind
 end
+# ---------------------------------------------------------------------------------------------

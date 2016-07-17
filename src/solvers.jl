@@ -113,90 +113,64 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
 
 end
 
-function theodorsen(surf::TwoDSurf, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
-    outfile = open("theo.dat", "w")
+function theodorsen(theo::TheoDef)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # reduced frequency
     
-    dt = dtstar*surf.c/surf.uref
-    t = 0.
-    
-    theta_m = surf.kindef.alpha.amp
-    psi = surf.kindef.alpha.phi
-    alfa_m = surf.kindef.alpha.mean
-    h_m = surf.kindef.h.amp
-    if (surf.coord_file == "sd7003_fine.dat")
-        alfa_zl = -2*pi/180
-    else
-        alfa_zl = 0
-    end
-    k = surf.kindef.alpha.w/2
-    w = surf.kindef.alpha.w
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
     
     #define a
-    a = (surf.pvt-0.5*surf.c)/(0.5*surf.c);
+    a = (theo.pvt-0.5)/0.5
+
+    wt = [0:2*pi/360:2*pi;]
+
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
     
-    for istep = 1:nsteps
-        #Udpate current time
-        t = t + dt
+    # steady-state Cl
+    Cl_ss = 2*pi*(theo.alpha_mean - theo.alpha_zl)
+    
+    # plunge contribution
+    Cl_h = 2*pi*theo.k^2*theo.h_amp*exp(im*wt) - im*4*pi*theo.k*C*theo.h_amp*exp(im*wt)
+    
+    # pitch contribution
+    Cl_alpha = (im*pi*theo.k + pi*theo.k^2*a)*theo.alpha_amp*exp(im*(wt+theo.phi)) + (1 + im*theo.k*(0.5-a))*2*pi*C*theo.alpha_amp*exp(im*(wt+theo.phi))
+    
+    # total contributions
+    Cl_tot = Cl_ss + Cl_h + Cl_alpha
 
-        wt = w*t
-        C = besselh(1,2,k)./(besselh(1,2,k) + im*besselh(0,2,k));
-
-        #Update kinematic parameters (not required for calculation, only for output)
-        update_kinem(surf, t)
-
-        # steady-state Cl
-        Cl_ss = 2*pi*(alfa_m-alfa_zl);
-
-        # plunge contribution
-        Cl_pl_nc = 2*pi*k^2*h_m*exp(im*wt);
-        Cl_pl_c = -im*4*pi*k*C*h_m*exp(im*wt);
-        
-        # pitch contribution
-        Cl_pi_nc = (im*pi*k + pi*k^2*a)*theta_m*exp(im*(wt+psi));
-        Cl_pi_c = (1 + im*k*(0.5-a))*2*pi*C*theta_m*exp(im*(wt+psi));
-
-        #non-circ unsteady contributions
-        Cl_nc = Cl_pl_nc+Cl_pi_nc;
-        
-        # circulatory unsteady contributions
-        Cl_c = Cl_pl_c+Cl_pi_c;
-        
-        # total contributions
-        Cl_tot = Cl_ss + Cl_nc + Cl_c;
-
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, Cl_tot)," "), "\n")
-    end
+    return wt/(2*pi), Cl_h, Cl_alpha, Cl_tot
+    
 end
 
-function theodorsen(surf::TwoDSurfwFlap, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
-    outfile = open("theo.dat", "w")
+function theodorsen(theo::TheoDefwFlap)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # beta_amp = flap amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # psi = phase angle by which flap rotation leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # xf = xf/c, non-dimensional flap location
     
-    dt = dtstar*surf.c/surf.uref
-    t = 0.
-    
-    alpha_amp = surf.kindef.alpha.amp
-    if (typeof(surf.kindef.alpha) != ConstDef)
-        phi = surf.kindef.alpha.phi
-        alpha_mean = surf.kindef.alpha.mean
-    else
-        phi = 0
-        alpha_mean = 0
-    end
-    beta_amp = surf.kindef.n.amp
-    psi = surf.kindef.n.phi
-    h_amp = surf.kindef.h.amp
-    
-    if (surf.coord_file == "sd7003_fine.dat")
-        alfa_zl = -2*pi/180
-    else
-        alfa_zl = 0
-    end
-    k = surf.kindef.n.w/2
-    w = surf.kindef.n.w
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
+    # beta =  beta_amp*exp(i*(wt + psi))
     
     #define a and c
-    a = (surf.pvt-0.5*surf.c)/(0.5*surf.c);
-    c = (surf.x_b[1]-0.5*surf.c)/(0.5*surf.c);
+    a = (theo.pvt-0.5)/0.5
+    c = (theo.xf-0.5)/0.5
 
     #Define the required coefficients
     T1 = -(2+c*c)*sqrt(1-c*c)/3 + c*acos(c)
@@ -219,29 +193,23 @@ function theodorsen(surf::TwoDSurfwFlap, nsteps::Int64 = 500, dtstar::Float64 = 
     T19 = T4*T11
     T20 = T10 - 2*sqrt(1-c*c)
     
-    for istep = 1:nsteps
-        #Udpate current time
-        t = t + dt
+    wt = [0:2*pi/360:2*pi;]
 
-        wt = w*t
-        C = besselh(1,2,k)./(besselh(1,2,k) + im*besselh(0,2,k));
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
+    
+    # steady-state Cl
+    Cl_ss = 2*pi*(theo.alpha_mean - theo.alpha_zl)
 
-        #Update kinematic parameters (not required for calculation, only for output)
-        update_kinem(surf, t)
-
-        # steady-state Cl
-        Cl_ss = 2*pi*(alpha_mean-alfa_zl);
-
-        #Formulae were derived in a julia notebook
-        Cl_h = 2*pi*h_amp*k*(-2*im*C+k)*exp(im*wt)
-        Cl_alpha = -pi*alpha_amp*(2*C*(im*k*(a-0.5)-1) - k*(a*k+im))*exp(im*(phi+wt))
-        Cl_beta = beta_amp*(C*(im*k*T11+2*T10) + k*(k*T1-im*T4))*exp(im*(wt+psi))
-        
-        # total contributions
-        Cl_tot = Cl_ss + Cl_h + Cl_alpha + Cl_beta
-
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, Cl_tot)," "), "\n")
-    end
+    #Derived in a Julia notebook (Available in the UNSflow package) 
+    # plunge contribution
+    Cl_h = 2*pi*theo.h_amp*theo.k*(-2*im*C+theo.k)*exp(im*wt)
+    Cl_alpha = -pi*theo.alpha_amp*(2*C*(im*theo.k*(a-0.5)-1) - theo.k*(a*theo.k+im))*exp(im*(theo.phi+wt))
+    Cl_beta = theo.beta_amp*(C*(im*theo.k*T11+2*T10) + theo.k*(theo.k*T1-im*T4))*exp(im*(wt+theo.psi))
+    
+    # total contributions
+    Cl_tot = Cl_ss + Cl_h + Cl_alpha + Cl_beta
+    return wt/(2*pi), Cl_ss, Cl_h, Cl_alpha, Cl_beta, Cl_tot
 end
 
 

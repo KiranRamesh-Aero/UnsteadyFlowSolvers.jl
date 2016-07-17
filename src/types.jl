@@ -1,5 +1,31 @@
 # ---------------------------------------------------------------------------------------------
-# Data structures used to re[resent the airfoil kinematics
+# Theodorsen solver input
+type TheoDef
+    alpha_amp :: Float64
+    h_amp :: Float64
+    alpha_mean :: Float64
+    alpha_zl :: Float64
+    k :: Float64
+    phi :: Float64
+    pvt :: Float64
+end
+
+type TheoDefwFlap
+    alpha_amp :: Float64
+    h_amp :: Float64
+    alpha_mean :: Float64
+    alpha_zl :: Float64
+    k :: Float64
+    phi :: Float64
+    pvt :: Float64
+    beta_amp :: Float64
+    xf :: Float64
+    psi :: Float64
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# Data structures used to represent the airfoil kinematics
 type KinemPar
     alpha :: Float64
     h :: Float64

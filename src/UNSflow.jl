@@ -7,7 +7,7 @@ using ForwardDiff
 export derivative
 
 using PyPlot
-export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes
+export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers
 
 using Debug
 

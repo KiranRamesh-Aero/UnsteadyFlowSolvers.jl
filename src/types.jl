@@ -58,6 +58,13 @@ immutable EldUpDef <: MotionDef
     a :: Float64
 end
 
+immutable EldUptstartDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+    tstart :: Float64
+end
+
 immutable EldRampReturnDef <:MotionDef
     amp :: Float64
     K :: Float64
@@ -72,6 +79,13 @@ end
 function call(eld::EldUpDef, t)
     sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
     t1 = 1.
+    t2 = t1 + ((eld.amp)/(2*eld.K))
+    ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
+end
+
+function call(eld::EldUptstartDef, t)
+    sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
+    t1 = eld.tstart
     t2 = t1 + ((eld.amp)/(2*eld.K))
     ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
 end
@@ -232,6 +246,9 @@ immutable TwoDSurfwFlap
         if (typeof(kindef.alpha) == EldUpDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldUptstartDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
         elseif (typeof(kindef.alpha) == EldRampReturnDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
@@ -252,11 +269,16 @@ immutable TwoDSurfwFlap
         if (typeof(kindef.h) == EldUpDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-          elseif (typeof(kindef.h) == EldUpIntDef)
+        elseif (typeof(kindef.h) == EldUptstartDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpInttstartDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == EldRampReturnDef)
-
             kinem.h= kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == ConstDef)
@@ -631,6 +653,14 @@ immutable EldUpIntDef <: MotionDef
     a :: Float64
 end
 
+immutable EldUpInttstartDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+    tstart :: Float64
+end
+
+
 function call(eld::EldUpIntDef, t)
 
     dt = 0.015
@@ -659,6 +689,36 @@ function call(eld::EldUpIntDef, t)
     end  
     amp
 end
+
+function call(eld::EldUpInttstartDef, t)
+
+    dt = 0.015
+    nsteps = t/dt + 1
+    nsteps = round(Int,nsteps)
+    dt = t/(nsteps-1)
+    sm = pi*pi*eld.K/(2*eld.amp*(1 - eld.a))
+    t1 = eld.tstart
+    t2 = t1 + ((eld.amp)/(2*eld.K))
+
+
+    prev_h = 0
+    amp = 0
+    for i = 1:nsteps
+      tmpt = (i-1)*dt
+      if (eld.amp == 0.) 
+      	 hdot = 0.
+      else
+         hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
+      end
+      amp = prev_h + hdot*dt
+      prev_h = amp
+    end
+    if (nsteps == 1)
+      amp = 0.
+    end  
+    amp
+end
+
 # END EldUpIntDef
 # ---------------------------------------------------------------------------------------------
 

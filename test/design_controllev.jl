@@ -1,13 +1,13 @@
-#workspace()
-#include("../src/UNSflow.jl")
-#using UNSflow
+workspace()
+include("../src/UNSflow.jl")
+using UNSflow
 
 #Base motion is an Eldredge pitch-up of SD7003 at Re=20k with amp=30 deg, K=0.2, smoothing =0.8
 #Plunge is superimposed so that LEV formation is prevented
 #Plunge is an integrated Eldredge pitch-up (Derivative of plunge is an Eldrege pitch-up)
 
 function lesp_design_max(h_amp::Float64, alphadef::MotionDef)
-  hdef = EldUpIntDef(h_amp,alphadef.K*h_amp/alphadef.amp,alphadef.a)
+  hdef = EldUpInttstartDef(h_amp,alphadef.K*h_amp/alphadef.amp,alphadef.a, 5.)
   udef = ConstDef(1.)
   full_kinem = KinemDef(alphadef, hdef, udef)
   lespcrit = [20;]
@@ -17,7 +17,7 @@ function lesp_design_max(h_amp::Float64, alphadef::MotionDef)
 
   curfield = TwoDFlowField()
 
-  nsteps =round(Int,1.5/0.015)+1
+  nsteps =round(Int,6.5/0.015)+1
 
   ldvm(surf, curfield, nsteps)
 
@@ -50,13 +50,13 @@ end
 
 
 
-alphadef = EldUpDef(30*pi/180,0.2,0.8)
+alphadef = EldUptstartDef(30*pi/180,0.2,0.8, 5.)
 h_amp = design_solve(alphadef)
 
-hdef = EldUpIntDef(h_amp,alphadef.K*h_amp/alphadef.amp,alphadef.a)
+hdef = EldUpInttstartDef(h_amp,alphadef.K*h_amp/alphadef.amp,alphadef.a, 5.)
 
 dt = 0.015
-nsteps =round(Int,3.5/dt)+1
+nsteps =round(Int,7.5/dt)+1
 
 mat = zeros(nsteps,4)
 for i = 1:nsteps
@@ -67,3 +67,14 @@ for i = 1:nsteps
     mat[i,4] = 1.
 end
 
+# mat[:,1] = mat[:,1] + 4
+# mat = mat[2:end,:]
+# mat[:,1] = mat[:,1]-0.01
+# din = zeros(267,4)
+# din[:,1] = 0:0.015:4
+# din[:,2] = 0.
+# din[:,3] = 0.
+# din[:,4] = 1.
+
+# dful = [din;mat]
+writedlm("motion_design1.dat",mat)

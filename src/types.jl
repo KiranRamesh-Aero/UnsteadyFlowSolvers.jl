@@ -21,6 +21,9 @@ type TheoDefwFlap
     beta_amp :: Float64
     xf :: Float64
     psi :: Float64
+    w :: Float64
+    u :: Float64
+    b :: Float64
 end
 # ---------------------------------------------------------------------------------------------
 

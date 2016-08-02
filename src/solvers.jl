@@ -211,7 +211,7 @@ function theodorsen(theo::TheoDefwFlap)
     # Pitching moment
     Cmal_h = 2*theo.h_amp*theo.w*(-2*im*C*theo.b*(a + 0.5) + pi*a*theo.b*theo.k)*exp(im*wt)/(theo.b*theo.u)
     Cmal_al = -2*pi*theo.alpha_amp*(2*C*(a + 0.5)*(im*theo.k*(a - 0.5) - 1) - theo.k*(theo.k*(a*a + 0.125) + im*(a - 0.5)))*exp(im*(theo.phi + wt))
-    Cmal_be = 2*theo.beta_amp*(C*(a + 0.5)*(im*theo.k*T11 + 2*T10) + 2*theo.k*theo.k*T18 - im*theo.k*T16 - T15)*exp(im*(theo.psi + wt))
+    Cmal_be = 2*theo.beta_amp*(C*(a + 0.5)*(im*theo.k*T11 + 2*T10) + 2*theo.k*theo.k*T13 - im*theo.k*T16 - T15)*exp(im*(theo.psi + wt))
     # -------------------------------------
     # Hinge moment
     Cmbe_h = 2*theo.h_amp*theo.w*(im*C*T12 + theo.k*T1)*exp(im*wt)/theo.u

@@ -74,7 +74,7 @@ function calc_forces(surf::TwoDSurfwFlap)
         # Same term as before with additional squared spatial derivative term and alphadot*eta term
         nonl_m1 = nonl_m1 + surf.x[ib]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]surf.bv[ib].s
         # Same term as before with additional squared spatial derivative term
-        nonl_m = nonl_m + sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
+        nonl_m = nonl_m + surf.x[in]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
     end
     nonl = nonl*2./(surf.uref*surf.uref*surf.c)
     nonl_cnc = nonl_cnc*2./(surf.uref*surf.uref*surf.c)

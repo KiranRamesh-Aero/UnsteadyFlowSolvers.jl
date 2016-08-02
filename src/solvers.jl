@@ -185,6 +185,7 @@ function theodorsen(theo::TheoDefwFlap)
     T8 = -(1+2*c*c)*sqrt(1-c*c)/3 + c*acos(c)
     T9 = ((1-c*c)^(3/2)/3 + a*T4)/2
     T10 = sqrt(1-c*c) + acos(c)
+    T13 = -0.5*(T7+(c-a)*T1)
     T14 = 1/16 + a*c/2
     T15 = T4 + T10
     T16 = T1 - T8 -(c-a)*T4 + T11/2
@@ -208,19 +209,19 @@ function theodorsen(theo::TheoDefwFlap)
     Cl_beta = theo.beta_amp*(C*(im*theo.k*T11+2*T10) + theo.k*(theo.k*T1-im*T4))*exp(im*(wt+theo.psi))
     # -------------------------------------
     # Pitching moment
-    Cmal_h = 2*theo.h_amp*theo.w*(-2*im*C*theo.b(a + 0.5) + pi*a*theo.b*theo.k)*exp(im*wt)/(theo.b*theo.u)
-    Cmal_al = -2*pi*theo.alpha_amp*(2*C*(a + 0.5)*(im*k*(a - 0.5) - 1) - theo.k*(theo.k*(a*a + 0.125) + im*(a - 0.5)))*exp(im*(phi + wt))
-    Cmal_be = 2*theo.beta_amp*(C*(a + 0.5)*(im*theo.k*T11 + 2*T10) + 2*theo.k*theo.k*T18 - im*theo.k*T16 - T15)*exp(im*(psi + wt))
+    Cmal_h = 2*theo.h_amp*theo.w*(-2*im*C*theo.b*(a + 0.5) + pi*a*theo.b*theo.k)*exp(im*wt)/(theo.b*theo.u)
+    Cmal_al = -2*pi*theo.alpha_amp*(2*C*(a + 0.5)*(im*theo.k*(a - 0.5) - 1) - theo.k*(theo.k*(a*a + 0.125) + im*(a - 0.5)))*exp(im*(theo.phi + wt))
+    Cmal_be = 2*theo.beta_amp*(C*(a + 0.5)*(im*theo.k*T11 + 2*T10) + 2*theo.k*theo.k*T18 - im*theo.k*T16 - T15)*exp(im*(theo.psi + wt))
     # -------------------------------------
     # Hinge moment
-    Cmbe_h = 2*theo.h_amp*theo.w*(im*C*T12 + k*T1)*exp(im*wt)/theo.u
-    Cmbe_al = 2*theo.alpha_amp*(C*T12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*T13 - im*T17))*exp(im*(phi + wt))
-    Cmbe_be = -theo.beta_amp*(C*T12*(im*theo.k*T11 + 2*T10) + 2*theo.k**2*T3 - im*theo.k*T19 + 2*T18)*exp(im*(psi + wt))/pi
+    Cmbe_h = 2*theo.h_amp*theo.w*(im*C*T12 + theo.k*T1)*exp(im*wt)/theo.u
+    Cmbe_al = 2*theo.alpha_amp*(C*T12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*T13 - im*T17))*exp(im*(theo.phi + wt))
+    Cmbe_be = -theo.beta_amp*(C*T12*(im*theo.k*T11 + 2*T10) + 2*theo.k*theo.k*T3 - im*theo.k*T19 + 2*T18)*exp(im*(theo.psi + wt))/pi
 
     # total contributions
     Cl_tot = Cl_ss + Cl_h + Cl_alpha + Cl_beta
     Cmal_tot = Cmal_h + Cmal_al + Cmal_be
-    Cmbe_tot = Cmbe_b + Cmbe_al + Cmbe_be
+    Cmbe_tot = Cmbe_h + Cmbe_al + Cmbe_be
 
 #   return wt/(2*pi), Cl_ss, Cl_h, Cl_alpha, Cl_beta, Cl_tot
 #   return wt/(2*pi), Cmal_h, Cmal_al, Cmal_be, Cmal_tot

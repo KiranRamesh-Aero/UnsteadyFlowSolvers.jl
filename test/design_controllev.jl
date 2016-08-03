@@ -17,7 +17,7 @@ function lesp_design_max(h_amp::Float64, alphadef::MotionDef)
 
   curfield = TwoDFlowField()
 
-  nsteps =round(Int,6.5/0.015)+1
+  nsteps =round(Int,5.5/0.015)+1
 
   ldvm(surf, curfield, nsteps)
 
@@ -77,4 +77,4 @@ end
 # din[:,4] = 1.
 
 # dful = [din;mat]
-writedlm("motion_design1.dat",mat)
+writedlm("motion_design2.dat",mat)

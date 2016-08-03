@@ -209,14 +209,14 @@ function theodorsen(theo::TheoDefwFlap)
     Cl_beta = theo.beta_amp*(C*(im*theo.k*T11+2*T10) + theo.k*(theo.k*T1-im*T4))*exp(im*(wt+theo.psi))
     # -------------------------------------
     # Pitching moment
-    Cmal_h = -pi*theo.h_amp*theo.k*(2*im*C*(a + 0.5) - a*k)*exp(im*wt)
+    Cmal_h = -pi*theo.h_amp*theo.k*(2*im*C*(a + 0.5) - a*theo.k)*exp(im*wt)
     Cmal_al = -0.5*pi*theo.alpha_amp*(2*C*(a + 0.5)*(im*theo.k*(a + 1) - 1) - theo.k*(theo.k*(a^2 + 0.125) + im*(a - 0.5)))*exp(im*(theo.phi + wt)) 
-    Cmal_be = 0.5*theo.beta_amp*(C*(a+0.5)*(im*theo.k*t11* + 2*t10) + 2*t13*theo.k^2 - im*theo.k*t16 - t15)*exp(wt + theo.psi)
+    Cmal_be = 0.5*theo.beta_amp*(C*(a+0.5)*(im*theo.k*T11* + 2*T10) + 2*T13*theo.k^2 - im*theo.k*T16 - T15)*exp(im*(wt + theo.psi))
     # -------------------------------------
     # Hinge moment
-    Cmbe_h = theo.h0*theo.k*(im*C*t12 + theo.k*t1)*exp(im*wt)
-    Cmbe_al = 0.5*theo.alpha_amp*(C*t12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*t13 - im*t17))*exp(theo.phi + wt)
-    Cmbe_be = -0.25*pi*theo.beta_amp*(C*t12*(im*theo.k*t11 + 2*t10) + 2*t3*theo.k^2 - im*theo.k*t19 +2*t18)*exp(wt + theo.psi)
+    Cmbe_h = theo.h_amp*theo.k*(im*C*T12 + theo.k*T1)*exp(im*wt)
+    Cmbe_al = 0.5*theo.alpha_amp*(C*T12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*T13 - im*T17))*exp(theo.phi + wt)
+    Cmbe_be = -0.25*pi*theo.beta_amp*(C*T12*(im*theo.k*T11 + 2*T10) + 2*T3*theo.k^2 - im*theo.k*T19 +2*T18)*exp(im*(wt + theo.psi))
 
     # total contributions
     Cl_tot = Cl_ss + Cl_h + Cl_alpha + Cl_beta

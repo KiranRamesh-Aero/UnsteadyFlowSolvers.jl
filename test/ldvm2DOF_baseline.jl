@@ -1,6 +1,6 @@
-#workspace()
-#include("../src/UNSflow.jl")
-#using UNSflow
+workspace()
+include("../src/UNSflow.jl")
+using UNSflow
 #
 #Uncomment the lines above when running for the first time
 

@@ -510,8 +510,9 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
         t = t + dt
 
         #Update kinematic parameters (based on 2DOF response)
-        update_kinem(surf, dt) 
-
+        if (istep > 1) # Allow initial condition
+            update_kinem(surf, dt) 
+        end
         #Update bound vortex positions
         update_boundpos(surf, dt)
 

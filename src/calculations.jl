@@ -59,9 +59,9 @@ end
 
 # ---------------------------------------------------------------------------------------------
 # Function for updating the downwash W: eqn (2.5) in Ramesh et al.
-function update_downwash(surf::TwoDSurf)
+function update_downwash(surf::TwoDSurf, vels::Vector{Float64})
     for ib = 1:surf.ndiv
-        surf.downwash[ib] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.uind[ib]*sin(surf.kinem.alpha) + surf.kinem.hdot*cos(surf.kinem.alpha) - surf.wind[ib]*cos(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[ib] - surf.pvt*surf.c) + surf.cam_slope[ib]*(surf.uind[ib]*cos(surf.kinem.alpha) + surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
+        surf.downwash[ib] = -(surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - surf.uind[ib]*sin(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) - surf.wind[ib]*cos(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[ib] - surf.pvt*surf.c) + surf.cam_slope[ib]*(surf.uind[ib]*cos(surf.kinem.alpha) + (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
     end
     return surf
 end
@@ -139,6 +139,20 @@ function update_a2toan(surf::TwoDSurfwFlap)
     return surf
 end
 # ---------------------------------------------------------------------------------------------
+
+#Function to update the external flowfield
+function update_externalvel(curfield::TwoDFlowField, t)
+    if (typeof(curfield.velX) == CosDef)
+        curfield.u[1] = curfield.velX(t)
+        curfield.w[1] = curfield.velZ(t)
+    elseif (typeof(curfield.velX) == SinDef)
+        curfield.u[1] = curfield.velX(t)
+        curfield.w[1] = curfield.velZ(t)
+    elseif (typeof(curfield.velX) == ConstDef)
+        curfield.u[1] = curfield.velX(t)
+        curfield.w[1] = curfield.velZ(t)
+    end
+end
 
 # ---------------------------------------------------------------------------------------------
 # Function updating the dimensional kinematic parameters

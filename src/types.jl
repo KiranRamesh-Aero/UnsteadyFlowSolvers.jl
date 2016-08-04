@@ -215,16 +215,18 @@ end
 # ---------------------------------------------------------------------------------------------
 #Definition of flowfield in 2D
 immutable TwoDFlowField
-    velX :: Float64
-    velZ :: Float64
+    velX :: MotionDef
+    velZ :: MotionDef
+    u :: Vector{Float64}
+    w :: Vector{Float64}
     tev :: Vector{TwoDVort}
     lev :: Vector{TwoDVort}
-    function TwoDFlowField()
-        velX = 0
-        velZ = 0
+    function TwoDFlowField(velX = ConstDef(0.), velZ = ConstDef(0.))
+        u = [0;]
+        w = [0;]
         tev = TwoDVort[]
         lev = TwoDVort[]
-        new(velX, velZ, tev, lev)
+        new(velX, velZ, u, w, tev, lev)
     end
 end
 # ---------------------------------------------------------------------------------------------
@@ -715,7 +717,7 @@ function call(kelv::KelvinCondition, tev_iter::Array{Float64})
     update_indbound(kelv.surf, kelv.field)
 
     #Calculate downwash
-    update_downwash(kelv.surf)
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
 
     #Calculate first two fourier coefficients
     update_a0anda1(kelv.surf)
@@ -831,7 +833,7 @@ function call(kelv::KelvinKutta, v_iter::Array{Float64})
     update_indbound(kelv.surf, kelv.field)
 
     #Calculate downwash
-    update_downwash(kelv.surf)
+    update_downwash(kelv.surf ,[kelv.field.u[1],kelv.field.w[1]])
 
     #Calculate first two fourier coefficients
     update_a0anda1(kelv.surf)

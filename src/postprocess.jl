@@ -87,7 +87,7 @@ function calc_forces(surf::TwoDSurf_2DOF)
 end
 
 
-function calc_forces(surf::TwoDSurfwFlap)
+function calc_forces(surf::TwoDSurfwFlap, dt)
 
     # First term in eqn (2.30) Ramesh et al. in coefficient form
     # No longer required
@@ -108,43 +108,62 @@ function calc_forces(surf::TwoDSurfwFlap)
     nonl_m2 = 0
     for ib = 1:surf.ndiv-1
         # 1st three terms in delta p, Ucos(),hdotsin(), alphadot*eta integrated
-        nonl_cnc = nonl_cnc + sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.bv[ib].s  
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1]) 
+        nonl_cnc = nonl_cnc + 0.5*(q1 + q2)*surf.bv[ib].s  
+
         # Same term as before with additional squared spatial derivative term
-        nonl = nonl + sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))
+        nonl = nonl + 0.5*(q1 + q2)*surf.bv[ib].s
+
         # Same term as before with additional squared spatial derivative term and alphadot*eta term
-        nonl_m1 = nonl_m1 + surf.x[ib]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]surf.bv[ib].s
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
+       q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1]) 
+        nonl_m1 = nonl_m1 + 0.5*(q1 + q2)*surf.x[ib]*surf.bv[ib].s
+
         # Same term as before with additional squared spatial derivative term
-        nonl_m = nonl_m + surf.x[in]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))
+        nonl_m = nonl_m + 0.5*(q1 + q2)*surf.x[ib]*surf.bv[ib].s
     end
     
     # -------------------------------------------------------------
-    xb = floor(surf.x_b[1]*ndiv)+1
+    xbdiv = indmin(abs(surf.x[:]-surf.x_b))
     m_be1a = 0
     m_be1b = 0
     m_be2a = 0
     m_be2b = 0
     me_be3 = 0
     # These are the expressions multipled by the square root term in eqn in Hinge_Moment notebook. 
-    for ib = xb:surf.ndiv-1
-        m_be1a = m_be1a + sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.bv[ib].s 
-        m_be1b = m_be1b + sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
-        m_be2a = m_be2a + surf.x[ib]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]surf.bv[ib].s
-        m_be2b = m_be2b + surf.x[ib]*sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
-    end 
-    # This block of code relates to the time derivate, double integration term. 
-    hinge = (surf.theta[surf.ndiv] - surf.theta[xb]) # This relates to the segment of the aerofoil being looked over i.e. x_b to x but in terms of theta
-    gam = zeros(surf.ndiv)
-        ib = 1:surf.ndiv
-            gam[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))*(surf.x_b[1]-surf.x[ib])*sin(surf.theta[ib])
-            for ia = 1:surf.naterm
-                gam[ib] = gam[ib] + surf.aterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])*sin(surf.theta[inb])
-            end
-            gam[ib] = gam[ib]*surf.uref*surf.c*surf.c/2.
-        end
- 
-    m_be3 = ForwardDiff.derivative(trapz(trapz(gam, surf.theta),hinge),t)
+    for ib = xbdiv:surf.ndiv-1
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])
+        m_be1a = m_be1a + 0.5*(q1 + q2)*surf.bv[ib].s 
 
-    m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + m_be3 
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))
+        m_be1b = m_be1b + 0.5*(q1 + q2)*surf.bv[ib].s
+
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])*surf.x[ib+1]
+        m_be2a = m_be2a + 0.5*(q1 + q2)*surf.bv[ib].s
+
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))*surf.x[ib+1]
+        m_be2b = m_be2b + 0.5*(q1 + q2)*surf.bv[ib].s
+    end 
+
+    # This block of code relates to the time derivate, double integration term.
+    intg = zeros(surf.ndiv-xbdiv+1) 
+    for ib = xbdiv:surf.ndiv
+        intg[ib-xbdiv+1] = (sum(bv(1:ib-1))-sum(bv_prev(1:ib-1)))/dt
+    end
+        
+    m_be3a = trapz(intg[:],surf.x[xbdiv:surf.ndiv])
+    m_be3b = trapz(intg[:]*surf.x[xbdiv:surf.ndiv]],surf.x[xbdiv:surf.ndiv])
+
+    m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + surf.x_b[1]*m_be3a - m_be3b 
 
     cm_be = m_be*2./(surf.uref*surf.uref*surf.c*surf.c)
     # ---------------------------------------------------------------------------------

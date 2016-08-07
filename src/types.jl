@@ -263,9 +263,10 @@ immutable TwoDSurfwFlap
     a0prev :: Vector{Float64}
     aprev :: Vector{Float64}
     bv :: Vector{TwoDVort}
+    bv_prev :: Vector{TwoDVort}
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
-
+    
     function TwoDSurfwFlap(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, x_b=1., lespcrit=zeros(1))
         x_b[1] = x_b[1]*c #Dimensional value  
         theta = zeros(ndiv)
@@ -277,7 +278,7 @@ immutable TwoDSurfwFlap
         bnd_x = zeros(ndiv)
         bnd_z = zeros(ndiv)
         kinem = KinemParwFlap(0, 0, 0, 0, 0, 0, 0, 0)
-
+        
         dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
             theta[ib] = real(ib-1.)*dtheta
@@ -286,7 +287,7 @@ immutable TwoDSurfwFlap
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
-
+        
         # Calculates the initial condition for airfoil pitch
         # Various options for prescribing the airfoil pitch kinematics
         if (typeof(kindef.alpha) == EldUpDef)
@@ -309,7 +310,7 @@ immutable TwoDSurfwFlap
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
         end
         # ---------------------------------------------------------------------------------------------
-
+        
         # Calculates the initial condition for airfoil plunge
         # Various options for prescribing the airfoil plunge kinematics
         if (typeof(kindef.h) == EldUpDef)
@@ -338,7 +339,7 @@ immutable TwoDSurfwFlap
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         end
         # ---------------------------------------------------------------------------------------------
-
+        
         # Calculates the initial condition for forward velocity of airfoil
         # Various options for prescribing the airfoil forward motion
         if (typeof(kindef.u) == EldUpDef)
@@ -353,7 +354,7 @@ immutable TwoDSurfwFlap
             kinem.udot = 0.
         end
         # ---------------------------------------------------------------------------------------------
-
+        
         # ---------------------------------------------------------------------------------------------
         # Calculates the initial condition for flap deflection beta (n)
         # Various options for prescribing the flap kinematics
@@ -373,52 +374,54 @@ immutable TwoDSurfwFlap
             kinem.n = kindef.n(0.)
             kinem.ndot = ForwardDiff.derivative(kindef.n,0.)*uref/c
         end
-        # ---------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------
 
-        
-        # Defines the aerofoil as a single flat plate
-        # Calls the calculation of the camber and it's derivatives (spatial and temporal)
-        #Deflection of flap is modelled as camber variation
-        if (coord_file != "FlatPlate") 
-            (cam_af, cam_slope) = camber_calc(x, coord_file)
-        end
-        
-        for i = 1:ndiv
-            if x[i] < x_b[1]
-                cam[i] = cam_af[i];
-            else 
-                cam[i] = cam_af[i] + (x_b[1] - x[i])*tan(kinem.n);
-                cam_tder[i] = (x_b[1] - x[i])*kinem.ndot*sec(kinem.n)*sec(kinem.n);
-            end
-        end  
-        # ---------------------------------------------------------------------------------------------
-        
-        # Populates the arrays for bnd_x, bnd_z based on initial conditions        
-        for i = 1:ndiv
-            bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
-            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
-        end
-        # ---------------------------------------------------------------------------------------------
 
-        # Defines the arrays for various parameters such that they can be later populated
-        uind = zeros(ndiv)
-        wind = zeros(ndiv)
-        downwash = zeros(ndiv)
-        a0 = zeros(1)
-        a0dot = zeros(1)
-        aterm = zeros(naterm)
-        adot = zeros(3)
-        a0prev = zeros(1)
-        aprev = zeros(3)
-        bv = TwoDVort[]
-        for i = 1:ndiv-1
-            push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
-        end
-        # ---------------------------------------------------------------------------------------------        
-        levflag = [0]
-        
-        new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam_af, cam, cam_slope, cam_tder, theta, x, x_b, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+# Defines the aerofoil as a single flat plate
+# Calls the calculation of the camber and it's derivatives (spatial and temporal)
+#Deflection of flap is modelled as camber variation
+if (coord_file != "FlatPlate") 
+    (cam_af, cam_slope) = camber_calc(x, coord_file)
+end
+
+for i = 1:ndiv
+    if x[i] < x_b[1]
+        cam[i] = cam_af[i];
+    else 
+        cam[i] = cam_af[i] + (x_b[1] - x[i])*tan(kinem.n);
+        cam_tder[i] = (x_b[1] - x[i])*kinem.ndot*sec(kinem.n)*sec(kinem.n);
     end
+end  
+# ---------------------------------------------------------------------------------------------
+
+# Populates the arrays for bnd_x, bnd_z based on initial conditions        
+for i = 1:ndiv
+    bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
+    bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
+end
+# ---------------------------------------------------------------------------------------------
+
+# Defines the arrays for various parameters such that they can be later populated
+uind = zeros(ndiv)
+wind = zeros(ndiv)
+downwash = zeros(ndiv)
+a0 = zeros(1)
+a0dot = zeros(1)
+aterm = zeros(naterm)
+adot = zeros(3)
+a0prev = zeros(1)
+aprev = zeros(3)
+bv = TwoDVort[]
+bv_prev = TwoDVort[]
+for i = 1:ndiv-1
+    push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
+    push!(bv_prev,TwoDVort(0,0,0,0.02*c,0,0))
+end
+# ---------------------------------------------------------------------------------------------        
+levflag = [0]
+
+new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam_af, cam, cam_slope, cam_tder, theta, x, x_b, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, bv_prev, lespcrit,levflag)
+end
 end
 # ---------------------------------------------------------------------------------------------
 # END TwoDSurfwFlap

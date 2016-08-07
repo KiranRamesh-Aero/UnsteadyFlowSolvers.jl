@@ -329,6 +329,8 @@ function update_bv(surf::TwoDSurf)
         gamma[ib] = gamma[ib]*surf.uref*surf.c
     end
 
+    surf.bv_prev = surf.bv
+    
     for ib = 2:surf.ndiv
         surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
         surf.bv[ib-1].x = (surf.bnd_x[ib] + surf.bnd_x[ib-1])/2.

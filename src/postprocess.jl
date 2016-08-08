@@ -118,14 +118,14 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
         nonl = nonl + 0.5*(q1 + q2)*surf.bv[ib].s
 
         # Same term as before with additional squared spatial derivative term and alphadot*eta term
-        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
-       q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1]) 
-        nonl_m1 = nonl_m1 + 0.5*(q1 + q2)*surf.x[ib]*surf.bv[ib].s
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]
+       q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])*surf.x[ib+1] 
+        nonl_m1 = nonl_m1 + 0.5*(q1 + q2)*surf.bv[ib].s
 
         # Same term as before with additional squared spatial derivative term
-        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
-        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))
-        nonl_m = nonl_m + 0.5*(q1 + q2)*surf.x[ib]*surf.bv[ib].s
+        q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))*surf.x[ib+1]
+        nonl_m = nonl_m + 0.5*(q1 + q2)*surf.bv[ib].s
     end
     
     # -------------------------------------------------------------
@@ -157,9 +157,9 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
     # This block of code relates to the time derivate, double integration term.
     intg = zeros(surf.ndiv-xbdiv+1) 
     
-    sumbv = 0
-    sumbv_prev = 0    
     for ib = xbdiv:surf.ndiv
+        sumbv = 0
+        sumbv_prev = 0    
     	for i_bv = 1:ib-1
     	    sumbv = sumbv + surf.bv[i_bv].s
 	    sumbv_prev = sumbv_prev + surf.bv_prev[i_bv].s

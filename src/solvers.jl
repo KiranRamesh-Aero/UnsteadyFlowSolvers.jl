@@ -215,7 +215,7 @@ function theodorsen(theo::TheoDefwFlap)
     # -------------------------------------
     # Hinge moment
     Cmbe_h = theo.h_amp*theo.k*(im*C*T12 + theo.k*T1)*exp(im*wt)
-    Cmbe_al = 0.5*theo.alpha_amp*(C*T12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*T13 - im*T17))*exp(theo.phi + wt)
+    Cmbe_al = 0.5*theo.alpha_amp*(C*T12*(im*theo.k*(a - 0.5) - 1) + theo.k*(2*theo.k*T13 - im*T17))*exp(im*(theo.phi + wt))
     Cmbe_be = -0.25*pi*theo.beta_amp*(C*T12*(im*theo.k*T11 + 2*T10) + 2*T3*theo.k^2 - im*theo.k*T19 +2*T18)*exp(im*(wt + theo.psi))
 
     # total contributions

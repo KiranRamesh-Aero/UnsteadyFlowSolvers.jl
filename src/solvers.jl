@@ -322,8 +322,8 @@ end
 
 
 function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
-    outfile = open("results.dat", "w")
-
+    mat = zeros(nsteps,9)
+    
     dt = dtstar*surf.c/surf.uref
     t = 0.
 
@@ -401,11 +401,10 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm, cm_be = calc_forces(surf, dt)
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, cm_be)," "), "\n")
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm cm_be]
     end
 
-    close(outfile)
-    surf, curfield
+    mat, surf, curfield
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)
@@ -413,7 +412,7 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
 end
 
 function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
-    outfile = open("results.dat", "w")
+    mat = zeros(nsteps,8)
 
     dt = dtstar*surf.c/surf.uref
     t = 0.
@@ -497,12 +496,10 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         #Using the force data, update - hddot and alphaddot 
         calc_struct2DOF(surf, cl, cm)
-        
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm)," "), "\n")
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]        
     end
 
-    close(outfile)
-    surf, curfield
+    mat, surf, curfield
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)

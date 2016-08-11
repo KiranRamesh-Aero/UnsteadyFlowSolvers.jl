@@ -401,10 +401,12 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm, cm_be = calc_forces(surf, dt)
+        
         mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm cm_be]
+
     end
 
-    mat, surf, curfield
+    return mat, surf, curfield
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)

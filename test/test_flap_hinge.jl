@@ -49,7 +49,6 @@ theo_in = TheoDefwFlap(alpha_amp, h_amp, alpha_mean, alpha_zl, k, 0., pvt, beta_
 #Plots to compare
 
 #UNSflow
-mat = readdlm("results.dat")
 range = round(Int,(ncyc-1)*nsteps/ncyc)+1:nsteps
 tbyT = (mat[range,1]-mat[range[1]])/T
 

@@ -1,22 +1,26 @@
 # ---------------------------------------------------------------------------------------------
 # Function for viewing the 2D vorticity field around the airfoil
 function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
-    scatter(map(q->q.x, field.tev),map(q->q.z,field.tev))
-    scatter(map(q->q.x, field.lev),map(q->q.z,field.lev))
-    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv))
+    scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.s,field.tev),cmap=ColorMap("jet"),edgecolors="none")
+    sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.s,field.lev),cmap=ColorMap("jet"),edgecolors="none")
+    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=2.0)
+colorbar(sc)
 end
 
 function view_vorts(surf::TwoDSurf_2DOF, field::TwoDFlowField)
-    scatter(map(q->q.x, field.tev),map(q->q.z,field.tev))
-    scatter(map(q->q.x, field.lev),map(q->q.z,field.lev))
-    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv))
+     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.z,field.tev),cmap=ColorMap("jet"))
+    sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.z,field.lev),cmap=ColorMap("jet"))
+    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=1.5)
+colorbar(sc)
 end
 
 function view_vorts(surf::TwoDSurfwFlap, field::TwoDFlowField)
-    scatter(map(q->q.x, field.tev),map(q->q.z,field.tev))
-    scatter(map(q->q.x, field.lev),map(q->q.z,field.lev))
-    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv))
+     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.s,field.tev),cmap=ColorMap("jet"),edgecolors="none")
+    sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.z,field.lev),cmap=ColorMap("jet"),edgecolors="none")
+    plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=2.0)
+colorbar(sc)
 end
+
 
 # ---------------------------------------------------------------------------------------------
 # Function that calculates the aerodynamic forces

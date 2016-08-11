@@ -407,15 +407,16 @@ function update_bv(surf::TwoDSurfwFlap)
         gamma[ib] = gamma[ib]*surf.uref*surf.c
     end
 
-    #for ib = 1:surf.ndiv-1
-    #    surf.bv_prev[ib] = surf.bv[ib]
-    #end
+    for ib = 1:surf.ndiv-1
+       surf.bv_prev[ib].s = surf.bv[ib].s
+    end
     
     for ib = 2:surf.ndiv
         surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
         surf.bv[ib-1].x = (surf.bnd_x[ib] + surf.bnd_x[ib-1])/2.
         surf.bv[ib-1].z = (surf.bnd_z[ib] + surf.bnd_z[ib-1])/2.
     end
+    return surf
 end
 # ---------------------------------------------------------------------------------------------
 

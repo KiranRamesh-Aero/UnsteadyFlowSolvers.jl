@@ -156,24 +156,30 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
 
     # This block of code relates to the time derivate, double integration term.
     intg = zeros(surf.ndiv-xbdiv+1) 
-    
+
     for ib = xbdiv:surf.ndiv
         sumbv = 0
         sumbv_prev = 0    
     	for i_bv = 1:ib-1
     	    sumbv = sumbv + surf.bv[i_bv].s
 	    sumbv_prev = sumbv_prev + surf.bv_prev[i_bv].s
-	end	 
+	end
+        
         intg[ib-xbdiv+1] = (sumbv-sumbv_prev)/dt
     end
-        
+    
+    
     m_be3a = trapz(intg[:],surf.x[xbdiv:surf.ndiv])
     m_be3b = trapz(intg[:].*surf.x[xbdiv:surf.ndiv],surf.x[xbdiv:surf.ndiv])
 
-    m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + surf.x_b[1]*m_be3a - m_be3b 
 
-    cm_be = m_be*2./(surf.uref*surf.uref*surf.c*surf.c)
-    # ---------------------------------------------------------------------------------
+
+
+
+m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + surf.x_b[1]*m_be3a - m_be3b 
+
+cm_be = m_be*2./(surf.uref*surf.uref*surf.c*surf.c)
+# ---------------------------------------------------------------------------------
 
     nonl = nonl*2./(surf.uref*surf.uref*surf.c)
     nonl_cnc = nonl_cnc*2./(surf.uref*surf.uref*surf.c)

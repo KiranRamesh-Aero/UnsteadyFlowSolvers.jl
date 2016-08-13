@@ -507,3 +507,120 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 #    view_vorts(surf, curfield)
 
 end
+
+function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, cf::Float64 = 0)
+    mat = zeros(nsteps,8)
+#    frames = TwoDFlowData[]
+    frames = TwoDFlowField[]
+    dtstar = 0.015
+    dt = dtstar*surf.c/surf.uref
+    t = 0.
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+
+        #Dynamically determine dt
+        dt = minimum([(0.015*0.2*2)/maximum([abs(surf.kinem.alphadot) abs(surf.kinem.hdot) abs(surf.kinem.u) abs(curfield.extv[1].vx)/2.]) 0.015]) #this is dimensional value - c/u from K cancels with dtstar
+        
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters (based on 2DOF response)
+        if (istep > 1) # Allow initial condition
+            update_kinem(surf, dt) 
+        end
+        println(dt, surf.kinem.alpha,surf.kinem.h,surf.kinem.u,surf.kinem.alphadot,surf.kinem.hdot,surf.kinem.udot)
+
+        #Check if ground is breached (for drone crash problem)
+        if (surf.kinem.h < 0) 
+            mat, surf, curfield
+            quit()
+        end
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+
+        kelv = KelvinCondition2DFree(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+        soln = nlsolve(not_in_place(kelv), [-0.01])
+        curfield.tev[length(curfield.tev)].s = soln.zero[1]
+        
+        #Check for LESP condition
+        #Update values with converged value of shed tev
+        #Update incduced velocities on airfoil
+        update_indbound(kelv.surf, kelv.field)
+
+        #Calculate downwash
+        update_downwash(kelv.surf)
+
+        #Calculate first two fourier coefficients
+        update_a0anda1(kelv.surf)
+
+        lesp = surf.a0[1]
+
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #2D iteration if LESP_crit is exceeded
+        if (abs(lesp)>surf.lespcrit[1])
+            #Add a TEV with dummy strength
+            place_tev(surf,curfield,dt)
+
+            #Add a LEV with dummy strength
+            place_lev(surf,curfield,dt)
+
+            kelvkutta = KelvinKutta2DFree(surf,curfield)
+            #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
+
+            soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
+            (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero[1], soln.zero[2]
+
+            surf.levflag[1] = 1
+        else
+            surf.levflag[1] = 0
+        end
+
+
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+
+        #Calculate bound vortex strengths
+        update_bv(surf)
+
+        wakeroll(surf, curfield, dt)
+
+        #Update kinematic terms in KinemPar2DOF
+        update_kinem2DOF(surf)
+        
+        #Calculate forces
+        cl, cd, cm = calc_forces(surf)
+
+        #Using the force data, update - hddot and alphaddot 
+        calc_moveFree(surf, cl, cd, cm, cf)
+        
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
+        if (rem(istep,10) == 0)
+            push!(frames, curfield)
+            #            push!(frames, TwoDFlowData(TwoDVort[], TwoDVort[], TwoDVort[],TwoDVort[]))
+#            frames[istep/10].tev = curfield.tev
+#            frames[istep/10].lev = curfield.tev
+#            frames[istep/10].extv = curfield.extv
+#            frames[istep/10].bv = surf.bv
+        end
+    end
+
+    mat, surf, frames
+    #Plot flowfield viz
+#    figure(0)
+#    view_vorts(surf, curfield)
+
+end

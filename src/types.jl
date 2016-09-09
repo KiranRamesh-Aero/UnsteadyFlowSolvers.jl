@@ -15,6 +15,12 @@ type TheoDef
     pvt :: Float64
 end
 
+type DelVortDef
+    flag :: Int8
+    limit :: Int16
+    dist :: Float64
+end
+
 type TheoDefwFlap
     alpha_amp :: Float64
     h_amp :: Float64
@@ -273,7 +279,7 @@ immutable TwoDFlowField
     end
 end
 
-type TwoDFlowData
+immutable TwoDFlowData
     tev :: Vector{TwoDVort}
     lev :: Vector{TwoDVort}
     extv :: Vector{TwoDVort}
@@ -832,6 +838,7 @@ end
 immutable KelvinCondition2DFree
     surf :: TwoDFreeSurf
     field :: TwoDFlowField
+    kelv_enf :: Float64
 end
 
 
@@ -920,7 +927,8 @@ function call(kelv::KelvinCondition2DFree, tev_iter::Array{Float64})
     for iv = 1:nlev
         val = val + kelv.field.lev[iv].s
     end
-
+    val = val + kelv.kelv_enf 
+    
     #Add kelv_enforced if necessary - merging will be better
     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
     # if the condition is satified 
@@ -977,6 +985,7 @@ end
 immutable KelvinKutta2DFree
     surf :: TwoDFreeSurf
     field :: TwoDFlowField
+    kelv_enf :: Float64
 end
 
 immutable KelvinKuttawFlap
@@ -1086,7 +1095,8 @@ function call(kelv::KelvinKutta2DFree, v_iter::Array{Float64})
     for iv = 1:nlev
         val[1] = val[1] + kelv.field.lev[iv].s
     end
-
+    val[1] = val[1] + kelv.kelv_enf
+    
     if (kelv.surf.a0[1] > 0)
         lesp_cond = kelv.surf.lespcrit[1]
     else

@@ -37,17 +37,17 @@ x_spl = Spline1D(s,x);
 y_spl = Spline1D(s,y);
 
 
-type TwoDPanel
-    x1 :: Float64
-    z1 :: Float64
-    x2 :: Float64
-    z2 :: Float64
-    x :: Float64
-    z :: Float64
-    s :: Float64
-    sig :: Float64
-    gam :: Float64
-end
+# type TwoDPanel
+#     x1 :: Float64
+#     z1 :: Float64
+#     x2 :: Float64
+#     z2 :: Float64
+#     x :: Float64
+#     z :: Float64
+#     s :: Float64
+#     sig :: Float64
+#     gam :: Float64
+# end
 
 sp = TwoDPanel[]
 

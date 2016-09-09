@@ -255,3 +255,27 @@ function transfer_cm(xreq::Float64, cm::Vector{Float64}, cl::Vector{Float64}, cd
 end
 # ---------------------------------------------------------------------------------------------
     
+function anim_flow(outfolder, freq)
+
+    #Outfolder contains the movie files
+    n = length(readdir(outfolder))
+
+    figure(1)
+    
+    for i = 1:n
+        data = readdlm(string(outfolder,"/field.$(freq*i)"))
+        rtev = 2:1+Int(data[1,1])
+        rlev = 2+Int(data[1,1]):1+Int(data[1,1]+data[1,2])
+        rextv = 2+Int(data[1,1]+data[1,2]):1+Int(data[1,1]+data[1,2]+data[1,3])
+        rbv = 2+Int(data[1,1]+data[1,2]+data[1,3]):1+Int(data[1,1]+data[1,2]+data[1,3]+data[1,4])
+        im = scatter(data[rtev,2],data[rtev,3],s=20,c=data[rtev,1],cmap=PyPlot.ColorMap("jet"),edgecolors="none");
+        scatter(data[rlev,2],data[rlev,3],s=20,c=data[rlev,1],cmap=PyPlot.ColorMap("jet"),edgecolors="none");
+        scatter(data[rextv,2],data[rextv,3],s=20,c=data[rextv,1],cmap=PyPlot.ColorMap("jet"),edgecolors="none");
+        plot(data[rbv,2],data[rbv,3],color = "black",linewidth=2.0)
+        PyPlot.savefig(outfolder * "/" * string(i) * ".png") 
+        PyPlot.clf()
+    end
+
+    run(`ffmpeg -r 25 -i $outfolder/%d.png $outfolder/anim.mpg`)
+    run (`open $outfolder/anim.mpg`)
+end

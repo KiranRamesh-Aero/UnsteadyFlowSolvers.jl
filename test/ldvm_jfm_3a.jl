@@ -1,6 +1,6 @@
-workspace()
-include("../src/UNSflow.jl")
-using UNSflow
+# workspace()
+# include("../src/UNSflow.jl")
+# using UNSflow
 #
 #Uncomment the lines above when running for the first time
 
@@ -37,24 +37,24 @@ nsteps =round(Int,t_tot/dt)+1
 
 ldvm(surf, curfield, nsteps, dt)
 
-#Present plots
-data = readdlm("results.dat")
+# #Present plots
+# data = readdlm("results.dat")
 
-range = round(Int,2*nsteps/3):nsteps
+# range = round(Int,2*nsteps/3):nsteps
 
-tbyT = (data[range,1]-data[range[1]])/period
+# tbyT = (data[range,1]-data[range[1]])/period
 
-alfa_f = data[range,2]*180/pi
+# alfa_f = data[range,2]*180/pi
 
-h_v = data[range,3]
+# h_v = data[range,3]
 
-lesp = data[range,5]
+# lesp = data[range,5]
 
-cl = data[range,5]
+# cl = data[range,5]
 
-cd = data[range,6]
+# cd = data[range,6]
 
-cm = data[range,7]
+# cm = data[range,7]
 
 # f = figure("pyplot_subplot_mixed", figsize=(12,8))
 

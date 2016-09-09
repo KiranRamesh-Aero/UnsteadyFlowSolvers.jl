@@ -9,14 +9,18 @@ export derivative
 using PyPlot
 export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers
 
+using PyCall
+
 using Debug
 
 using NLsolve
 export nlsolve, not_in_place
 
-export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll, ldvm, calc_forces, design_solve, lesp_design_max, transfer_cm, theodorsen
+using ParallelAccelerator
 
-export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree, MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef, ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfwFlap, TwoDSurf_2DOF, TwoDFreeSurf, TwoDVort, TwoDFlowField, KelvinCondition, KelvinKutta, EldRampReturnDef, EldUpIntDef, EldUpInttstartDef, SinDef, CosDef, TheoDef, TheoDefwFlap, TwoDFlowData
+export camber_calc, update_boundpos, update_kinem, update_indbound, update_downwash, update_a0anda1, place_tev, update_a2toan, mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts, wakeroll, lautat, lautat_wakeroll, ldvm, calc_forces, design_solve, lesp_design_max, transfer_cm, theodorsen, anim_flow, drone_trajectory_problem
+
+export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree, MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef, ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfwFlap, TwoDSurf_2DOF, TwoDFreeSurf, TwoDVort, TwoDFlowField, KelvinCondition, KelvinKutta, EldRampReturnDef, EldUpIntDef, EldUpInttstartDef, SinDef, CosDef, TheoDef, TheoDefwFlap, TwoDFlowData, DelVortDef
 
 include("types.jl")
 include("calculations.jl")

@@ -230,7 +230,7 @@ function theodorsen(theo::TheoDefwFlap)
 end
 
 
-function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.))
     mat = zeros(nsteps,8)
     
     dt = dtstar*surf.c/surf.uref
@@ -277,6 +277,8 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
         #2D iteration if LESP_crit is exceeded
         if (abs(lesp)>surf.lespcrit[1])
+            #Remove the previous tev
+            pop!(curfield.tev)
             #Add a TEV with dummy strength
             place_tev(surf,curfield,dt)
 
@@ -306,13 +308,36 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
         #Calculate bound vortex strengths
         update_bv(surf)
-
+        
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1) 
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
         wakeroll(surf, curfield, dt)
-
+        
         cl, cd, cm = calc_forces(surf)
         mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
     end
 
+
+    
     mat, surf, curfield
     #Plot flowfield viz
 #    figure(0)
@@ -368,6 +393,8 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         #2D iteration if LESP_crit is exceeded
         if (abs(lesp)>surf.lespcrit[1])
+            #Remove the previous tev
+            pop!(curfield.tev)
             #Add a TEV with dummy strength
             place_tev(surf,curfield,dt)
 
@@ -458,6 +485,8 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         #2D iteration if LESP_crit is exceeded
         if (abs(lesp)>surf.lespcrit[1])
+            #Remove the previous tev
+            pop!(curfield.tev)
             #Add a TEV with dummy strength
             place_tev(surf,curfield,dt)
 
@@ -508,19 +537,26 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
 end
 
-function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, cf::Float64 = 0)
-    mat = zeros(nsteps,8)
-#    frames = TwoDFlowData[]
-    frames = TwoDFlowField[]
+function drone_trajectory_problem(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, cf::Float64 = 0)
+    mat = zeros(nsteps,10)
+    ind_fr = 0
+    fr_freq = 1000
+
     dtstar = 0.015
     dt = dtstar*surf.c/surf.uref
     t = 0.
-
+    kelv_enf = 0
+    
     #Intialise flowfield
     for istep = 1:nsteps
 
         #Dynamically determine dt
-        dt = minimum([(0.015*0.2*2)/maximum([abs(surf.kinem.alphadot) abs(surf.kinem.hdot) abs(surf.kinem.u) abs(curfield.extv[1].vx)/2.]) 0.015]) #this is dimensional value - c/u from K cancels with dtstar
+        #If the shooting vorrtex is in the vicinity of airfoil, use a smaller time step
+        if (sqrt((curfield.extv[1].x-surf.bv[35].x)^2 + (curfield.extv[1].z-surf.bv[35].z)^2) < 10*surf.c)
+            dt = minimum([(0.015*0.2*3)/maximum([abs(surf.kinem.alphadot) abs(surf.kinem.hdot) abs(surf.kinem.u) abs(curfield.extv[1].vx)/2.]) 0.015]) #this is dimensional value - c/u from K cancels with dtstar
+        else
+            dt = minimum([(0.015*0.2*3)/maximum([abs(surf.kinem.alphadot) abs(surf.kinem.hdot) abs(surf.kinem.u)]) 0.015]) #this is dimensional value - c/u from K cancels with dtstar
+        end
         
         #Udpate current time
         t = t + dt
@@ -529,12 +565,12 @@ function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         if (istep > 1) # Allow initial condition
             update_kinem(surf, dt) 
         end
-        println(dt, surf.kinem.alpha,surf.kinem.h,surf.kinem.u,surf.kinem.alphadot,surf.kinem.hdot,surf.kinem.udot)
+        println(istep," ", t," ",length(curfield.tev)," ", length(curfield.lev))
 
         #Check if ground is breached (for drone crash problem)
         if (surf.kinem.h < 0) 
             mat, surf, curfield
-            quit()
+            break
         end
         #Update bound vortex positions
         update_boundpos(surf, dt)
@@ -542,7 +578,7 @@ function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         #Add a TEV with dummy strength
         place_tev(surf,curfield,dt)
 
-        kelv = KelvinCondition2DFree(surf,curfield)
+        kelv = KelvinCondition2DFree(surf,curfield, kelv_enf)
         #Solve for TEV strength to satisfy Kelvin condition
         #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
         soln = nlsolve(not_in_place(kelv), [-0.01])
@@ -558,21 +594,28 @@ function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, 
 
         #Calculate first two fourier coefficients
         update_a0anda1(kelv.surf)
-
-        lesp = surf.a0[1]
-
+        
+        if surf.kinem.u == 0
+            lesp = surf.a0[1]
+        else
+            lesp = surf.a0[1]/surf.kinem.u
+        end
+        
         #Update adot
         update_a2a3adot(surf,dt)
 
+        
         #2D iteration if LESP_crit is exceeded
         if (abs(lesp)>surf.lespcrit[1])
+            #Remove the previous tev
+            pop!(curfield.tev)
             #Add a TEV with dummy strength
             place_tev(surf,curfield,dt)
 
             #Add a LEV with dummy strength
             place_lev(surf,curfield,dt)
 
-            kelvkutta = KelvinKutta2DFree(surf,curfield)
+            kelvkutta = KelvinKutta2DFree(surf,curfield, kelv_enf)
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
 
             soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
@@ -593,6 +636,26 @@ function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, 
             surf.aprev[ia] = surf.aterm[ia]
         end
 
+        #Remove vortices that are far away from airfoil
+        if length(curfield.tev) > 100
+            if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > 10*surf.c)
+                kelv_enf = kelv_enf + curfield.tev[1].s
+                for i = 1:length(curfield.tev)-1
+                    curfield.tev[i] = curfield.tev[i+1]
+                end
+                pop!(curfield.tev)
+            end
+        end
+        if length(curfield.lev) > 100
+            if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > 10*surf.c)
+                kelv_enf = kelv_enf + curfield.lev[1].s
+                for i = 1:length(curfield.lev)-1
+                    curfield.lev[i] = curfield.lev[i+1]
+                end
+                pop!(curfield.lev)
+            end
+        end
+        
         #Calculate bound vortex strengths
         update_bv(surf)
 
@@ -607,18 +670,21 @@ function ldvm(surf::TwoDFreeSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         #Using the force data, update - hddot and alphaddot 
         calc_moveFree(surf, cl, cd, cm, cf)
         
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
-        if (rem(istep,10) == 0)
-            push!(frames, curfield)
-            #            push!(frames, TwoDFlowData(TwoDVort[], TwoDVort[], TwoDVort[],TwoDVort[]))
-#            frames[istep/10].tev = curfield.tev
-#            frames[istep/10].lev = curfield.tev
-#            frames[istep/10].extv = curfield.extv
-#            frames[istep/10].bv = surf.bv
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm surf.bnd_x[div(surf.ndiv,2)] surf.bnd_z[div(surf.ndiv,2)]]
+        if (rem(istep,fr_freq) == 0)
+            ind_fr += 1
+            outfile = open("dump/field.$istep", "w")
+            flowmat = zeros(1+length(curfield.tev)+length(curfield.lev)+length(curfield.extv)+length(surf.bv),4)
+            flowmat[1,:] = [length(curfield.tev), length(curfield.lev), length(curfield.extv), length(surf.bv)]
+            flowmat[2:end,1] = [map(q->q.s, curfield.tev); map(q->q.s, curfield.lev); map(q->q.s, curfield.extv); map(q->q.s, surf.bv)] 
+            flowmat[2:end,2] = [map(q->q.x, curfield.tev); map(q->q.x, curfield.lev); map(q->q.x, curfield.extv); map(q->q.x, surf.bv)]
+            flowmat[2:end,3] = [map(q->q.z, curfield.tev); map(q->q.z, curfield.lev); map(q->q.z, curfield.extv); map(q->q.z, surf.bv)] 
+            writedlm(outfile, flowmat)
+            close(outfile)
         end
     end
 
-    mat, surf, frames
+    mat, surf, curfield
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)

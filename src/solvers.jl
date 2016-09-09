@@ -445,6 +445,7 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
     dt = dtstar*surf.c/surf.uref
     t = 0.
+    kelv_enf = 0
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -461,7 +462,7 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
         #Add a TEV with dummy strength
         place_tev(surf,curfield,dt)
 
-        kelv = KelvinCondition2DOF(surf,curfield)
+        kelv = KelvinCondition2DOF(surf,curfield,kelv_enf)
         #Solve for TEV strength to satisfy Kelvin condition
         #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
         soln = nlsolve(not_in_place(kelv), [-0.01])
@@ -493,7 +494,7 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
             #Add a LEV with dummy strength
             place_lev(surf,curfield,dt)
 
-            kelvkutta = KelvinKutta2DOF(surf,curfield)
+            kelvkutta = KelvinKutta2DOF(surf,curfield,kelv_enf)
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
 
             soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])

@@ -323,9 +323,9 @@ immutable TwoDSurfwFlap
     bv_prev :: Vector{TwoDVort}
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
-    
+
     function TwoDSurfwFlap(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, x_b=1., lespcrit=zeros(1))
-        x_b[1] = x_b[1]*c #Dimensional value  
+        x_b[1] = x_b[1]*c #Dimensional value
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -335,7 +335,7 @@ immutable TwoDSurfwFlap
         bnd_x = zeros(ndiv)
         bnd_z = zeros(ndiv)
         kinem = KinemParwFlap(0, 0, 0, 0, 0, 0, 0, 0)
-        
+
         dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
             theta[ib] = real(ib-1.)*dtheta
@@ -344,7 +344,7 @@ immutable TwoDSurfwFlap
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
-        
+
         # Calculates the initial condition for airfoil pitch
         # Various options for prescribing the airfoil pitch kinematics
         if (typeof(kindef.alpha) == EldUpDef)
@@ -367,7 +367,7 @@ immutable TwoDSurfwFlap
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
         end
         # ---------------------------------------------------------------------------------------------
-        
+
         # Calculates the initial condition for airfoil plunge
         # Various options for prescribing the airfoil plunge kinematics
         if (typeof(kindef.h) == EldUpDef)
@@ -396,7 +396,7 @@ immutable TwoDSurfwFlap
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         end
         # ---------------------------------------------------------------------------------------------
-        
+
         # Calculates the initial condition for forward velocity of airfoil
         # Various options for prescribing the airfoil forward motion
         if (typeof(kindef.u) == EldUpDef)
@@ -411,7 +411,7 @@ immutable TwoDSurfwFlap
             kinem.udot = 0.
         end
         # ---------------------------------------------------------------------------------------------
-        
+
         # ---------------------------------------------------------------------------------------------
         # Calculates the initial condition for flap deflection beta (n)
         # Various options for prescribing the flap kinematics
@@ -437,21 +437,21 @@ immutable TwoDSurfwFlap
 # Defines the aerofoil as a single flat plate
 # Calls the calculation of the camber and it's derivatives (spatial and temporal)
 #Deflection of flap is modelled as camber variation
-if (coord_file != "FlatPlate") 
+if (coord_file != "FlatPlate")
     (cam_af, cam_slope) = camber_calc(x, coord_file)
 end
 
 for i = 1:ndiv
     if x[i] < x_b[1]
         cam[i] = cam_af[i];
-    else 
+    else
         cam[i] = cam_af[i] + (x_b[1] - x[i])*tan(kinem.n);
         cam_tder[i] = (x_b[1] - x[i])*kinem.ndot*sec(kinem.n)*sec(kinem.n);
     end
-end  
+end
 # ---------------------------------------------------------------------------------------------
 
-# Populates the arrays for bnd_x, bnd_z based on initial conditions        
+# Populates the arrays for bnd_x, bnd_z based on initial conditions
 for i = 1:ndiv
     bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
     bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
@@ -474,7 +474,7 @@ for i = 1:ndiv-1
     push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
     push!(bv_prev,TwoDVort(0,0,0,0.02*c,0,0))
 end
-# ---------------------------------------------------------------------------------------------        
+# ---------------------------------------------------------------------------------------------
 levflag = [0]
 
 new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam_af, cam, cam_slope, cam_tder, theta, x, x_b, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, bv_prev, lespcrit,levflag)
@@ -648,7 +648,7 @@ immutable TwoDSurf_2DOF
             cam, cam_slope = camber_calc(x, coord_file)
         end
 
-        
+
         for i = 1:ndiv
             bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
             bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
@@ -716,7 +716,7 @@ immutable TwoDFreeSurf
             cam, cam_slope = camber_calc(x, coord_file)
         end
 
-        
+
         for i = 1:ndiv
             bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
             bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
@@ -771,7 +771,7 @@ function call(eld::EldUpIntDef, t)
     amp = 0
     for i = 1:nsteps
       tmpt = (i-1)*dt
-      if (eld.amp == 0.) 
+      if (eld.amp == 0.)
       	 hdot = 0.
       else
          hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
@@ -781,7 +781,7 @@ function call(eld::EldUpIntDef, t)
     end
     if (nsteps == 1)
       amp = 0.
-    end  
+    end
     amp
 end
 
@@ -800,7 +800,7 @@ function call(eld::EldUpInttstartDef, t)
     amp = 0
     for i = 1:nsteps
       tmpt = (i-1)*dt
-      if (eld.amp == 0.) 
+      if (eld.amp == 0.)
       	 hdot = 0.
       else
          hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
@@ -810,7 +810,7 @@ function call(eld::EldUpInttstartDef, t)
     end
     if (nsteps == 1)
       amp = 0.
-    end  
+    end
     amp
 end
 
@@ -833,6 +833,7 @@ end
 immutable KelvinCondition2DOF
     surf :: TwoDSurf_2DOF
     field :: TwoDFlowField
+    kelv_enf :: Float64
 end
 
 immutable KelvinCondition2DFree
@@ -868,7 +869,7 @@ function call(kelv::KelvinCondition, tev_iter::Array{Float64})
 
     #Add kelv_enforced if necessary - merging will be better
     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
-    # if the condition is satified 
+    # if the condition is satified
 
     return val
 end
@@ -896,10 +897,11 @@ function call(kelv::KelvinCondition2DOF, tev_iter::Array{Float64})
     for iv = 1:nlev
         val = val + kelv.field.lev[iv].s
     end
+    val = val + kelv.kelv_enf
 
     #Add kelv_enforced if necessary - merging will be better
     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
-    # if the condition is satified 
+    # if the condition is satified
 
     return val
 end
@@ -927,11 +929,11 @@ function call(kelv::KelvinCondition2DFree, tev_iter::Array{Float64})
     for iv = 1:nlev
         val = val + kelv.field.lev[iv].s
     end
-    val = val + kelv.kelv_enf 
-    
+    val = val + kelv.kelv_enf
+
     #Add kelv_enforced if necessary - merging will be better
     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
-    # if the condition is satified 
+    # if the condition is satified
 
     return val
 end
@@ -962,7 +964,7 @@ function call(kelv::KelvinConditionwFlap, tev_iter::Array{Float64})
 
     #Add kelv_enforced if necessary - merging will be better
     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
-    # if the condition is satified 
+    # if the condition is satified
 
     return val
 end
@@ -980,6 +982,7 @@ end
 immutable KelvinKutta2DOF
     surf :: TwoDSurf_2DOF
     field :: TwoDFlowField
+    kelv_enf :: Float64
 end
 
 immutable KelvinKutta2DFree
@@ -1057,6 +1060,7 @@ function call(kelv::KelvinKutta2DOF, v_iter::Array{Float64})
     for iv = 1:nlev
         val[1] = val[1] + kelv.field.lev[iv].s
     end
+    val[1] = val[1] + kelv.kelv_enf
 
     if (kelv.surf.a0[1] > 0)
         lesp_cond = kelv.surf.lespcrit[1]
@@ -1096,7 +1100,7 @@ function call(kelv::KelvinKutta2DFree, v_iter::Array{Float64})
         val[1] = val[1] + kelv.field.lev[iv].s
     end
     val[1] = val[1] + kelv.kelv_enf
-    
+
     if (kelv.surf.a0[1] > 0)
         lesp_cond = kelv.surf.lespcrit[1]
     else

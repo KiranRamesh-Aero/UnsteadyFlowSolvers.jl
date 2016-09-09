@@ -40,7 +40,7 @@ surf = TwoDSurf_2DOF(1., 1., "FlatPlate", pvt, 70, 35, strpar, kinem, lespcrit)
 
 curfield = TwoDFlowField()
 
-nsteps = 150000
+nsteps = 5000
 
 ldvm(surf, curfield, nsteps, dt)
 

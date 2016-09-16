@@ -1,3 +1,71 @@
+#Function for calculating a simple 3D correction based on quasi-steady LLT
+
+function simple_LLT(mat::Array{Float64,2}, surf::TwoDSurf, s::Float64, n_bterm::Int64, n_span::Int64)
+    # s is the semi-span
+    nsteps = length(mat[:,1])
+
+    bnd_circ2d = mat[:,9]
+    t = mat[:,1]
+    alpha = mat[:,2]
+    h = mat[:,3]
+    hdot = zeros(nsteps)
+    hdot[1] = 0
+    hdot[2:end] = diff(h)./diff(t)
+    u = mat[:,4]
+
+
+    lhs = zeros(n_span,n_bterm)
+    rhs = zeros(n_span)
+    b_coeff = zeros(n_bterm)
+    bcoeff_prev = zeros(n_bterm)
+    bdot = zeros(n_bterm)
+    sp_gam = zeros(nsteps,n_span)
+    psi = zeros(n_span)
+    dt = mat[2,1]-mat[1,1]
+    cnc_f = zeros(nsteps)
+    cnnc_f = zeros(nsteps)
+
+    for i = 1:n_span
+        psi[i] = (real(i)/(n_span+1))*pi
+    end
+
+
+    for i = 1:nsteps
+        for j = 1:n_span
+            for n = 1:n_bterm
+                lhs[j,n] = sin(n*psi[j])*(sin(psi[j]) + (n*surf.c*pi/(4*s)))
+            end
+            rhs[j] = surf.c*pi*sin(psi[j])*bnd_circ2d[i]/(4*s)
+        end
+        bcoeff_prev = b_coeff
+        b_coeff = \(lhs, rhs)
+        bdot = (b_coeff - bcoeff_prev)/dt
+
+        # for j = 1:n_span
+        #     sp_gam[i,j] = 0
+        #     for n = 1:n_bterm
+        #         sp_gam[i,j] = sp_gam[i,j] + 4*s*u*b_coeff[n]*sin(n*psi[j])
+        #     end
+        # end
+
+        sum_bcoeff = 0
+        for n = 1:n_bterm
+            if rem(n,2) != 0
+                sum_bcoeff = sum_bcoeff + b_coeff[n]
+            end
+        end
+        cnc_f[i] = -2*pi*(u[i]*cos(alpha[i])/surf.uref + hdot[i]*sin(alpha[i])/surf.uref)*(sum_bcoeff)
+        sum_bdot = 0
+        for n = 1:n_bterm
+            if rem(n,2) != 0
+                sum_bdot = sum_bdot + bdot[n]
+            end
+        end
+        cnnc_f[i] = -(2*pi*surf.c/(surf.uref))*(3*sum_bdot/4)
+    end
+    return cnc_f, cnnc_f
+end
+
 # ---------------------------------------------------------------------------------------------
 # Function for calculating a_2 and a_3 fourier coefficients
 function update_a2a3adot(surf::TwoDSurf,dt)
@@ -146,7 +214,7 @@ end
 # ---------------------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------------------------
-# Function for calculating the fourier coefficients a_2 upwards to a_n 
+# Function for calculating the fourier coefficients a_2 upwards to a_n
 function update_a2toan(surf::TwoDSurf)
     for ia = 2:surf.naterm
         surf.aterm[ia] = trapz(surf.downwash.*cos(ia*surf.theta),surf.theta)
@@ -219,7 +287,7 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     end
     # ---------------------------------------------------------------------------------------------
-    
+
     # Plunge kinematics
     if (typeof(surf.kindef.h) == EldUpDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
@@ -289,7 +357,7 @@ end
 # ---------------------------------------------------------------------------------------------
 # Function updating the kinematic parameters
 function update_kinem(surf::TwoDSurfwFlap, t)
-# Added by Laura Merchant 2016 
+# Added by Laura Merchant 2016
     # ---------------------------------------------------------------------------------------------
     # Pitch kinematics
     if (typeof(surf.kindef.alpha) == EldUpDef)
@@ -345,7 +413,7 @@ function update_kinem(surf::TwoDSurfwFlap, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = 0.
     end
-    
+
     # ---------------------------------------------------------------------------------------------
     # Deformation kinematics
     if (typeof(surf.kindef.n) == CosDef)
@@ -382,7 +450,7 @@ function update_bv(surf::TwoDSurf)
     end
 
 
-    
+
     for ib = 2:surf.ndiv
         surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
         surf.bv[ib-1].x = (surf.bnd_x[ib] + surf.bnd_x[ib-1])/2.
@@ -479,11 +547,11 @@ function calc_struct2DOF(surf::TwoDSurf_2DOF, cl::Float64, cm::Float64)
     m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
     m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
     m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
-    
+
     R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
-    
+
     R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
-    
+
     surf.kinem.hddot = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
     surf.kinem.alphaddot = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
     return surf
@@ -492,13 +560,13 @@ end
 function calc_moveFree(surf::TwoDFreeSurf, cl::Float64, cd :: Float64,
 cm :: Float64, cf :: Float64)
     accl_g = 9.8
-    
+
     surf.kinem.udot = -2*surf.strpar.kappa*surf.uref*surf.uref*(cd+cf*sin(surf.kinem.alpha))/(pi*surf.c)
     surf.kinem.hddot = 2*surf.strpar.kappa*surf.uref*surf.uref*(cl+cf*cos(surf.kinem.alpha))/(pi*surf.c) - accl_g
     surf.kinem.alphaddot = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c*surf.strpar.r_g*surf.strpar.r_g)
 end
 
-    
+
 function update_bv(surf::TwoDSurfwFlap)
     gamma = zeros(surf.ndiv)
     for ib = 1:surf.ndiv
@@ -512,7 +580,7 @@ function update_bv(surf::TwoDSurfwFlap)
     for ib = 1:surf.ndiv-1
        surf.bv_prev[ib].s = surf.bv[ib].s
     end
-    
+
     for ib = 2:surf.ndiv
         surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
         surf.bv[ib-1].x = (surf.bnd_x[ib] + surf.bnd_x[ib-1])/2.
@@ -576,19 +644,19 @@ end
 
 # ---------------------------------------------------------------------------------------------
 # Updating the deformation of the aerofoil: camber, spatial and time derivatives (from flap)
-# Added by Laura Merchant 2016 
+# Added by Laura Merchant 2016
 function update_deform(surf::TwoDSurfwFlap, t)
     ndiv = length(surf.x);
 
     for i=1:ndiv
         if surf.x[i] < surf.x_b[1]
             surf.cam[i] = surf.cam_af[i];
-        else 
+        else
             surf.cam[i] = surf.cam_af[i] + (surf.x_b[1]-surf.x[i])*tan(surf.kinem.n);
             surf.cam_tder[i] = (surf.x_b[1]-surf.x[i])*surf.kinem.ndot*sec(surf.kinem.n)*sec(surf.kinem.n);
         end
-    end  
-    
+    end
+
     cam_spl = Spline1D(surf.x,surf.cam);
     surf.cam_slope[1:surf.ndiv] = Dierckx.derivative(cam_spl,surf.x);
     return surf
@@ -722,7 +790,7 @@ function wakeroll(surf::TwoDFreeSurf, curfield::TwoDFlowField, dt)
         curfield.extv[i].x += dt*curfield.extv[i].vx
         curfield.extv[i].z += dt*curfield.extv[i].vz
     end
-    
+
     return curfield
 end
 

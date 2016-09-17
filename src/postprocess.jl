@@ -4,7 +4,7 @@ function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.s,field.tev),cmap=ColorMap("jet"),edgecolors="none")
     sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.s,field.lev),cmap=ColorMap("jet"),edgecolors="none")
     plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=2.0)
-colorbar(sc)
+    colorbar(sc)
 end
 
 function view_vorts(surf::TwoDSurf_2DOF, field::TwoDFlowField)
@@ -19,7 +19,7 @@ function view_vorts(surf::TwoDFreeSurf, field::TwoDFlowField)
     scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.s,field.lev),cmap=ColorMap("jet"),edgecolors="none")
     scatter(map(q->q.x, field.extv),map(q->q.z,field.extv),s=40,c=map(q->q.s,field.extv),cmap=ColorMap("jet"),edgecolors="none")
     plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=2.0)
-    
+
 end
 
 function view_vorts(surf::TwoDSurfwFlap, field::TwoDFlowField)
@@ -27,6 +27,11 @@ function view_vorts(surf::TwoDSurfwFlap, field::TwoDFlowField)
     sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.s,field.lev),cmap=ColorMap("jet"),edgecolors="none")
     plot(map(q->q.x, surf.bv),map(q->q.z,surf.bv),color = "black",linewidth=2.0)
 colorbar(sc)
+end
+
+function view_vorts(field::Vector{TwoDVort})
+    scatter(map(q->q.x, field),map(q->q.z,field),s=20,c=map(q->q.s,field),cmap=ColorMap("jet"),edgecolors="none")
+    colorbar(sc)
 end
 
 
@@ -56,7 +61,7 @@ function calc_forces(surf::TwoDSurf)
     # Normal force coefficient
     cn = cnc + cnnc + nonl
 
-    # Lift and drag coefficients 
+    # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
@@ -89,7 +94,7 @@ function calc_forces(surf::TwoDSurf_2DOF)
     # Normal force coefficient
     cn = cnc + cnnc + nonl
 
-    # Lift and drag coefficients 
+    # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
@@ -122,7 +127,7 @@ function calc_forces(surf::TwoDFreeSurf)
     # Normal force coefficient
     cn = cnc + cnnc + nonl
 
-    # Lift and drag coefficients 
+    # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
@@ -154,8 +159,8 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
     for ib = 1:surf.ndiv-1
         # 1st three terms in delta p, Ucos(),hdotsin(), alphadot*eta integrated
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
-        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1]) 
-        nonl_cnc = nonl_cnc + 0.5*(q1 + q2)*surf.bv[ib].s  
+        q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])
+        nonl_cnc = nonl_cnc + 0.5*(q1 + q2)*surf.bv[ib].s
 
         # Same term as before with additional squared spatial derivative term
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
@@ -164,7 +169,7 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
 
         # Same term as before with additional squared spatial derivative term and alphadot*eta term
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])*surf.x[ib]
-       q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])*surf.x[ib+1] 
+       q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])*surf.x[ib+1]
         nonl_m1 = nonl_m1 + 0.5*(q1 + q2)*surf.bv[ib].s
 
         # Same term as before with additional squared spatial derivative term
@@ -172,7 +177,7 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
         q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))*surf.x[ib+1]
         nonl_m = nonl_m + 0.5*(q1 + q2)*surf.bv[ib].s
     end
-    
+
     # -------------------------------------------------------------
     xbdiv = indmin(abs(surf.x[:]-surf.x_b[1]))
     m_be1a = 0
@@ -180,11 +185,11 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
     m_be2a = 0
     m_be2b = 0
     me_be3 = 0
-    # These are the expressions multipled by the square root term in eqn in Hinge_Moment notebook. 
+    # These are the expressions multipled by the square root term in eqn in Hinge_Moment notebook.
     for ib = xbdiv:surf.ndiv-1
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib])
         q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.kinem.u*cos(surf.kinem.alpha)+surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[ib+1])
-        m_be1a = m_be1a + 0.5*(q1 + q2)*surf.bv[ib].s 
+        m_be1a = m_be1a + 0.5*(q1 + q2)*surf.bv[ib].s
 
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))
         q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))
@@ -197,23 +202,23 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
         q1 = sqrt(1+surf.cam_slope[ib]*surf.cam_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]
         q2 = sqrt(1+surf.cam_slope[ib+1]*surf.cam_slope[ib+1])*(surf.uind[ib+1]*cos(surf.kinem.alpha) - surf.wind[ib+1]*sin(surf.kinem.alpha))*surf.x[ib+1]
         m_be2b = m_be2b + 0.5*(q1 + q2)*surf.bv[ib].s
-    end 
+    end
 
     # This block of code relates to the time derivate, double integration term.
-    intg = zeros(surf.ndiv-xbdiv+1) 
+    intg = zeros(surf.ndiv-xbdiv+1)
 
     for ib = xbdiv:surf.ndiv
         sumbv = 0
-        sumbv_prev = 0    
+        sumbv_prev = 0
     	for i_bv = 1:ib-1
     	    sumbv = sumbv + surf.bv[i_bv].s
 	    sumbv_prev = sumbv_prev + surf.bv_prev[i_bv].s
 	end
-        
+
         intg[ib-xbdiv+1] = (sumbv-sumbv_prev)/dt
     end
-    
-    
+
+
     m_be3a = trapz(intg[:],surf.x[xbdiv:surf.ndiv])
     m_be3b = trapz(intg[:].*surf.x[xbdiv:surf.ndiv],surf.x[xbdiv:surf.ndiv])
 
@@ -221,7 +226,7 @@ function calc_forces(surf::TwoDSurfwFlap, dt)
 
 
 
-m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + surf.x_b[1]*m_be3a - m_be3b 
+m_be = surf.x_b[1]*(m_be1a + m_be1b) - (m_be2a + m_be2b) + surf.x_b[1]*m_be3a - m_be3b
 
 cm_be = m_be*2./(surf.uref*surf.uref*surf.c*surf.c)
 # ---------------------------------------------------------------------------------
@@ -234,7 +239,7 @@ cm_be = m_be*2./(surf.uref*surf.uref*surf.c*surf.c)
     # Normal force coefficient
     cn = nonl_cnc + cnnc + nonl
 
-    # Lift and drag coefficients 
+    # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
@@ -254,14 +259,14 @@ function transfer_cm(xreq::Float64, cm::Vector{Float64}, cl::Vector{Float64}, cd
     return cm
 end
 # ---------------------------------------------------------------------------------------------
-    
+
 function anim_flow(outfolder, freq)
 
     #Outfolder contains the movie files
     n = length(readdir(outfolder))
 
     figure(1)
-    
+
     for i = 1:n
         data = readdlm(string(outfolder,"/field.$(freq*i)"))
         rtev = 2:1+Int(data[1,1])
@@ -272,10 +277,10 @@ function anim_flow(outfolder, freq)
         scatter(data[rlev,2],data[rlev,3],s=20,c=data[rlev,1],cmap=PyPlot.ColorMap("jet"),edgecolors="none");
         scatter(data[rextv,2],data[rextv,3],s=20,c=data[rextv,1],cmap=PyPlot.ColorMap("jet"),edgecolors="none");
         plot(data[rbv,2],data[rbv,3],color = "black",linewidth=2.0)
-        PyPlot.savefig(outfolder * "/" * string(i) * ".png") 
+        PyPlot.savefig(outfolder * "/" * string(i) * ".png")
         PyPlot.clf()
     end
 
     run(`ffmpeg -r 25 -i $outfolder/%d.png $outfolder/anim.mpg`)
-    run (`open $outfolder/anim.mpg`)
+    run(`open $outfolder/anim.mpg`)
 end

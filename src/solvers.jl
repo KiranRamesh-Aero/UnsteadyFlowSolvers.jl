@@ -441,12 +441,14 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
 end
 
-function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.))
-    mat = zeros(nsteps,8)
+function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), t::Float64 = 0., mat = Array(Float64, 0, 8), kelv_enf = 0.)
+
+    #mat = zeros(nsteps,8)
+    mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    t = 0.
-    kelv_enf = 0
+    #t = 0.
+    #kelv_enf = 0
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -454,7 +456,7 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
         t = t + dt
 
         #Update kinematic parameters (based on 2DOF response)
-        if (istep > 1) # Allow initial condition
+        if (t > dt) # Allow initial condition
             update_kinem(surf, dt)
         end
         #Update bound vortex positions
@@ -551,10 +553,11 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         #Using the force data, update - hddot and alphaddot
         calc_struct2DOF(surf, cl, cm)
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        #mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
     end
-
-    mat, surf, curfield
+    mat = mat'
+    mat, surf, curfield, kelv_enf
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)

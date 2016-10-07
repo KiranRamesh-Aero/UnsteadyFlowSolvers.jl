@@ -167,25 +167,25 @@ immutable ConstDef <: MotionDef
 end
 
 
-function call(eld::EldUpDef, t)
+function (eld::EldUpDef)(t)
     sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
     t1 = 1.
     t2 = t1 + ((eld.amp)/(2*eld.K))
     ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
 end
 
-function call(eld::EldUptstartDef, t)
+function (eld::EldUptstartDef)(t)
     sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
     t1 = eld.tstart
     t2 = t1 + ((eld.amp)/(2*eld.K))
     ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
 end
 
-function call(cons::ConstDef, t)
+function (cons::ConstDef)(t)
     cons.amp
 end
 
-function call(eld::EldRampReturnDef, tt)
+function (eld::EldRampReturnDef)(tt)
     fr = eld.K/(pi*abs(eld.amp));
     t1 = 1.
     t2 = t1 + (1./(2*pi*fr));
@@ -223,11 +223,11 @@ immutable CosDef <: MotionDef
   phi :: Float64
 end
 
-function call(kin::SinDef, t)
+function (kin::SinDef)(t)
   (kin.mean) + (kin.amp)*sin(kin.w*t + kin.phi)
 end
 
-function call(kin::CosDef, t)
+function (kin::CosDef)(t)
   (kin.mean) + (kin.amp)*cos(kin.w*t + kin.phi)
 end
 # ---------------------------------------------------------------------------------------------
@@ -294,11 +294,11 @@ end
 immutable TwoDSurfwFlap
     c :: Float64
     uref :: Float64
-    coord_file :: ASCIIString
+    coord_file :: String
     pvt :: Float64
     ndiv :: Int8
     naterm :: Int8
-    dynamics_type :: ASCIIString
+    dynamics_type :: String
     kindef :: KinemDefwFlap
     cam_af :: Vector{Float64}
     cam :: Vector{Float64}
@@ -486,11 +486,10 @@ end
 immutable TwoDSurf
     c :: Float64
     uref :: Float64
-    coord_file :: ASCIIString
+    coord_file :: String
     pvt :: Float64
     ndiv :: Int8
     naterm :: Int8
-    dynamics_type :: ASCIIString
     kindef :: KinemDef
     cam :: Vector{Float64}
     cam_slope :: Vector{Float64}
@@ -512,7 +511,7 @@ immutable TwoDSurf
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
 
-    function TwoDSurf(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef,lespcrit=zeros(1))
+    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1), c=1., uref=1., ndiv=70, naterm=35)
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -598,7 +597,7 @@ immutable TwoDSurf
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
         levflag = [0]
-        new(c, uref, coord_file, pvt, ndiv, naterm, dynamics_type, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
     end
 end
 
@@ -606,7 +605,7 @@ end
 immutable TwoDSurf_2DOF
     c :: Float64
     uref :: Float64
-    coord_file :: ASCIIString
+    coord_file :: String
     pvt :: Float64
     ndiv :: Int8
     naterm :: Int8
@@ -674,7 +673,7 @@ end
 immutable TwoDFreeSurf
     c :: Float64
     uref :: Float64
-    coord_file :: ASCIIString
+    coord_file :: String
     pvt :: Float64
     ndiv :: Int8
     naterm :: Int8
@@ -756,7 +755,7 @@ immutable EldUpInttstartDef <: MotionDef
 end
 
 
-function call(eld::EldUpIntDef, t)
+function (eld::EldUpIntDef)(t)
 
     dt = 0.015
     nsteps = t/dt + 1
@@ -785,7 +784,7 @@ function call(eld::EldUpIntDef, t)
     amp
 end
 
-function call(eld::EldUpInttstartDef, t)
+function (eld::EldUpInttstartDef)(t)
 
     dt = 0.015
     nsteps = t/dt + 1
@@ -843,7 +842,7 @@ immutable KelvinCondition2DFree
 end
 
 
-function call(kelv::KelvinCondition, tev_iter::Array{Float64})
+function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -874,7 +873,7 @@ function call(kelv::KelvinCondition, tev_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinCondition2DOF, tev_iter::Array{Float64})
+function (kelv::KelvinCondition2DOF)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -906,7 +905,7 @@ function call(kelv::KelvinCondition2DOF, tev_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinCondition2DFree, tev_iter::Array{Float64})
+function (kelv::KelvinCondition2DFree)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -938,7 +937,7 @@ function call(kelv::KelvinCondition2DFree, tev_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinConditionwFlap, tev_iter::Array{Float64})
+function (kelv::KelvinConditionwFlap)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -996,7 +995,7 @@ immutable KelvinKuttawFlap
     field :: TwoDFlowField
 end
 
-function call(kelv::KelvinKutta, v_iter::Array{Float64})
+function (kelv::KelvinKutta)(v_iter::Array{Float64})
     val = zeros(2)
 
     #Update the TEV and LEV strengths
@@ -1034,7 +1033,7 @@ function call(kelv::KelvinKutta, v_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinKutta2DOF, v_iter::Array{Float64})
+function (kelv::KelvinKutta2DOF)(v_iter::Array{Float64})
     val = zeros(2)
 
     #Update the TEV and LEV strengths
@@ -1073,7 +1072,7 @@ function call(kelv::KelvinKutta2DOF, v_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinKutta2DFree, v_iter::Array{Float64})
+function (kelv::KelvinKutta2DFree)(v_iter::Array{Float64})
     val = zeros(2)
 
     #Update the TEV and LEV strengths
@@ -1112,7 +1111,7 @@ function call(kelv::KelvinKutta2DFree, v_iter::Array{Float64})
     return val
 end
 
-function call(kelv::KelvinKuttawFlap, v_iter::Array{Float64})
+function (kelv::KelvinKuttawFlap)(v_iter::Array{Float64})
     val = zeros(2)
 
     #Update the TEV and LEV strengths

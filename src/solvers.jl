@@ -1,7 +1,7 @@
-function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
-    outfile = open("results.dat", "w")
+function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
 
-    dtstar = 0.015
+    mat = zeros(nsteps,8)
+
     dt = dtstar*surf.c/surf.uref
     t = 0.
 
@@ -44,23 +44,19 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
         #wakeroll(surf, curfield)
 
         cl, cd, cm = calc_forces(surf)
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm)," "), "\n")
+
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
 
     end
-    close(outfile)
-
-    #Plot flowfield viz and A0 history
-    figure(0)
-    view_vorts(surf, curfield)
+    mat, surf, curfield
 
 end
 
-function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
-    outfile = open("results.dat", "w")
+function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
 
-    dtstar = 0.015
+    mat = zeros(nsteps,8)
+
     dt = dtstar*surf.c/surf.uref
-    nsteps = 500
     t = 0.
 
     #Intialise flowfield
@@ -102,14 +98,10 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64)
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm = calc_forces(surf)
-        write(outfile, join((t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm)," "), "\n")
+        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
 
     end
-    close(outfile)
-
-    #Plot flowfield viz
-    figure(0)
-    view_vorts(surf, curfield)
+    mat, surf, curfield
 
 end
 
@@ -333,7 +325,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm, cn, cs = calc_forces(surf)
-        bnd_circ = surf.uref*surf.c*pi*(surf.a0[1] + surf.aterm[1]/2.)
+        bnd_circ = (surf.a0[1] + surf.aterm[1]/2.)
         mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm bnd_circ cn cs]
     end
 

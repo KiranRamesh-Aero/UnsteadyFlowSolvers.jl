@@ -607,7 +607,7 @@ end
 
 # ---------------------------------------------------------------------------------------------
 # Aerofoil camber calculation from coordinate file
-function camber_calc(x::Vector,airfoil::ASCIIString)
+function camber_calc(x::Vector,airfoil::String)
     #Determine camber and camber slope on airfoil from airfoil input file
 
     ndiv = length(x);
@@ -903,7 +903,7 @@ function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
     le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
     le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
 
-    if (surf.levflag[1] == 0) then
+    if (surf.levflag[1] == 0)
         xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
         zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
     else
@@ -922,7 +922,7 @@ function place_lev(surf::TwoDSurf_2DOF,field::TwoDFlowField,dt)
     le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
     le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
 
-    if (surf.levflag[1] == 0) 
+    if (surf.levflag[1] == 0)
         xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
         zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
     else

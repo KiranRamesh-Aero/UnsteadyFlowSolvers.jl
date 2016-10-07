@@ -3,4 +3,4 @@ Dierckx
 ForwardDiff
 PyPlot
 NLsolve
-not_in_place in NLsolve/differentiable_functions.jl should be changed to accept any general argument, not just functions
+

@@ -52,7 +52,7 @@ significant role.
 The LDVM is coupled with a structural model to simulate the
 aeroelastic behaviour of an airfoil that is elastically supported by
 translational and torsional springs in heave and pitch
-respectively. Problems that be studied include flutter, limit cycles
+respectively. Problems that can be studied include flutter, limit cycles
 resulting from LEV shedding.
 
 

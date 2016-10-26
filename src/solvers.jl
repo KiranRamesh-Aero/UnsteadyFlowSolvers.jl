@@ -1,9 +1,14 @@
-function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
+function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
 
-    mat = zeros(nsteps,8)
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    t = 0.
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -41,23 +46,52 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         #Calculate bound vortex strengths
         #update_bv(surf)
 
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+
+
         #wakeroll(surf, curfield)
 
         cl, cd, cm = calc_forces(surf)
 
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
-
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
     end
-    mat, surf, curfield
+    mat = mat'
+
+    mat, surf, curfield, kelv_enf
 
 end
 
-function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
+function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
 
-    mat = zeros(nsteps,8)
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    t = 0.
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -95,13 +129,36 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 
         #Calculate bound vortex strengths
         update_bv(surf)
 
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+
+
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm = calc_forces(surf)
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
-
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
     end
-    mat, surf, curfield
+    mat = mat'
+    mat, surf, curfield, kelv_enf
 
 end
 
@@ -222,11 +279,19 @@ function theodorsen(theo::TheoDefwFlap)
 end
 
 
-function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.))
-    mat = zeros(nsteps,11)
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    #mat = zeros(nsteps,11)
+    mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    t = 0.
+    #t = 0.
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -324,26 +389,29 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         end
         wakeroll(surf, curfield, dt)
 
-        cl, cd, cm, cn, cs = calc_forces(surf)
-        bnd_circ = (surf.a0[1] + surf.aterm[1]/2.)
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm bnd_circ cn cs]
+        #cl, cd, cm, cn, cs = calc_forces(surf)
+        cl, cd, cm = calc_forces(surf)
+        #bnd_circ = (surf.a0[1] + surf.aterm[1]/2.)
+        #mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm bnd_circ cn cs]
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
     end
 
-
-
-    mat, surf, curfield
-    #Plot flowfield viz
-#    figure(0)
-#    view_vorts(surf, curfield)
-
+    mat = mat'
+    mat, surf, curfield, kelv_enf
 end
 
 
-function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
-    mat = zeros(nsteps,9)
+function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVort(0, 0, 0.), mat = Array(Float64, 0, 9), kelv_enf = 0.)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    t = 0.
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -418,22 +486,51 @@ function ldvm(surf::TwoDSurfwFlap, curfield::TwoDFlowField, nsteps::Int64 = 500,
         #Calculate bound vortex strengths
         update_bv(surf)
 
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+
         wakeroll(surf, curfield, dt)
 
         cl, cd, cm, cm_be = calc_forces(surf, dt)
 
-        mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm cm_be]
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, cm_be])
 
     end
 
-    return mat, surf, curfield
+    mat = mat'
+    mat, surf, curfield, kelv_enf
     #Plot flowfield viz
 #    figure(0)
 #    view_vorts(surf, curfield)
 
 end
 
-function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), t::Float64 = 0., mat = Array(Float64, 0, 8), kelv_enf = 0.)
+function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
 
     #mat = zeros(nsteps,8)
     mat = mat'

@@ -212,23 +212,23 @@ end
 immutable SinDef <: MotionDef
   mean :: Float64
   amp :: Float64
-  w :: Float64
+  k :: Float64
   phi :: Float64
 end
 
 immutable CosDef <: MotionDef
   mean :: Float64
   amp :: Float64
-  w :: Float64
+  k :: Float64
   phi :: Float64
 end
 
 function (kin::SinDef)(t)
-  (kin.mean) + (kin.amp)*sin(kin.w*t + kin.phi)
+  (kin.mean) + (kin.amp)*sin(2*kin.k*t + kin.phi)
 end
 
 function (kin::CosDef)(t)
-  (kin.mean) + (kin.amp)*cos(kin.w*t + kin.phi)
+  (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
 end
 # ---------------------------------------------------------------------------------------------
 
@@ -842,7 +842,8 @@ immutable KelvinCondition2DFree
 end
 
 
-function f_KelvinCondition(surf::TwoDSurf, field::TwoDFlowField, tev_iter::Array{Float64})
+
+function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -872,39 +873,6 @@ function f_KelvinCondition(surf::TwoDSurf, field::TwoDFlowField, tev_iter::Array
 
     return val
 end
-
-Base.Call(f::KelvinCondition, tev_iter) = f_KelvinCondition(f.surf, f.field, tev_iter)
-
-# function (kelv::KelvinCondition)(tev_iter::Array{Float64})
-#     #Update the TEV strength
-#     nlev = length(kelv.field.lev)
-#     ntev = length(kelv.field.tev)
-#     kelv.field.tev[ntev].s = tev_iter[1]
-
-#     #Update incduced velocities on airfoil
-#     update_indbound(kelv.surf, kelv.field)
-
-#     #Calculate downwash
-#     update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
-
-#     #Calculate first two fourier coefficients
-#     update_a0anda1(kelv.surf)
-
-#     val = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.)
-
-#     for iv = 1:ntev
-#         val = val + kelv.field.tev[iv].s
-#     end
-#     for iv = 1:nlev
-#         val = val + kelv.field.lev[iv].s
-#     end
-
-#     #Add kelv_enforced if necessary - merging will be better
-#     # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
-#     # if the condition is satified
-
-#     return val
-# end
 
 
 

@@ -66,7 +66,7 @@ function calc_forces(surf::TwoDSurf)
 
     #Pitching moment is clockwise or nose up positive
     cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
-    return cl, cd, cm, cn, cs
+    return cl, cd, cm
 end
 
 function calc_forces(surf::TwoDSurf_2DOF)

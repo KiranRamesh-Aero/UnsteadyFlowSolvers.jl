@@ -1,3 +1,32 @@
+#Function for estimating a problem's time step
+
+function find_tstep(kin:: Array{CosDef})
+    dtstar = 0.015
+    for i = 1:length(kin)
+        dt_tmp = 0.015*0.2/(kin[i].k*kin[i].amp)
+        dtstar = minimum([dt_tmp dtstar])
+    end
+    return dtstar
+end
+
+function find_tstep(kin:: EldUpDef)
+    dtstar = 0.015
+    dtstar = minimum([0.015*0.2/kin.K 0.015])
+    return dtstar
+end                        
+
+function find_tstep(kin:: EldUptstartDef)
+    dtstar = 0.015
+    dtstar = minimum([0.015*0.2/kin.K 0.015])
+    return dtstar
+end
+
+function find_tstep(kin:: EldRampReturnDef)
+    dtstar = 0.015
+    dtstar = minimum([0.015*0.2/kin.K 0.015])
+    return dtstar
+end
+
 #Function for calculating a simple 3D correction based on quasi-steady LLT
 
 function simple_LLT(mat::Array{Float64,2}, surf::TwoDSurf, s::Float64, n_bterm::Int64, n_span::Int64)
@@ -91,6 +120,23 @@ function update_a2a3adot(surf::TwoDSurf_2DOF,dt)
     end
     return surf
 end
+
+function update_adot(surf::TwoDSurf,dt)
+    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+    for ia = 1:3
+        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+    end
+    return surf
+end
+
+function update_adot(surf::TwoDSurf_2DOF,dt)
+    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+    for ia = 1:3
+        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+    end
+    return surf
+end
+
 
 function update_a2a3adot(surf::TwoDFreeSurf,dt)
     for ia = 2:3

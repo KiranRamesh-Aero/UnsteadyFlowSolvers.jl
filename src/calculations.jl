@@ -1,5 +1,12 @@
 #Function for estimating a problem's time step
 
+#Simple linear interpolation function
+function interp(x1 ::Float64, x2 :: Float64, y1 :: Float64, y2 :: Float64, x::Float64)
+    y = y1 + (y2 - y1)*(x - x1)/(x2 - x1)
+    return y
+end
+
+    
 function find_tstep(kin:: Array{CosDef})
     dtstar = 0.015
     for i = 1:length(kin)

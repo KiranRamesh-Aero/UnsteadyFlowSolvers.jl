@@ -2,6 +2,196 @@
 
 const accl_g = 9.80665
 
+#----------------------------------------------------------------------------------------------
+# Definition of a 3D surface
+immutable patch
+    x :: Float64
+    y :: Float64
+    z :: Float64
+    pvt :: Float64
+    coord_file :: String
+    c :: Float64
+    twist :: Float64
+    lc :: Float64
+    nspan :: Int8
+end
+    
+immutable ThreeDSurf
+    cref :: Float64
+    bref :: Float64
+    sref :: Float64
+    uref :: Float64
+    patchdata :: Vector{patch}
+    ndiv :: Int8
+    nspan :: Int8
+    naterm :: Int8
+    nbterm :: Int8
+    kindef :: Vector{KinemDef}
+    c :: Vector{Float64}
+    pvt :: Vector{Float64}
+    cam :: Array{Float64,2}
+    cam_slope :: Array{Float64,2}
+    theta :: Vector{Float64}
+    x :: Vector{Float64}
+    kinem :: Vector{KinemPar}
+    bnd_x :: Array{Float64,2}
+    bnd_z :: Array{Float64,2}
+    uind :: Array{Float64,2}
+    vind :: Array{Float64,2}
+    wind :: Array{Float64,2}
+    downwash :: Array{Float64,2}
+    a0 :: Array{Float64,2}
+    aterm :: Array{Float64,2}
+    a0dot :: Array{Float64,2}
+    adot :: Array{Float64,2}
+    a0prev :: Array{Float64,2}
+    aprev :: Array{Float64,2}
+    bv :: Array{TwoDVort,2}
+    lespcrit :: Vector{Float64}
+    levflag :: Vector{Int8,2}
+    
+    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35)
+        nspan = 0
+        for i = 1:length(patchdata)
+            nspan += patchdata[i].nspan
+        end
+        nspan = nspan + 1
+        lespcrit = zeros(nspan)
+        
+        cam = zeros(nspan,ndiv)
+        cam_slope = zeros(nspan,ndiv)
+        bnd_x = zeros(nspan,ndiv)
+        bnd_z = zeros(nspan,ndiv)
+        c = zeros(nspan)
+        pvt = zeros(nspan)
+        
+        for i = 1:length(patchdata) - 1
+            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
+            for j = 1:patchdata[i].nspan
+                nspan += 1
+                yle[nspan] = patchdata[i].y + (i-1)*divspan
+                xle[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].x, patchdata[i+1].x, yle[nspan])
+                zle[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].z, patchdata[i+1].z, yle[nspan])
+                c[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].c, patchdata[i+1].c, yle[nspan])
+                twist[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].twist, patchdata[i+1].twist, yle[nspan])
+                cam1, cam_slope1 = camber_calc(x, patchdata[i].coord_file)
+                cam2, cam_slope2 = camber_calc(x, patchdata[i+1].coord_file)
+                for k = 1:ndiv
+                    cam[nspan,k] = interp(patchdata[i],y, patchdata[i+1].y, cam1[k], cam2[k], yle[nspan])
+                    cam_slope[nspan,k] = interp(patchdata[i],y, patchdata[i+1].y, cam_slope1[k], cam_slope2[k], yle[nspan])
+                end
+                lespcrit[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
+                pvt[nspan] = interp1(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
+            end
+        end
+        i = length(patchdata)
+        nspan += 1
+        yle[nspan] = patchdata[i].y
+        xle[nspan] = patchdata[i].x
+        zle[nspan] = patchdata[i].z
+        c[nspan] = patchdata[i].c
+        twist[nspan] = patchdata[i].twist
+        pvt[nspan] = patchdata[i].pvt
+        lespcrit[nspan] = patchdata[i].lc
+        
+        theta = zeros(ndiv)
+        x = zeros(ndiv)
+        cam[nspan,:], cam_slope[nspan,:] = camber_calc(x, patchdata[i].coord_file)
+        
+        inkim = KinemPar(0, 0, 0, 0, 0, 0)
+        for i = 1:nspan
+            kinem[i] = inkim
+        end
+        
+        dtheta = pi/(ndiv-1)
+        for ib = 1:ndiv
+            theta[ib] = real(ib-1.)*dtheta
+            x[ib] = c/2.*(1-cos(theta[ib]))
+        end
+
+        for i = 1:nspan
+            if (typeof(kindef[i].alpha) == EldUpDef)
+                kinem[i].alpha = kindef[i].alpha(0.)
+                kinem[i].alphadot = ForwardDiff.derivative(kindef[i].alpha,0.)*uref/cref
+            elseif (typeof(kindef[i].alpha) == EldRampReturnDef)
+                kinem[i].alpha = kindef[i].alpha(0.)
+                kinem[i].alphadot = ForwardDiff.derivative(kindef[i].alpha,0.)*uref/cref
+            elseif (typeof(kindef[i].alpha) == ConstDef)
+                kinem[i].alpha = kindef[i].alpha(0.)
+                kinem[i].alphadot = 0.
+            elseif (typeof(kindef[i].alpha) == SinDef)
+                kinem[i].alpha = kindef[i].alpha(0.)
+                kinem[i].alphadot = ForwardDiff.derivative(kindef[i].alpha,0.)*uref/cref
+            elseif (typeof(kindef[i].alpha) == CosDef)
+                kinem[i].alpha = kindef[i].alpha(0.)
+                kinem[i].alphadot = ForwardDiff.derivative(kindef[i].alpha,0.)*uref/cref
+            end
+            
+            if (typeof(kindef[i].h) == EldUpDef)
+                kinem[i].h = kindef[i].h(0.)*cref
+                kinem[i].hdot = ForwardDiff.derivative(kindef[i].h,0.)*uref
+            elseif (typeof(kindef[i].h) == EldUpIntDef)
+                kinem[i].h = kindef[i].h(0.)*cref
+                kinem[i].hdot = ForwardDiff.derivative(kindef[i].h,0.)*uref
+            elseif (typeof(kindef[i].h) == EldRampReturnDef)
+                kinem[i].h= kindef[i].h(0.)*cref
+                kinem[i].hdot = ForwardDiff.derivative(kindef[i].h,0.)*uref
+            elseif (typeof(kindef[i].h) == ConstDef)
+                kinem[i].h = kindef[i].h(0.)*cref
+                kinem[i].hdot = 0.
+            elseif (typeof(kindef[i].h) == SinDef)
+                kinem[i].h = kindef[i].h(0.)*cref
+                kinem[i].hdot = ForwardDiff.derivative(kindef[i].h,0.)*uref
+            elseif (typeof(kindef[i].h) == CosDef)
+                kinem[i].h = kindef[i].h(0.)*cref
+                kinem[i].hdot = ForwardDiff.derivative(kindef[i].h,0.)*uref
+            end
+            
+            if (typeof(kindef[i].u) == EldUpDef)
+                kinem[i].u = kindef[i].u(0.)*uref
+                kinem[i].udot = ForwardDiff.derivative(kindef[i].u,0.)*uref*uref/cref
+            elseif (typeof(kindef[i].u) == EldRampReturnDef)
+                kinem[i].u, kinem[i].udot = kindef[i].u(0.)
+                kinem[i].u = kinem[i].u*uref
+                kinem[i].udot = kinem[i].udot*uref*uref/cref
+            elseif (typeof(kindef[i].u) == ConstDef)
+                kinem[i].u = kindef[i].u(0.)*uref
+                kinem[i].udot = 0.
+            end
+        end
+
+
+
+for j = 1:nspan
+    for i = 1:ndiv
+        bnd_x[j,i] = -((c[j] - pvt[j]*c[j])+((pvt[j]*c[j] - x[i])*cos(kinem[j].alpha))) + (cam[j,i]*sin(kinem[j].alpha))
+        bnd_z[j,i] = kinem[j].h + ((pvt[j]*c[j] - x[i])*sin(kinem[j].alpha))+(cam[j,i]*cos(kinem[j].alpha))
+    end
+end
+
+uind = zeros(nspan,ndiv)
+vind = zeros(nspan,ndiv)
+wind = zeros(nspan,ndiv)
+downwash = zeros(nspan,ndiv)
+a0 = zeros(1)
+a0dot = zeros(1)
+aterm = zeros(naterm)
+adot = zeros(3)
+a0prev = zeros(1)
+aprev = zeros(3)
+bv = Vector{TwoDVort[]}
+
+for j = 1:n_div
+    for i = 1:ndiv-1
+        push!(bv[j],ThreeDVort(0,0,0,0.02*cref,0,0))
+    end
+end
+levflag = zeros(nspan)
+
+        new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+    end
+end
+ 
 
 # ---------------------------------------------------------------------------------------------
 # Theodorsen solver input
@@ -260,6 +450,19 @@ end
 # ---------------------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------------------------
+#Definition of a 3D vortex blob
+type ThreeDVort
+    x :: Vector{Float64}
+    s :: Vector{Float64}
+    vc :: Float64
+    vx :: Float64
+    vy :: Float64
+    vz :: Float64
+end
+# ---------------------------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------------------------
 #Definition of flowfield in 2D
 immutable TwoDFlowField
     velX :: MotionDef
@@ -278,6 +481,29 @@ immutable TwoDFlowField
         new(velX, velZ, u, w, tev, lev, extv)
     end
 end
+
+#Definition of flowfield in 3D
+immutable TwoDFlowField
+    velX :: MotionDef
+    velY :: MotionDef
+    velZ :: MotionDef
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+    tev :: Vector{ThreeDVort}
+    lev :: Vector{ThreeDVort}
+    extv :: Vector{ThreeDVort}
+    function TwoDFlowField(velX = ConstDef(0.), velY = ConstDef(0.), velZ = ConstDef(0.))
+        u = [0;]
+        v = [0;]
+        w = [0;]
+        tev = ThreeDVort[]
+        lev = ThreeDVort[]
+        extv = ThreeDVort[]
+        new(velX, velY, velZ, u, v, w, tev, lev, extv)
+    end
+end
+
 
 immutable TwoDFlowData
     tev :: Vector{TwoDVort}

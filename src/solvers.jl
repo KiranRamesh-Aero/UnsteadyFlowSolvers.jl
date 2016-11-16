@@ -1494,3 +1494,6 @@ function design_solve(alphadef::MotionDef)
   end
   return iter_h[iter]
 end
+
+function QSLLT_ldvm()
+    

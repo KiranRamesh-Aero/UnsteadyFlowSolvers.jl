@@ -818,6 +818,7 @@ immutable ThreeDSurf
     cam :: Array{Float64,2}
     cam_slope :: Array{Float64,2}
     theta :: Vector{Float64}
+    psi :: Vector{Float64}
     x :: Array{Float64,2}
     xle :: Vector{Float64}
     yle :: Vector{Float64}
@@ -846,7 +847,8 @@ immutable ThreeDSurf
         end
         nspan = nspan + 1
         lespcrit = zeros(nspan)
-        
+
+        psi = zeros(nspan)
         cam = zeros(nspan,ndiv)
         cam_slope = zeros(nspan,ndiv)
         cam1 = zeros(ndiv)
@@ -874,14 +876,18 @@ immutable ThreeDSurf
   	        x[is,ib] = c[is]/2.*(1-cos(theta[ib]))
 	    end
 	end
-	
         
 	nspan = 0
         for i = 1:length(patchdata) - 1
-            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
+            startpsi = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+            lenpsi = (patchdata[i+1].y - patchdata[i].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+            dpsi =  lenpsi/patchdata[i].nspan
+#            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
             for j = 1:patchdata[i].nspan
                 nspan += 1
-                yle[nspan] = patchdata[i].y + (i-1)*divspan
+                psi[nspan] = startpsi + (j-1)*dpsi
+                #                yle[nspan] = patchdata[i].y + (i-1)*divspan
+                yle[nspan] = -bref*cos(psi[nspan])/2.
                 xle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].x, patchdata[i+1].x, yle[nspan])
                 zle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].z, patchdata[i+1].z, yle[nspan])
                 c[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].c, patchdata[i+1].c, yle[nspan])
@@ -902,6 +908,7 @@ immutable ThreeDSurf
         end
         i = length(patchdata)
         nspan += 1
+        psi[nspan] = pi
         yle[nspan] = patchdata[i].y
         xle[nspan] = patchdata[i].x
         zle[nspan] = patchdata[i].z
@@ -1025,14 +1032,14 @@ immutable ThreeDSurf
                 kinem[i].udot = 0.
             end
 
-addspl = Spline1D(kinem.add[:,1], kinem.add[:,2])
+addspl = Spline1D(kindef.add[:,1], kindef.add[:,2])
 
-if (kinem.vary == 1)
+if (kindef.vary == 1)
     
     for i = 1:nspan
         kinem.h[i] = kinem.h[nspan]*evaluate(addspl,yle[i])
     end
-elseif (kinem.vary == 2)
+elseif (kindef.vary == 2)
     addspl = Spline1D(kinem.add[:,1], kinem.add[:,2])
     for i = 1:nspan
         kinem.alpha[i] = kinem.alpha[nspan]*evaluate(addspl,yle[i])
@@ -1069,8 +1076,8 @@ for j = 1:nspan
 end
 levflag = zeros(nspan)
 
-        new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
-    end
+new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, psi, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+end
 end
  
 

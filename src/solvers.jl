@@ -162,6 +162,88 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 
 
 end
 
+function lautat_wakeroll_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 11), kelv_enf = 0.)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+
+        kelv = KelvinCondition(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+        soln = nlsolve(not_in_place(kelv), [-0.01])
+        curfield.tev[length(curfield.tev)].s = soln.zero[1]
+
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #Check for LEV and shed if yes
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+
+        #Calculate bound vortex strengths
+        update_bv(surf)
+
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+
+
+        wakeroll(surf, curfield, dt)
+
+        cl, cd, cm, bc, cn, cs = calc_forces_more(surf)
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, bc, cn, cs])
+    end
+    mat = mat'
+    mat, surf, curfield, kelv_enf
+
+end
+
+
 function theodorsen(theo::TheoDef)
     # Inputs:
     # h_amp = h_amp/c, plunge amplitude, positive up
@@ -1495,7 +1577,272 @@ function design_solve(alphadef::MotionDef)
   return iter_h[iter]
 end
 
-function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+
+    psi = zeros(surf.nspan)
+    dpsi = pi/surf.nspan
+    
+    for i = 1:surf.nspan
+        psi[i] = (real(i)-0.5)*dpsi
+    end
+
+    mat = Array{Float64, 2}[] 
+    
+    if surf.kindef.vartype == "Constant"
+        
+        #This is just the 2D solution corrected to 3D - kinematics at all strips is the same
+
+        kinem2d = KinemDef(surf.kindef.alpha, surf.kindef.h, surf.kindef.u)
+        
+        surf2d = TwoDSurf(surf.patchdata[1].coord_file, surf.patchdata[1].pvt, kinem2d, [surf.patchdata[1].lc;])
+
+        #If 3D flow field is defined with disturbances or external vortices, these should be transferred to the 2D flowfield
+        curfield2d = TwoDFlowField()
+        
+        mat2d, surf2d, curfield2d = lautat_wakeroll_more(surf2d, curfield2d, nsteps, dtstar)
+
+        #Fill the 2D solution into the 3D data structures
+
+        for i = 1:surf.nspan
+            push!(mat, mat2d)
+            surf.cam[i,:] = surf2d.cam
+            surf.cam_slope[i,:] = surf2d.cam_slope
+            surf.kinem[i,:] = surf2d.kinem
+            surf.bnd_x[i,:] = surf2d.bnd_x
+            surf.bnd_z[i,:] = surf2d.bnd_z
+            surf.uind[i,:] = surf2d.uind
+            surf.vind[i,:] = 0
+            surf.wind[i,:] = surf2d.wind
+            surf.downwash[i,:] = surf2d.downwash
+            surf.a0[i] = surf2d.a0[1]
+            surf.aterm[i,:] = surf2d.aterm
+            surf.a0dot[i] = surf2d.a0dot[1]
+            surf.adot[i,:] = surf2d.adot
+            surf.a0prev[i] = surf2d.a0prev[1]
+            surf.aprev[i,:] = surf2d.aprev
+            surf.levflag[i] = surf2d.levflag[1]
+
+            #Convert the bound vortices into 3d vortices and add them
+            for j = 1:length(surf2d.bv)
+                surf.bv[i,j] = ThreeDVort([surf2d.bv[j].x; surf.yle[i]; surf2d.bv[j].z], [0.; surf2d.bv[j].s; 0.], surf2d.bv[j].vc, surf2d.bv[j].vx, 0., surf2d.bv[j].vz)
+            end
+        end
+        
+        for j = 1:surf.nspan
+            for i = 1:length(curfield2d.lev)
+                push!(field.lev, ThreeDVort([curfield2d.lev[i].x; surf.yle[j]; curfield2d.lev[i].z], [0.; curfield2d.lev[i].s; 0.], curfield2d.lev[i].vc, curfield2d.lev[i].vx, 0., curfield2d.lev[i].vz))
+            end
+            for i = 1:length(curfield2d.tev)
+                push!(field.tev, ThreeDVort([curfield2d.tev[i].x; surf.yle[j]; curfield2d.tev[i].z], [0.; curfield2d.tev[i].s; 0.], curfield2d.tev[i].vc, curfield2d.tev[i].vx, 0., curfield2d.tev[i].vz))
+            end
+            for i = 1:length(curfield2d.extv)
+                push!(field.extv, ThreeDVort([curfield2d.extv[i].x; surf.yle[j]; curfield2d.extv[i].z], [0.; curfield2d.extv[i].s; 0.], curfield2d.extv[i].vc, curfield2d.extv[i].vx, 0., curfield2d.extv[i].vz))
+            end
+        end
+
+        AR = surf.bref/surf.cref
+        
+        lhs = zeros(surf.nspan,surf.nbterm)
+        rhs = zeros(surf.nspan)
+        bcoeff = zeros(nsteps,surf.nbterm)
+        
+        cnc_finite = zeros(nsteps)
+        cnnc_finite = zeros(nsteps)
+
+        # There is no apparent mass correction in this method
+
+        for i = 1:nsteps
+            for j = 1:surf.nspan
+                for n = 1:surf.nbterm
+                    lhs[j,n] = sin(n*psi[j])*(sin(psi[j]) + (n*pi/(2*AR)))
+                end
+                rhs[j] = pi*sin(psi[j])*mat[j][i,9]/(2*AR)
+            end
+            
+            bcoeff[i,:] = \(lhs, rhs)
+        end
+        
+        a03d = zeros(nsteps,surf.nspan)
+        cd_ind = zeros(nsteps)
+
+        for i = 1:nsteps
+            cd_ind[i] = 0
+            for n = 1:surf.nbterm
+                cd_ind[i] = cd_ind[i] + real(n)*bcoeff[i,n]^2
+            end
+            cd_ind[i] = cd_ind[i]*pi*AR
+            for j = 1:surf.nspan
+                a03d[i,j] = 0
+
+                for n = 1:surf.nbterm
+                    a03d[i,j] = a03d[i,j] - real(n)*bcoeff[i,n]*sin(n*psi[j])/sin(psi[j])
+                end
+            end
+        end
+
+        cn = zeros(nsteps)
+        cs = zeros(nsteps)
+        cl = zeros(nsteps)
+        cd = zeros(nsteps)
+        cn3d = zeros(surf.nspan)
+        cs3d = zeros(surf.nspan)
+        cl3d = zeros(surf.nspan)
+        cd3d = zeros(surf.nspan)
+        
+        for i = 1:nsteps
+            cn[i] = 0
+            cs[i] = 0
+            update_kinem(surf2d, mat[1][i,1])
+                        
+            for j = 1:surf.nspan
+                cn3d[j] = mat[j][i,10] + (2*pi/surf.uref)*(mat[j][i,4]*cos(mat[j][i,2]) + surf2d.kinem.hdot*sin(mat[j][i,2]))*a03d[i,j]
+                cs3d[j] = mat[j][i,11] + 2*pi*a03d[i,j]^2
+                cl3d[j] = cn3d[j]*cos(mat[j][i,2]) + cs3d[j]*sin(mat[j][i,2])
+                cd3d[j] = cn3d[j]*sin(mat[j][i,2]) - cs3d[j]*cos(mat[j][i,2]) 
+                cn[i] = cn[i] + cn3d[j]*sin(psi[j])*dpsi/2
+                cs[i] = cs[i] + cs3d[j]*sin(psi[j])*dpsi/2
+                cl[i] = cl[i] + cl3d[j]*sin(psi[j])*dpsi/2
+                cd[i] = cd[i] + cd3d[j]*sin(psi[j])*dpsi/2
+            end
+        end
+        return cl, cd, cd_ind, surf, field, mat2d, a03d
+        
+    end
+
     
 end
+
+function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+
+    psi = zeros(surf.nspan)
+    dpsi = pi/surf.nspan
     
+    for i = 1:surf.nspan
+        psi[i] = (real(i)-0.5)*dpsi
+    end
+
+    mat = Array{Float64, 2}[] 
+    
+    if surf.kindef.vartype == "Constant"
+        
+        # Kinematics at all strips is the same
+
+        kinem2d = KinemDef(surf.kindef.alpha, surf.kindef.h, surf.kindef.u)
+        
+        surf2d = TwoDSurf(surf.patchdata[1].coord_file, surf.patchdata[1].pvt, kinem2d, [surf.patchdata[1].lc;])
+
+        #If 3D flow field is defined with disturbances or external vortices, these should be transferred to the 2D flowfield
+        curfield2d = TwoDFlowField()
+        
+        mat2d, surf2d, curfield2d = lautat_wakeroll_more(surf2d, curfield2d, nsteps, dtstar)
+
+        #Fill the 2D solution into the 3D data structures
+
+        for i = 1:surf.nspan
+            push!(mat, mat2d)
+            surf.cam[i,:] = surf2d.cam
+            surf.cam_slope[i,:] = surf2d.cam_slope
+            surf.kinem[i,:] = surf2d.kinem
+            surf.bnd_x[i,:] = surf2d.bnd_x
+            surf.bnd_z[i,:] = surf2d.bnd_z
+            surf.uind[i,:] = surf2d.uind
+            surf.vind[i,:] = 0
+            surf.wind[i,:] = surf2d.wind
+            surf.downwash[i,:] = surf2d.downwash
+            surf.a0[i] = surf2d.a0[1]
+            surf.aterm[i,:] = surf2d.aterm
+            surf.a0dot[i] = surf2d.a0dot[1]
+            surf.adot[i,:] = surf2d.adot
+            surf.a0prev[i] = surf2d.a0prev[1]
+            surf.aprev[i,:] = surf2d.aprev
+            surf.levflag[i] = surf2d.levflag[1]
+
+            #Convert the bound vortices into 3d vortices and add them
+            for j = 1:length(surf2d.bv)
+                surf.bv[i,j] = ThreeDVort([surf2d.bv[j].x; surf.yle[i]; surf2d.bv[j].z], [0.; surf2d.bv[j].s; 0.], surf2d.bv[j].vc, surf2d.bv[j].vx, 0., surf2d.bv[j].vz)
+            end
+        end
+        
+        for j = 1:surf.nspan
+            for i = 1:length(curfield2d.lev)
+                push!(field.lev, ThreeDVort([curfield2d.lev[i].x; surf.yle[j]; curfield2d.lev[i].z], [0.; curfield2d.lev[i].s; 0.], curfield2d.lev[i].vc, curfield2d.lev[i].vx, 0., curfield2d.lev[i].vz))
+            end
+            for i = 1:length(curfield2d.tev)
+                push!(field.tev, ThreeDVort([curfield2d.tev[i].x; surf.yle[j]; curfield2d.tev[i].z], [0.; curfield2d.tev[i].s; 0.], curfield2d.tev[i].vc, curfield2d.tev[i].vx, 0., curfield2d.tev[i].vz))
+            end
+            for i = 1:length(curfield2d.extv)
+                push!(field.extv, ThreeDVort([curfield2d.extv[i].x; surf.yle[j]; curfield2d.extv[i].z], [0.; curfield2d.extv[i].s; 0.], curfield2d.extv[i].vc, curfield2d.extv[i].vx, 0., curfield2d.extv[i].vz))
+            end
+        end
+
+        AR = surf.bref/surf.cref
+        
+        lhs = zeros(surf.nspan,surf.nbterm)
+        rhs = zeros(surf.nspan)
+        bcoeff = zeros(nsteps,surf.nbterm)
+        
+        cnc_finite = zeros(nsteps)
+        cnnc_finite = zeros(nsteps)
+
+        # There is no apparent mass correction in this method
+
+        for i = 1:nsteps
+            for j = 1:surf.nspan
+                for n = 1:surf.nbterm
+                    lhs[j,n] = sin(n*psi[j])*(sin(psi[j]) + (n*pi/(2*AR)))
+                end
+                rhs[j] = pi*sin(psi[j])*mat[j][i,9]/(2*AR)
+            end
+            
+            bcoeff[i,:] = \(lhs, rhs)
+        end
+        
+        a03d = zeros(nsteps,surf.nspan)
+        cd_ind = zeros(nsteps)
+
+        for i = 1:nsteps
+            cd_ind[i] = 0
+            for n = 1:surf.nbterm
+                cd_ind[i] = cd_ind[i] + real(n)*bcoeff[i,n]^2
+            end
+            cd_ind[i] = cd_ind[i]*pi*AR
+            for j = 1:surf.nspan
+                a03d[i,j] = 0
+
+                for n = 1:surf.nbterm
+                    a03d[i,j] = a03d[i,j] - real(n)*bcoeff[i,n]*sin(n*psi[j])/sin(psi[j])
+                end
+            end
+        end
+
+        cn = zeros(nsteps)
+        cs = zeros(nsteps)
+        cl = zeros(nsteps)
+        cd = zeros(nsteps)
+        cn3d = zeros(surf.nspan)
+        cs3d = zeros(surf.nspan)
+        cl3d = zeros(surf.nspan)
+        cd3d = zeros(surf.nspan)
+        
+        for i = 1:nsteps
+            cn[i] = 0
+            cs[i] = 0
+            update_kinem(surf2d, mat[1][i,1])
+                        
+            for j = 1:surf.nspan
+                cn3d[j] = mat[j][i,10] + (2*pi/surf.uref)*(mat[j][i,4]*cos(mat[j][i,2]) + surf2d.kinem.hdot*sin(mat[j][i,2]))*a03d[i,j]
+                cs3d[j] = mat[j][i,11] + 2*pi*a03d[i,j]^2
+                cl3d[j] = cn3d[j]*cos(mat[j][i,2]) + cs3d[j]*sin(mat[j][i,2])
+                cd3d[j] = cn3d[j]*sin(mat[j][i,2]) - cs3d[j]*cos(mat[j][i,2]) 
+                cn[i] = cn[i] + cn3d[j]*sin(psi[j])*dpsi/2
+                cs[i] = cs[i] + cs3d[j]*sin(psi[j])*dpsi/2
+                cl[i] = cl[i] + cl3d[j]*sin(psi[j])*dpsi/2
+                cd[i] = cd[i] + cd3d[j]*sin(psi[j])*dpsi/2
+            end
+        end
+        return cl, cd, cd_ind, surf, field, mat2d, a03d
+        
+    end
+    
+end
+

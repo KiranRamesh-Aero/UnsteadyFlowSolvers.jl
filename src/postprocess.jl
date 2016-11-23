@@ -114,7 +114,7 @@ function calc_forces_E(surf::TwoDSurf, lev :: Float64, dt :: Float64)
     cs = 2*pi*surf.a0[1]*surf.a0[1]
 
     #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
-    nonl=0
+    nonl=0 
     nonl_m=0
     for ib = 1:surf.ndiv-1
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s

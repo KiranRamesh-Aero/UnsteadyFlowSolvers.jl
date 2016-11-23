@@ -1184,8 +1184,12 @@ immutable KelvinCondition2DFree
     kelv_enf :: Float64
 end
 
-
-
+immutable KelvinConditionLLTldvm
+    surf3d :: ThreeDSurf
+    surf :: Vector{TwoDSurf}
+    field :: Vector{TwoDFlowField}
+end
+    
 function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
@@ -1313,6 +1317,70 @@ function (kelv::KelvinConditionwFlap)(tev_iter::Array{Float64})
 
     return val
 end
+
+function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
+    val = zeros(kelv.surf3d.nspan)
+    bc = zeros(kelv.surf3d.nspan)
+    
+    #Assume symmetry condition for now
+    for i = 1:kelv.surf3d.nspan
+        nlev = length(kelv.field[i].lev)
+        ntev = length(kelv.field[i].tev)
+        kelv.field[i].tev[ntev].s = tev_iter[i]
+        
+        #Update incduced velocities on airfoil
+        update_indbound(kelv.surf[i], kelv.field[i])
+
+        #Calculate downwash
+        update_downwash(kelv.surf[i], [kelv.field[i].u[1],kelv.field[i].w[1]])
+
+        #Calculate first two fourier coefficients
+        update_a0anda1(kelv.surf[i])
+
+        bc[i] = kelv.surf[i].a0[1] + 0.5*kelv.surf[i].aterm[1]
+        
+        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+        
+        for iv = 1:ntev
+            val[i] = val[i] + kelv.field[i].tev[iv].s
+        end
+        for iv = 1:nlev
+            val[i] = val[i] + kelv.field[i].lev[iv].s
+        end
+    end
+    
+    AR = kelv.surf3d.bref/kelv.surf3d.cref
+    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nbterm)
+    rhs = zeros(kelv.surf3d.nspan)
+    bcoeff = zeros(kelv.surf3d.nbterm)
+    
+    for j = 1:kelv.surf3d.nspan
+        for n = 1:kelv.surf3d.nbterm
+            lhs[j,n] = sin(n*kelv.surf3d.psi[j])*(sin(kelv.surf3d.psi[j]) + (n*pi/(2*AR)))
+        end
+        rhs[j] = pi*sin(kelv.surf3d.psi[j])*bc[j]/(2*AR)
+    end
+    bcoeff[:] = \(lhs, rhs)    
+    
+    a03d = zeros(kelv.surf3d.nspan)
+
+    for j = 2:kelv.surf3d.nspan-1
+        a03d[j] = 0
+        for n = 1:kelv.surf3d.nbterm
+            a03d[j] = a03d[j] - real(n)*bcoeff[n]*sin(n*kelv.surf3d.psi[j])/sin(kelv.surf3d.psi[j])
+        end
+    end
+    a03d[1] = -bc[1]
+    a03d[kelv.surf3d.nspan] = -bc[kelv.surf3d.nspan]
+        
+    for i = 2:kelv.surf3d.nspan-1
+        val[i] = val[i] + kelv.surf[i].uref*kelv.surf[i].c*pi*a03d[i]
+    end
+    #val[1] = 0
+    #val[kelv.surf3d.nspan] = 0
+    return val
+end
+
 
 # END KelvinCondition
 # ---------------------------------------------------------------------------------------------

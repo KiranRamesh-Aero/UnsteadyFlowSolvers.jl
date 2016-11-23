@@ -401,13 +401,13 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         #Check for LESP condition
         #Update values with converged value of shed tev
         #Update incduced velocities on airfoil
-        update_indbound(kelv.surf, kelv.field)
+        update_indbound(surf, curfield)
 
         #Calculate downwash
-        update_downwash(kelv.surf, [curfield.u[1],curfield.w[1]])
+        update_downwash(surf, [curfield.u[1],curfield.w[1]])
 
         #Calculate first two fourier coefficients
-        update_a0anda1(kelv.surf)
+        update_a0anda1(surf)
 
         lesp = surf.a0[1]
 
@@ -1714,13 +1714,6 @@ end
 
 function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
 
-    psi = zeros(surf.nspan)
-    dpsi = pi/surf.nspan
-    
-    for i = 1:surf.nspan
-        psi[i] = (real(i)-0.5)*dpsi
-    end
-
     mat = Array{Float64, 2}[] 
     
     if surf.kindef.vartype == "Constant"
@@ -1789,9 +1782,9 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
         for i = 1:nsteps
             for j = 1:surf.nspan
                 for n = 1:surf.nbterm
-                    lhs[j,n] = sin(n*psi[j])*(sin(psi[j]) + (n*pi/(2*AR)))
+                    lhs[j,n] = sin(n*surf.psi[j])*(sin(surf.psi[j]) + (n*pi/(2*AR)))
                 end
-                rhs[j] = pi*sin(psi[j])*mat[j][i,9]/(2*AR)
+                rhs[j] = pi*sin(surf.psi[j])*mat[j][i,9]/(2*AR)
             end
             
             bcoeff[i,:] = \(lhs, rhs)
@@ -1810,7 +1803,7 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
                 a03d[i,j] = 0
 
                 for n = 1:surf.nbterm
-                    a03d[i,j] = a03d[i,j] - real(n)*bcoeff[i,n]*sin(n*psi[j])/sin(psi[j])
+                    a03d[i,j] = a03d[i,j] - real(n)*bcoeff[i,n]*sin(n*surf.psi[j])/sin(surf.psi[j])
                 end
             end
         end
@@ -1834,10 +1827,12 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
                 cs3d[j] = mat[j][i,11] + 2*pi*a03d[i,j]^2
                 cl3d[j] = cn3d[j]*cos(mat[j][i,2]) + cs3d[j]*sin(mat[j][i,2])
                 cd3d[j] = cn3d[j]*sin(mat[j][i,2]) - cs3d[j]*cos(mat[j][i,2]) 
-                cn[i] = cn[i] + cn3d[j]*sin(psi[j])*dpsi/2
-                cs[i] = cs[i] + cs3d[j]*sin(psi[j])*dpsi/2
-                cl[i] = cl[i] + cl3d[j]*sin(psi[j])*dpsi/2
-                cd[i] = cd[i] + cd3d[j]*sin(psi[j])*dpsi/2
+            end
+            for j = 1:surf.nspan-1
+                cn[i] = cn[i] + 0.5*(cn3d[j] + cn3d[j+1])*sin(0.5*(surf.psi[j] + surf.psi[j+1]))*(surf.psi[j+1] - surf.psi[j])/2
+                cs[i] = cs[i] + 0.5*(cs3d[j] + cs3d[j+1])*sin(0.5*(surf.psi[j] + surf.psi[j+1]))*(surf.psi[j+1] - surf.psi[j])/2
+                cl[i] = cl[i] + 0.5*(cl3d[j] + cl3d[j+1])*sin(0.5*(surf.psi[j] + surf.psi[j+1]))*(surf.psi[j+1] - surf.psi[j])/2
+                cd[i] = cd[i] + 0.5*(cd3d[j] + cd3d[j+1])*sin(0.5*(surf.psi[j] + surf.psi[j+1]))*(surf.psi[j+1] - surf.psi[j])/2
             end
         end
         return cl, cd, cd_ind, surf, field, mat2d, a03d
@@ -1846,3 +1841,133 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
     
 end
 
+function LLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+    
+    mat = Array(Float64, 0, 4)
+
+    mat = mat'
+    
+    surf2d = TwoDSurf[]
+    field2d = TwoDFlowField[]
+    kinem2d = KinemDef[]
+
+    dt = dtstar*surf.cref/surf.uref
+
+    t = 0.
+
+    cl = zeros(surf.nspan)
+    cd = zeros(surf.nspan)
+    cm = zeros(surf.nspan)
+    
+    if surf.kindef.vartype == "Constant"
+
+        for i = 1:surf.nspan
+            # Kinematics at all strips is the same
+            
+            push!(kinem2d, KinemDef(surf.kindef.alpha, surf.kindef.h, surf.kindef.u))
+            push!(surf2d, TwoDSurf(surf.patchdata[1].coord_file, surf.patchdata[1].pvt, kinem2d[i], [surf.patchdata[1].lc;]))
+            #If 3D flow field is defined with disturbances or external vortices, these should be transferred to the 2D flowfield
+            push!(field2d, TwoDFlowField())
+        end
+    end
+
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        for i = 1:surf.nspan
+            #Update kinematic parameters
+            update_kinem(surf2d[i], t)
+        
+            #Update flow field parameters if any
+            update_externalvel(field2d[i], t)
+
+            #Update bound vortex positions
+            update_boundpos(surf2d[i], dt)
+
+            #Add a TEV with dummy strength
+            place_tev(surf2d[i], field2d[i], dt)
+        end
+        
+        kelv = KelvinConditionLLTldvm(surf, surf2d, field2d)
+        
+        #Solve for TEV strength to satisfy Kelvin condition
+        
+        soln = nlsolve(not_in_place(kelv), -0.01*ones(surf.nspan))
+        for i = 1:surf.nspan
+            field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
+
+            #Update incduced velocities on airfoil
+            update_indbound(surf2d[i], field2d[i])
+            
+            #Calculate downwash
+            update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
+            
+            #Calculate first two fourier coefficients
+            update_a0anda1(surf2d[i])
+
+            #Update rest of Fourier terms
+            update_a2toan(surf2d[i])
+            
+            #Update derivatives of Fourier coefficients
+            update_adot(surf2d[i],dt)
+            
+            #Set previous values of aterm to be used for derivatives in next time step
+            surf2d[i].a0prev[1] = surf2d[i].a0[1]
+            for ia = 1:3
+                surf2d[i].aprev[ia] = surf2d[i].aterm[ia]
+            end
+            
+            #Calculate bound vortex strengths
+            update_bv(surf2d[i])
+            
+            # #Remove vortices that are far away from airfoil
+            # if (delvort.flag == 1)
+            #     if length(field2d[i].tev) > delvort.limit
+            #         if (sqrt((field2d[i].tev[1].x- surf2d[i].bnd_x[div(surf2d[i].ndiv,2)])^2 + (field2d[i].tev[1].z- surf2d[i].bnd_z[div(surf2d[i].ndiv,2)])^2) > delvort.dist*surf2d[i].c)
+            #             kelv_enf = kelv_enf + field2d[i].tev[1].s
+            #             for i = 1:length(field2d[i].tev)-1
+            #                 field2d[i].tev[i] = field2d[i].tev[i+1]
+            #             end
+            #             pop!(field2d[i].tev)
+            #         end
+            #     end
+            #     if length(field2d[i].lev) > delvort.limit
+            #         if (sqrt((field2d[i].lev[1].x- surf2d[i].bnd_x[div(surf2d[i].ndiv,2)])^2 + (field2d[i].lev[1].z- surf2d[i].bnd_z[div(surf2d[i].ndiv,2)])^2) > delvort.dist*surf2d[i].c)
+            #             kelv_enf = kelv_enf + field2d[i].lev[1].s
+            #             for i = 1:length(field2d[i].lev)-1
+            #                 field2d[i].lev[i] = field2d[i].lev[i+1]
+            #             end
+            #         pop!(field2d[i].lev)
+            #         end
+            #     end
+            # end
+            wakeroll(surf2d[i], field2d[i], dt)
+
+            if (surf.levflag[i] == 1) 
+                cl[i], cd[i], cm[i] = calc_forces_E(surf2d[i], field2d[i].lev[length(field2d[i].lev)].s, dt)
+            else
+                cl[i], cd[i], cm[i] = calc_forces(surf2d[i])
+            end
+
+        end
+
+        cl3d = 0
+        cd3d = 0
+        cm3d = 0
+        
+        for i = 1:surf.nspan-1
+            cl3d = cl3d + 0.5*(cl[i] + cl[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2
+            cd3d = cd3d + 0.5*(cd[i] + cd[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2
+            cm3d = cm3d + 0.5*(cm[i] + cm[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2       
+        end
+
+        mat = hcat(mat, [t, cl3d, cd3d, cm3d])
+    end
+    mat = mat'    
+    mat, surf2d, field2d
+    
+end
+        
+        
+           

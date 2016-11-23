@@ -840,9 +840,9 @@ immutable ThreeDSurf
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
     
-    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35, nbterm = 70)
+    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, n/aterm=35, nbterm = 21)
         nspan = 0
-        for i = 1:length(patchdata)
+        for i = 1:length(patchdata)-1
             nspan += patchdata[i].nspan
         end
         nspan = nspan + 1
@@ -879,13 +879,27 @@ immutable ThreeDSurf
         
 	nspan = 0
         for i = 1:length(patchdata) - 1
+            if i != 1
+                nspan += 1
+                psi[nspan] = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+                yle[nspan] = patchdata[i].y
+                xle[nspan] = patchdata[i].x
+                zle[nspan] = patchdata[i].z
+                c[nspan] = patchdata[i].c
+                twist[nspan] = patchdata[i].twist
+                if (patchdata[i].coord_file != "FlatPlate")
+                    cam[nspan,:], cam_slope[nspan,:] = camber_calc(0.5*(1-cos(theta)), patchdata[i].coord_file)
+                end
+                lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
+                pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
+            end
             startpsi = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
             lenpsi = (patchdata[i+1].y - patchdata[i].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
-            dpsi =  lenpsi/patchdata[i].nspan
+            dpsi =  lenpsi/(patchdata[i].nspan + 1.)
 #            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
             for j = 1:patchdata[i].nspan
                 nspan += 1
-                psi[nspan] = startpsi + (j-1)*dpsi
+                psi[nspan] = startpsi + real(j)*dpsi
                 #                yle[nspan] = patchdata[i].y + (i-1)*divspan
                 yle[nspan] = -bref*cos(psi[nspan])/2.
                 xle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].x, patchdata[i+1].x, yle[nspan])
@@ -905,19 +919,6 @@ immutable ThreeDSurf
                 lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
                 pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
             end
-        end
-        i = length(patchdata)
-        nspan += 1
-        psi[nspan] = pi
-        yle[nspan] = patchdata[i].y
-        xle[nspan] = patchdata[i].x
-        zle[nspan] = patchdata[i].z
-        c[nspan] = patchdata[i].c
-        twist[nspan] = patchdata[i].twist
-        pvt[nspan] = patchdata[i].pvt
-        lespcrit[nspan] = patchdata[i].lc
-        if (patchdata[i].coord_file != "FlatPlate")
-            cam[nspan,:], cam_slope[nspan,:] = camber_calc(x[nspan,:], patchdata[i].coord_file)
         end
         
         inkim = KinemPar(0, 0, 0, 0, 0, 0)
@@ -1364,16 +1365,14 @@ function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
     
     a03d = zeros(kelv.surf3d.nspan)
 
-    for j = 2:kelv.surf3d.nspan-1
+    for j = 1:kelv.surf3d.nspan
         a03d[j] = 0
         for n = 1:kelv.surf3d.nbterm
             a03d[j] = a03d[j] - real(n)*bcoeff[n]*sin(n*kelv.surf3d.psi[j])/sin(kelv.surf3d.psi[j])
         end
     end
-    a03d[1] = -bc[1]
-    a03d[kelv.surf3d.nspan] = -bc[kelv.surf3d.nspan]
-        
-    for i = 2:kelv.surf3d.nspan-1
+
+    for i = 1:kelv.surf3d.nspan
         val[i] = val[i] + kelv.surf[i].uref*kelv.surf[i].c*pi*a03d[i]
     end
     #val[1] = 0

@@ -840,7 +840,7 @@ immutable ThreeDSurf
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
     
-    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, n/aterm=35, nbterm = 21)
+    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35, nbterm = 21)
         nspan = 0
         for i = 1:length(patchdata)-1
             nspan += patchdata[i].nspan

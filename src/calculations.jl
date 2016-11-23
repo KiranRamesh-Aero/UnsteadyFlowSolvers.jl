@@ -1050,6 +1050,34 @@ function mutual_ind(vorts::Vector{TwoDVort})
     return vorts
 end
 
+# Function determining the effects of interacting vorticies - velocities induced on each other - rotation induced on each other
+function mutual_ind(vorts::Vector{ThreeDVort})
+    for i = 1:length(vorts)
+        for j = i+1:length(vorts)
+            dx = vorts[i].x[1] - vorts[j].x[1]
+            dy = vorts[i].x[2] - vorts[j].x[2]
+            dz = vorts[i].x[3] - vorts[j].x[3]
+            #source- tar
+            r = sqrt(dx*dx + dz*dz + dy*dy)
+            rho = r/vorts[i].vc
+            f = sqrt(2./pi)*exp(-rho^2/2.)
+            g = erf(rho/sqrt(2.)) - rho*f
+
+            #Continue from here.
+            
+            magitr = 1./(2*pi*sqrt(vorts[j].vc*vorts[j].vc*vorts[j].vc*vorts[j].vc + dsq*dsq))
+            magjtr = 1./(2*pi*sqrt(vorts[i].vc*vorts[i].vc*vorts[i].vc*vorts[i].vc + dsq*dsq))
+
+            vorts[j].vx -= dz * vorts[i].s * magjtr
+            vorts[j].vz += dx * vorts[i].s * magjtr
+
+            vorts[i].vx += dz * vorts[j].s * magitr
+            vorts[i].vz -= dx * vorts[j].s * magitr
+        end
+    end
+    return vorts
+end
+
 
 # ---------------------------------------------------------------------------------------------
 # Function for updating the positions of the bound vortices

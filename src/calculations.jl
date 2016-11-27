@@ -1050,34 +1050,43 @@ function mutual_ind(vorts::Vector{TwoDVort})
     return vorts
 end
 
-# Function determining the effects of interacting vorticies - velocities induced on each other - rotation induced on each other
-function mutual_ind(vorts::Vector{ThreeDVort})
-    for i = 1:length(vorts)
-        for j = i+1:length(vorts)
-            dx = vorts[i].x[1] - vorts[j].x[1]
-            dy = vorts[i].x[2] - vorts[j].x[2]
-            dz = vorts[i].x[3] - vorts[j].x[3]
-            #source- tar
-            r = sqrt(dx*dx + dz*dz + dy*dy)
-            rho = r/vorts[i].vc
-            f = sqrt(2./pi)*exp(-rho^2/2.)
-            g = erf(rho/sqrt(2.)) - rho*f
-
-            #Continue from here.
-            
-            magitr = 1./(2*pi*sqrt(vorts[j].vc*vorts[j].vc*vorts[j].vc*vorts[j].vc + dsq*dsq))
-            magjtr = 1./(2*pi*sqrt(vorts[i].vc*vorts[i].vc*vorts[i].vc*vorts[i].vc + dsq*dsq))
-
-            vorts[j].vx -= dz * vorts[i].s * magjtr
-            vorts[j].vz += dx * vorts[i].s * magjtr
-
-            vorts[i].vx += dz * vorts[j].s * magitr
-            vorts[i].vz -= dx * vorts[j].s * magitr
-        end
-    end
-    return vorts
+function fgfromrhoGauss(rho::Float64)
+    f = sqrt(2./pi)*exp(-rho^2/2.)
+    g = erf(rho/sqrt(2.)) - rho*f
+    return f, g
 end
 
+function mutual_ind(vorts::Vector{ThreeDVort})
+      for i = 1:length(vorts)
+          for j = i+1:length(vorts)
+              dx = vorts[i].x[1] - vorts[j].x[1]
+              dy = vorts[i].x[2] - vorts[j].x[2]
+              dz = vorts[i].x[3] - vorts[j].x[3]
+              #source - tar
+
+              r = sqrt(dx*dx + dz*dz + dy*dy)
+              rhoi = r/vorts[i].vc
+              rhoj = r/vorts[i].vc
+
+              f, g = fgfromrhoGauss(rhoi)
+            
+              vorts[j].v += -g*cross([dx; dy; dz],vorts[i].s)/(4.*pi*r^3)
+                
+              vorts[j].ds += -(-g*cross(vorts[j].s, vorts[i].s)/rhoi^3 + 
+                ((3*g/rhoi^3 - f)*dot(vorts[j].s, [dx;dy;dz])*cross([dx;dy;dz],vorts[i].s))/r^2)/(4*pi*vorts[i].vc^3)  
+                
+            
+            f, g = fgfromrhoGauss(rhoj)
+            vorts[i].v += -g*cross([dx; dy; dz],vorts[j].s)/(4.*pi*r^3)
+                
+            vorts[i].ds += -(-g*cross(vorts[i].s, vorts[j].s)/rhoj^3 + 
+            ((3*g/rhoj^3 - f)*dot(vorts[i].s, [dx;dy;dz])*cross([dx;dy;dz],vorts[j].s))/r^2)/(4*pi*vorts[j].vc^3)  
+                
+
+          end
+      end
+      return vorts
+end
 
 # ---------------------------------------------------------------------------------------------
 # Function for updating the positions of the bound vortices

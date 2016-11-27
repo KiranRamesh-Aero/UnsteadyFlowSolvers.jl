@@ -1442,7 +1442,7 @@ function design_solve(alphadef::MotionDef)
   return iter_h[iter]
 end
 
-function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+function QScorrect_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
 
     psi = zeros(surf.nspan)
     dpsi = pi/surf.nspan
@@ -1577,7 +1577,7 @@ function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: In
     
 end
 
-function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+function QScorrect_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
 
     mat = Array{Float64, 2}[] 
     
@@ -1706,7 +1706,7 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
     
 end
 
-function LLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
     
     mat = Array(Float64, 0, 4)
 
@@ -1864,6 +1864,233 @@ function LLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64,
     mat, surf2d, field2d
     
 end
+
+
+function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+    
+    mat = Array(Float64, 0, 4)
+
+    mat = mat'
+    
+    surf2d = TwoDSurf[]
+    field2d = TwoDFlowField[]
+    kinem2d = KinemDef[]
+
+    dt = dtstar*surf.cref/surf.uref
+
+    t = 0.
+
+    AR = surf.bref/surf.cref
+
+    bc = zeros(surf.nspan)
+    a03d = zeros(surf.nspan)
+    cl = zeros(surf.nspan)
+    cd = zeros(surf.nspan)
+    cm = zeros(surf.nspan)
+
+    lhs = zeros(surf.nspan, surf.nbterm)
+    rhs = zeros(surf.nspan)
+    bcoeff = zeros(surf.nbterm)
+    
+    if surf.kindef.vartype == "Constant"
+
+        for i = 1:surf.nspan
+            # Kinematics at all strips is the same
+            
+            push!(kinem2d, KinemDef(surf.kindef.alpha, surf.kindef.h, surf.kindef.u))
+            push!(surf2d, TwoDSurf(surf.patchdata[1].coord_file, surf.patchdata[1].pvt, kinem2d[i], [surf.patchdata[1].lc;]))
+            #If 3D flow field is defined with disturbances or external vortices, these should be transferred to the 2D flowfield
+            push!(field2d, TwoDFlowField())
+        end
+    end
+
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        for i = 1:surf.nspan
+            #Update kinematic parameters
+            update_kinem(surf2d[i], t)
         
+            #Update flow field parameters if any
+            update_externalvel(field2d[i], t)
+
+            #Update bound vortex positions
+            update_boundpos(surf2d[i], dt)
+
+            #Add a TEV with dummy strength
+            place_tev(surf2d[i], field2d[i], dt)
+        end
+        
+        kelv = KelvinConditionLLTldvm(surf, surf2d, field2d)
+        
+        #Solve for TEV strength to satisfy Kelvin condition
+        
+        soln = nlsolve(not_in_place(kelv), -0.01*ones(surf.nspan))
+        
+        for i = 1:surf.nspan
+            field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
+
+            #Update incduced velocities on airfoil
+            update_indbound(surf2d[i], field2d[i])
+            
+            #Calculate downwash
+            update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
+            
+            #Calculate first two fourier coefficients
+            update_a0anda1(surf2d[i])
+
+            bc[i] = surf2d[i].a0[1] + 0.5*surf2d[i].aterm[1]
+        end
+
+        for i = 1:surf.nspan
+            for n = 1:surf.nbterm
+                lhs[i,n] = sin(n*surf.psi[i])*(sin(surf.psi[i]) + (n*pi/(2*AR)))
+            end
+            rhs[i] = pi*sin(surf.psi[i])*bc[i]/(2*AR)
+        end
+        bcoeff[:] = \(lhs, rhs)   
+
+        for i = 1:surf.nspan
+            a03d[i] = 0
+            for n = 1:surf.nbterm
+            a03d[i] = a03d[i] - real(n)*bcoeff[n]*sin(n*surf.psi[i])/sin(surf.psi[i])
+            end
+        end
+
+        nshed = Int(0) 
+        for i = 1:surf.nspan
+            #Update 3D effect on A0
+            surf2d[i].a0[1] = surf2d[i].a0[1] + a03d[i]
+
+            #2D iteration if LESP_crit is exceeded
+            if abs(surf2d[i].a0[1]) > surf2d[i].lespcrit[1]
+                #Remove the previous tev
+                pop!(field2d[i].tev)
+                #Add a TEV with dummy strength
+                place_tev(surf2d[i],field2d[i],dt)
+
+                #Add a LEV with dummy strength
+                place_lev(surf2d[i],field2d[i],dt)
+                surf2d[i].levflag[1] = 1
+                nshed += 1
+            else
+                surf2d[i].levflag[1] = 0
+            end
+        end 
+        if nshed > 0 
+            kelvkutta = KelvinKuttaLLTldvm(surf,surf2d,field2d, nshed)
+
+            #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
+            soln = nlsolve(not_in_place(kelvkutta), [-0.01*ones(surf.nspan); 0.01*ones(nshed)])
+        end
+
+        cntr = surf.nspan + 1
+        
+        for i = 1:surf.nspan
+            field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
+        end
+        for i = 1:surf.nspan
+            if surf2d[i].levflag[1] == 1
+                field2d[i].lev[length(field2d[i].lev)].s = soln.zero[cntr]
+                cntr += 1
+            end
+        end
+
+        for i = 1:surf.nspan
+            #Update incduced velocities on airfoil
+            update_indbound(surf2d[i], field2d[i])
+            
+            #Calculate downwash
+            update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
+            
+            #Calculate first two fourier coefficients
+            update_a0anda1(surf2d[i])
+            
+            bc[i] = surf2d[i].a0[1] + 0.5*surf2d[i].aterm[1]
+        end
+
+        for i = 1:surf.nspan
+            for n = 1:surf.nbterm
+                lhs[i,n] = sin(n*surf.psi[i])*(sin(surf.psi[i]) + (n*pi/(2*AR)))
+            end
+            rhs[i] = pi*sin(surf.psi[i])*bc[i]/(2*AR)
+        end
+        bcoeff[:] = \(lhs, rhs)   
+
+        for i = 1:surf.nspan
+            a03d[i] = 0
+            for n = 1:surf.nbterm
+            a03d[i] = a03d[i] - real(n)*bcoeff[n]*sin(n*surf.psi[i])/sin(surf.psi[i])
+            end
+        end
+
+        for i = 1:surf.nspan
+            #Update 3D effect on A0
+            surf2d[i].a0[1] = surf2d[i].a0[1] + a03d[i]
+            
+            #Update rest of Fourier terms
+            update_a2toan(surf2d[i])
+            
+            #Update derivatives of Fourier coefficients
+            update_adot(surf2d[i],dt)
+            
+            #Set previous values of aterm to be used for derivatives in next time step
+            surf2d[i].a0prev[1] = surf2d[i].a0[1]
+            for ia = 1:3
+                surf2d[i].aprev[ia] = surf2d[i].aterm[ia]
+            end
+            
+            #Calculate bound vortex strengths
+            update_bv(surf2d[i])
+            
+            # #Remove vortices that are far away from airfoil
+            # if (delvort.flag == 1)
+            #     if length(field2d[i].tev) > delvort.limit
+            #         if (sqrt((field2d[i].tev[1].x- surf2d[i].bnd_x[div(surf2d[i].ndiv,2)])^2 + (field2d[i].tev[1].z- surf2d[i].bnd_z[div(surf2d[i].ndiv,2)])^2) > delvort.dist*surf2d[i].c)
+            #             kelv_enf = kelv_enf + field2d[i].tev[1].s
+            #             for i = 1:length(field2d[i].tev)-1
+            #                 field2d[i].tev[i] = field2d[i].tev[i+1]
+            #             end
+            #             pop!(field2d[i].tev)
+            #         end
+            #     end
+            #     if length(field2d[i].lev) > delvort.limit
+            #         if (sqrt((field2d[i].lev[1].x- surf2d[i].bnd_x[div(surf2d[i].ndiv,2)])^2 + (field2d[i].lev[1].z- surf2d[i].bnd_z[div(surf2d[i].ndiv,2)])^2) > delvort.dist*surf2d[i].c)
+            #             kelv_enf = kelv_enf + field2d[i].lev[1].s
+            #             for i = 1:length(field2d[i].lev)-1
+            #                 field2d[i].lev[i] = field2d[i].lev[i+1]
+            #             end
+            #         pop!(field2d[i].lev)
+            #         end
+            #     end
+            # end
+            wakeroll(surf2d[i], field2d[i], dt)
+
+            if (surf2d[i].levflag[1] == 1) 
+                cl[i], cd[i], cm[i] = calc_forces_E(surf2d[i], field2d[i].lev[length(field2d[i].lev)].s, dt)
+            else
+                cl[i], cd[i], cm[i] = calc_forces(surf2d[i])
+            end
+
+        end
+
+        cl3d = 0
+        cd3d = 0
+        cm3d = 0
+        
+        for i = 1:surf.nspan-1
+            cl3d = cl3d + 0.5*(cl[i] + cl[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2
+            cd3d = cd3d + 0.5*(cd[i] + cd[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2
+            cm3d = cm3d + 0.5*(cm[i] + cm[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])/2       
+        end
+
+        mat = hcat(mat, [t, cl3d, cd3d, cm3d])
+    end
+    mat = mat'    
+    mat, surf2d, field2d
+    
+end
+
         
            

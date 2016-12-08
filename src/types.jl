@@ -307,7 +307,12 @@ end
 #Definition of flowfield in 3D
 immutable ThreeDFieldSimple
     f2d :: Vector{TwoDFlowField}
+    function ThreeDFieldSimple()
+        f2d = TwoDFlowField[]
+    new(f2d)
+    end
 end
+
 
 # immutable ThreeDFlowField
 #     velX :: MotionDef
@@ -804,7 +809,7 @@ immutable patch
     lc :: Float64
     nspan :: Int8
 end
-    
+
 # immutable ThreeDSurf
 #     cref :: Float64
 #     bref :: Float64
@@ -841,7 +846,7 @@ end
 #     bv :: Array{ThreeDVort,2}
 #     lespcrit :: Vector{Float64}
 #     levflag :: Vector{Int8}
-    
+
 #     function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35)
 #         nspan = 0
 #         for i = 1:length(patchdata)-1
@@ -863,22 +868,22 @@ end
 #         pvt = zeros(nspan)
 # 	yle = zeros(nspan)
 # 	xle = zeros(nspan)
-# 	zle = zeros(nspan)	    
+# 	zle = zeros(nspan)
 #        	twist = zeros(nspan)
 
 #         kinem = KinemPar[]
-        
+
 # 	theta = zeros(ndiv)
 #         x = zeros(nspan,ndiv)
 
 #         dtheta = pi/(ndiv-1)
 #         for ib = 1:ndiv
 #             theta[ib] = real(ib-1.)*dtheta
-# 	    for is = 1:nspan	      
+# 	    for is = 1:nspan
 #   	        x[is,ib] = c[is]/2.*(1-cos(theta[ib]))
 # 	    end
 # 	end
-        
+
 # 	nspan = 0
 #         for i = 1:length(patchdata) - 1
 #             if i != 1
@@ -922,7 +927,7 @@ end
 #                 pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
 #             end
 #         end
-        
+
 #         inkim = KinemPar(0, 0, 0, 0, 0, 0)
 #         for i = 1:nspan
 #             push!(kinem, inkim)
@@ -947,7 +952,7 @@ end
 #                 kinem[i].alpha = kindef.alpha(0.)
 #                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
 #             end
-                
+
 #             if (typeof(kindef.h) == EldUpDef)
 #                 kinem[i].h = kindef.h(0.)*cref
 #                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
@@ -967,7 +972,7 @@ end
 #                 kinem[i].h = kindef.h(0.)*cref
 #                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
 #             end
-            
+
 #             if (typeof(kindef.u) == EldUpDef)
 #                 kinem[i].u = kindef.u(0.)*uref
 #                 kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
@@ -979,7 +984,7 @@ end
 #                 kinem[i].u = kindef.u(0.)*uref
 #                 kinem[i].udot = 0.
 #             end
-            
+
 #             for i = 2:nspan
 #                 kinem[i] = kinem[1]
 #             end
@@ -1002,7 +1007,7 @@ end
 #                 kinem[i].alpha = kindef.alpha(0.)
 #                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
 #             end
-            
+
 #             if (typeof(kindef.h) == EldUpDef)
 #                 kinem[i].h = kindef.h(0.)*cref
 #                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
@@ -1022,7 +1027,7 @@ end
 #                 kinem[i].h = kindef.h(0.)*cref
 #                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
 #             end
-            
+
 #             if (typeof(kindef.u) == EldUpDef)
 #                 kinem[i].u = kindef.u(0.)*uref
 #                 kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
@@ -1038,7 +1043,7 @@ end
 # addspl = Spline1D(kindef.add[:,1], kindef.add[:,2])
 
 # if (kindef.vary == 1)
-    
+
 #     for i = 1:nspan
 #         kinem.h[i] = kinem.h[nspan]*evaluate(addspl,yle[i])
 #     end
@@ -1046,7 +1051,7 @@ end
 #     addspl = Spline1D(kinem.add[:,1], kinem.add[:,2])
 #     for i = 1:nspan
 #         kinem.alpha[i] = kinem.alpha[nspan]*evaluate(addspl,yle[i])
-#     end 
+#     end
 # end
 
 # end
@@ -1082,7 +1087,7 @@ end
 # new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, psi, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
 # end
 # end
- 
+
 
 immutable ThreeDSurfSimple
     cref :: Float64
@@ -1098,26 +1103,36 @@ immutable ThreeDSurfSimple
     psi :: Vector{Float64}
     yle :: Vector{Float64}
     s2d :: Vector{TwoDSurf}
-    
-    function ThreeDSurfSimple(AR, kindef, lespcrit = [10.;], nspan = 20, cref = 1., uref=1., ndiv=70, naterm=35)
+    a03d :: Vector{Float64}
+    bc :: Vector{Float64}
+    nshed :: Vector{Float64}
+
+    function ThreeDSurfSimple(AR, kindef, coord_file, pvt, lespcrit = [10.;], nspan = 20, cref = 1., uref=1., ndiv=70, naterm=35)
 
         bref = AR*cref
 
         psi = zeros(nspan)
+        yle = zeros(nspan)
+
+        s2d = TwoDSurf[]
 
 	for i = 1:nspan
-            psi[i] = real(j)*(pi/2)/nspan
+            psi[i] = real(i)*(pi/2)/nspan
             yle[i] = -bref*cos(psi[i])/2.
         end
-        
-        for i = 1:surf.nspan
+
+        for i = 1:nspan
             push!(s2d, TwoDSurf(coord_file, pvt,  kindef, lespcrit, cref, uref, ndiv, naterm))
         end
 
-new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d)
+        a03d = zeros(nspan)
+        bc = zeros(nspan)
+        nshed = [0.;]
+
+new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d, a03d, bc, nshed)
 end
 end
- 
+
 
 
 
@@ -1224,11 +1239,10 @@ immutable KelvinCondition2DFree
 end
 
 immutable KelvinConditionLLTldvm
-    surf3d :: ThreeDSurf
-    surf :: Vector{TwoDSurf}
-    field :: Vector{TwoDFlowField}
+    surf :: ThreeDSurfSimple
+    field :: ThreeDFieldSimple
 end
-    
+
 function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
     nlev = length(kelv.field.lev)
@@ -1358,53 +1372,53 @@ function (kelv::KelvinConditionwFlap)(tev_iter::Array{Float64})
 end
 
 function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
-    val = zeros(2*kelv.surf3d.nspan)
-    bc = zeros(kelv.surf3d.nspan)
-    AR = kelv.surf3d.bref/kelv.surf3d.cref
-    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nspan)
-    rhs = zeros(kelv.surf3d.nspan)
-    a03d = zeros(kelv.surf3d.nspan)      
+    val = zeros(2*kelv.surf.nspan)
+    lhs = zeros(kelv.surf.nspan,kelv.surf.nspan)
+    rhs = zeros(kelv.surf.nspan)
 
     #Assume symmetry condition for now
-    for i = 1:kelv.surf3d.nspan
-        nlev = length(kelv.field[i].lev)
-        ntev = length(kelv.field[i].tev)
-        kelv.field[i].tev[ntev].s = tev_iter[i]
-        
+    for i = 1:kelv.surf.nspan
+        nlev = length(kelv.field.f2d[i].lev)
+        ntev = length(kelv.field.f2d[i].tev)
+        kelv.field.f2d[i].tev[ntev].s = tev_iter[i]
+
         #Update incduced velocities on airfoil
-        update_indbound(kelv.surf[i], kelv.field[i])
+        update_indbound(kelv.surf.s2d[i], kelv.field.f2d[i])
 
         #Calculate downwash
-        update_downwash(kelv.surf[i], [kelv.field[i].u[1],kelv.field[i].w[1]])
+        update_downwash(kelv.surf.s2d[i], [kelv.field.f2d[i].u[1], kelv.field.f2d[i].w[1]])
 
         #Calculate first two fourier coefficients
-        update_a0anda1(kelv.surf[i])
+        update_a0anda1(kelv.surf.s2d[i])
 
-        bc[i] = kelv.surf[i].a0[1] + 0.5*kelv.surf[i].aterm[1]
+        kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
 
-        a03d[i] = 0
-        for n = 1:kelv.surf3d.nspan
+        kelv.surf.a03d[i] = 0
+
+        for n = 1:kelv.surf.nspan
             nn = 2*n - 1
-            a03d[i] = a03d[i] - real(nn)*tev_iter[n+kelv.surf3d.nspan]*sin(nn*kelv.surf3d.psi[i])/sin(kelv.surf3d.psi[i])
+            kelv.surf.a03d[i] = kelv.surf.a03d[i] - real(nn)*tev_iter[n+kelv.surf.nspan]*sin(nn*kelv.surf.psi[i])/sin(kelv.surf.psi[i])
         end
-        
-        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(bc[i] + a03d[i])
-        
+
+        val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
+
         for iv = 1:ntev
-            val[i] = val[i] + kelv.field[i].tev[iv].s
+            val[i] = val[i] + kelv.field.f2d[i].tev[iv].s
         end
         for iv = 1:nlev
-            val[i] = val[i] + kelv.field[i].lev[iv].s
+            val[i] = val[i] + kelv.field.f2d[i].lev[iv].s
         end
     end
 
-    for i = 1:kelv.surf3d.nspan
-        for n = 1:kelv.surf3d.nbterm
+    for i = 1:kelv.surf.nspan
+        for n = 1:kelv.surf.nspan
             nn = 2*n - 1
-            lhs[i,n] = sin(nn*kelv.surf3d.psi[i])*(sin(kelv.surf3d.psi[i]) + (nn*pi/(2*AR)))
+            lhs[i,n] = sin(nn*kelv.surf.psi[i])*(sin(kelv.surf.psi[i]) + (nn*pi/(2*kelv.surf.AR)))
         end
-        rhs[i] = pi*sin(kelv.surf3d.psi[i])*bc[i]/(2*AR)
+        rhs[i] = pi*sin(kelv.surf.psi[i])*kelv.surf.bc[i]/(2*kelv.surf.AR)
     end
+
+    val[kelv.surf.nspan+1:2*kelv.surf.nspan] = lhs*tev_iter[kelv.surf.nspan+1:2*kelv.surf.nspan] - rhs
 
     return val
 end
@@ -1438,11 +1452,9 @@ immutable KelvinKuttawFlap
 end
 
 immutable KelvinKuttaLLTldvm
-    surf3d :: ThreeDSurf
-    surf :: Vector{TwoDSurf}
+    surf :: ThreeDSurfSimple
     field :: Vector{TwoDFlowField}
-    nshed :: Int8
-end
+ end
 
 function (kelv::KelvinKutta)(v_iter::Array{Float64})
     val = zeros(2)
@@ -1606,9 +1618,9 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
     rhs = zeros(kelv.surf3d.nspan)
     bcoeff = zeros(kelv.surf3d.nspan)
     a03d = zeros(kelv.surf3d.nspan)
-    
+
     cntr = kelv.surf3d.nspan + 1
-    
+
     #Assume symmetry condition for now
     for i = 1:kelv.surf3d.nspan
         nlev = length(kelv.field[i].lev)
@@ -1637,16 +1649,16 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
                 a03d[i] = a03d[i] - real(nn)*tev_iter[n+kelv.surf3d.nspan+kelv.nshed]*sin(nn*kelv.surf3d.psi[i])/sin(kelv.surf3d.psi[i])
             end
         end
-        
+
         val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(bc[i] + a03d[i])
-        
+
         for iv = 1:ntev
             val[i] = val[i] + kelv.field[i].tev[iv].s
         end
         for iv = 1:nlev
             val[i] = val[i] + kelv.field[i].lev[iv].s
         end
-        
+
         if kelv.surf[i].levflag[1] == 1
             if kelv.surf[i].a0[1] > 0
                 lesp_cond = kelv.surf[i].lespcrit[1]
@@ -1656,7 +1668,7 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
             val[cntr-1] = kelv.surf[i].a0[1] + a03d[i] - lesp_cond
         end
     end
-    
+
     for i = 1:kelv.surf3d.nspan
         for n = 1:kelv.surf3d.nspan
             nn = 2*n - 1
@@ -1666,7 +1678,7 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
     end
 
     val[kelv.surf3d.nspan+kelv.nshed+1:2*kelv.surf3d.nspan+kelv.nshed] = lhs*tev_iter[kelv.surf3d.nspan+kelv.nshed+1:2*kelv.surf3d.nspan+kelv.nshed] - rhs
-    
+
     return val
 end
 

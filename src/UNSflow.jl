@@ -32,7 +32,7 @@ ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfwFlap,
 TwoDSurf_2DOF, TwoDFreeSurf, TwoDVort, TwoDFlowField, KelvinCondition,
 KelvinKutta, EldRampReturnDef, EldUpIntDef, EldUpInttstartDef, SinDef,
 CosDef, TheoDef, TheoDefwFlap, TwoDFlowData, DelVortDef, patch,
-ThreeDSurf, KinemDef3D, ThreeDVort, ThreeDFlowField,
+ThreeDSurfSimple, KinemDef3D, ThreeDVort, ThreeDFieldSimple,
 KelvinConditionLLTldvm, KelvinKuttaLLTldvm
 
 include("types.jl")

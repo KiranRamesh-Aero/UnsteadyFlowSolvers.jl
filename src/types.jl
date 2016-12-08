@@ -305,26 +305,30 @@ immutable TwoDFlowField
 end
 
 #Definition of flowfield in 3D
-immutable ThreeDFlowField
-    velX :: MotionDef
-    velY :: MotionDef
-    velZ :: MotionDef
-    u :: Vector{Float64}
-    v :: Vector{Float64}
-    w :: Vector{Float64}
-    tev :: Vector{ThreeDVort}
-    lev :: Vector{ThreeDVort}
-    extv :: Vector{ThreeDVort}
-    function ThreeDFlowField(velX = ConstDef(0.), velY = ConstDef(0.), velZ = ConstDef(0.))
-        u = [0;]
-        v = [0;]
-        w = [0;]
-        tev = ThreeDVort[]
-        lev = ThreeDVort[]
-        extv = ThreeDVort[]
-        new(velX, velY, velZ, u, v, w, tev, lev, extv)
-    end
+immutable ThreeDFieldSimple
+    f2d :: Vector{TwoDFlowField}
 end
+
+# immutable ThreeDFlowField
+#     velX :: MotionDef
+#     velY :: MotionDef
+#     velZ :: MotionDef
+#     u :: Vector{Float64}
+#     v :: Vector{Float64}
+#     w :: Vector{Float64}
+#     tev :: Vector{ThreeDVort}
+#     lev :: Vector{ThreeDVort}
+#     extv :: Vector{ThreeDVort}
+#     function ThreeDFlowField(velX = ConstDef(0.), velY = ConstDef(0.), velZ = ConstDef(0.))
+#         u = [0;]
+#         v = [0;]
+#         w = [0;]
+#         tev = ThreeDVort[]
+#         lev = ThreeDVort[]
+#         extv = ThreeDVort[]
+#         new(velX, velY, velZ, u, v, w, tev, lev, extv)
+#     end
+# end
 
 
 immutable TwoDFlowData
@@ -801,285 +805,320 @@ immutable patch
     nspan :: Int8
 end
     
-immutable ThreeDSurf
+# immutable ThreeDSurf
+#     cref :: Float64
+#     bref :: Float64
+#     sref :: Float64
+#     uref :: Float64
+#     patchdata :: Vector{patch}
+#     ndiv :: Int8
+#     nspan :: Int8
+#     naterm :: Int8
+#     kindef :: KinemDef3D
+#     c :: Vector{Float64}
+#     pvt :: Vector{Float64}
+#     cam :: Array{Float64,2}
+#     cam_slope :: Array{Float64,2}
+#     theta :: Vector{Float64}
+#     psi :: Vector{Float64}
+#     x :: Array{Float64,2}
+#     xle :: Vector{Float64}
+#     yle :: Vector{Float64}
+#     zle :: Vector{Float64}
+#     kinem :: Vector{KinemPar}
+#     bnd_x :: Array{Float64,2}
+#     bnd_z :: Array{Float64,2}
+#     uind :: Array{Float64,2}
+#     vind :: Array{Float64,2}
+#     wind :: Array{Float64,2}
+#     downwash :: Array{Float64,2}
+#     a0 :: Vector{Float64}
+#     aterm :: Array{Float64,2}
+#     a0dot :: Vector{Float64}
+#     adot :: Array{Float64,2}
+#     a0prev :: Vector{Float64}
+#     aprev :: Array{Float64,2}
+#     bv :: Array{ThreeDVort,2}
+#     lespcrit :: Vector{Float64}
+#     levflag :: Vector{Int8}
+    
+#     function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35)
+#         nspan = 0
+#         for i = 1:length(patchdata)-1
+#             nspan += patchdata[i].nspan
+#         end
+
+#         lespcrit = zeros(nspan)
+
+#         psi = zeros(nspan)
+#         cam = zeros(nspan,ndiv)
+#         cam_slope = zeros(nspan,ndiv)
+#         cam1 = zeros(ndiv)
+#         cam_slope1 = zeros(ndiv)
+#         cam2 = zeros(ndiv)
+#         cam_slope2 = zeros(ndiv)
+#         bnd_x = zeros(nspan,ndiv)
+#         bnd_z = zeros(nspan,ndiv)
+#         c = zeros(nspan)
+#         pvt = zeros(nspan)
+# 	yle = zeros(nspan)
+# 	xle = zeros(nspan)
+# 	zle = zeros(nspan)	    
+#        	twist = zeros(nspan)
+
+#         kinem = KinemPar[]
+        
+# 	theta = zeros(ndiv)
+#         x = zeros(nspan,ndiv)
+
+#         dtheta = pi/(ndiv-1)
+#         for ib = 1:ndiv
+#             theta[ib] = real(ib-1.)*dtheta
+# 	    for is = 1:nspan	      
+#   	        x[is,ib] = c[is]/2.*(1-cos(theta[ib]))
+# 	    end
+# 	end
+        
+# 	nspan = 0
+#         for i = 1:length(patchdata) - 1
+#             if i != 1
+#                 nspan += 1
+#                 psi[nspan] = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+#                 yle[nspan] = patchdata[i].y
+#                 xle[nspan] = patchdata[i].x
+#                 zle[nspan] = patchdata[i].z
+#                 c[nspan] = patchdata[i].c
+#                 twist[nspan] = patchdata[i].twist
+#                 if (patchdata[i].coord_file != "FlatPlate")
+#                     cam[nspan,:], cam_slope[nspan,:] = camber_calc(0.5*(1-cos(theta)), patchdata[i].coord_file)
+#                 end
+#                 lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
+#                 pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
+#             end
+#             startpsi = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+#             lenpsi = (patchdata[i+1].y - patchdata[i].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
+#             dpsi =  lenpsi/(patchdata[i].nspan + 1.)
+# #            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
+#             for j = 1:patchdata[i].nspan
+#                 nspan += 1
+#                 psi[nspan] = startpsi + real(j)*dpsi
+#                 #                yle[nspan] = patchdata[i].y + (i-1)*divspan
+#                 yle[nspan] = -bref*cos(psi[nspan])/2.
+#                 xle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].x, patchdata[i+1].x, yle[nspan])
+#                 zle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].z, patchdata[i+1].z, yle[nspan])
+#                 c[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].c, patchdata[i+1].c, yle[nspan])
+#                 twist[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].twist, patchdata[i+1].twist, yle[nspan])
+#                 if (patchdata[i].coord_file != "FlatPlate")
+#                     cam1, cam_slope1 = camber_calc(0.5*(1-cos(theta)), patchdata[i].coord_file)
+#                 end
+#                 if (patchdata[i+1].coord_file != "FlatPlate")
+#                     cam2, cam_slope2 = camber_calc(0.5*(1-cos(theta)), patchdata[i+1].coord_file)
+#                 end
+#                 for k = 1:ndiv
+#                     cam[nspan,k] = interp(patchdata[i].y, patchdata[i+1].y, cam1[k], cam2[k], yle[nspan])*c[nspan]
+#                     cam_slope[nspan,k] = interp(patchdata[i].y, patchdata[i+1].y, cam_slope1[k], cam_slope2[k], yle[nspan])*c[nspan]
+#                 end
+#                 lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
+#                 pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
+#             end
+#         end
+        
+#         inkim = KinemPar(0, 0, 0, 0, 0, 0)
+#         for i = 1:nspan
+#             push!(kinem, inkim)
+#         end
+
+
+#         if (kindef.vartype == "Constant")
+#             i = 1
+#             if (typeof(kindef.alpha) == EldUpDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == EldRampReturnDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == ConstDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = 0.
+#             elseif (typeof(kindef.alpha) == SinDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == CosDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             end
+                
+#             if (typeof(kindef.h) == EldUpDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == EldUpIntDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == EldRampReturnDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == ConstDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = 0.
+#             elseif (typeof(kindef.h) == SinDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == CosDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             end
+            
+#             if (typeof(kindef.u) == EldUpDef)
+#                 kinem[i].u = kindef.u(0.)*uref
+#                 kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
+#             elseif (typeof(kindef.u) == EldRampReturnDef)
+#                 kinem[i].u, kinem[i].udot = kindef.u(0.)
+#                 kinem[i].u = kinem[i].u*uref
+#                 kinem[i].udot = kinem[i].udot*uref*uref/cref
+#             elseif (typeof(kindef.u) == ConstDef)
+#                 kinem[i].u = kindef.u(0.)*uref
+#                 kinem[i].udot = 0.
+#             end
+            
+#             for i = 2:nspan
+#                 kinem[i] = kinem[1]
+#             end
+#         elseif (typeof(kindef.vartype) == "Read")
+#             # Provide the max amplitude as the input, and the read array goes from 0 to 1 as a function of yle
+#             i = nspan
+#             if (typeof(kindef.alpha) == EldUpDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == EldRampReturnDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == ConstDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = 0.
+#             elseif (typeof(kindef.alpha) == SinDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             elseif (typeof(kindef.alpha) == CosDef)
+#                 kinem[i].alpha = kindef.alpha(0.)
+#                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
+#             end
+            
+#             if (typeof(kindef.h) == EldUpDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == EldUpIntDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == EldRampReturnDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == ConstDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = 0.
+#             elseif (typeof(kindef.h) == SinDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             elseif (typeof(kindef.h) == CosDef)
+#                 kinem[i].h = kindef.h(0.)*cref
+#                 kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+#             end
+            
+#             if (typeof(kindef.u) == EldUpDef)
+#                 kinem[i].u = kindef.u(0.)*uref
+#                 kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
+#             elseif (typeof(kindef.u) == EldRampReturnDef)
+#                 kinem[i].u, kinem[i].udot = kindef.u(0.)
+#                 kinem[i].u = kinem[i].u*uref
+#                 kinem[i].udot = kinem[i].udot*uref*uref/cref
+#             elseif (typeof(kindef.u) == ConstDef)
+#                 kinem[i].u = kindef.u(0.)*uref
+#                 kinem[i].udot = 0.
+#             end
+
+# addspl = Spline1D(kindef.add[:,1], kindef.add[:,2])
+
+# if (kindef.vary == 1)
+    
+#     for i = 1:nspan
+#         kinem.h[i] = kinem.h[nspan]*evaluate(addspl,yle[i])
+#     end
+# elseif (kindef.vary == 2)
+#     addspl = Spline1D(kinem.add[:,1], kinem.add[:,2])
+#     for i = 1:nspan
+#         kinem.alpha[i] = kinem.alpha[nspan]*evaluate(addspl,yle[i])
+#     end 
+# end
+
+# end
+
+
+
+# for j = 1:nspan
+#     for i = 1:ndiv
+#         bnd_x[j,i] = -((c[j] - pvt[j]*c[j])+((pvt[j]*c[j] - x[j,i])*cos(kinem[j].alpha))) + (cam[j,i]*sin(kinem[j].alpha))
+#         bnd_z[j,i] = kinem[j].h + ((pvt[j]*c[j] - x[j,i])*sin(kinem[j].alpha))+(cam[j,i]*cos(kinem[j].alpha))
+#     end
+# end
+
+# uind = zeros(nspan,ndiv)
+# vind = zeros(nspan,ndiv)
+# wind = zeros(nspan,ndiv)
+# downwash = zeros(nspan,ndiv)
+# a0 = zeros(nspan)
+# a0dot = zeros(nspan)
+# aterm = zeros(nspan,naterm)
+# adot = zeros(nspan,3)
+# a0prev = zeros(nspan)
+# aprev = zeros(nspan,3)
+# bv = Array(ThreeDVort,nspan,ndiv-1)
+
+# for j = 1:nspan
+#     for i = 1:ndiv-1
+#         bv[j,i] = ThreeDVort([0; 0; 0;], [0; 0; 0;], 0.02*cref, [0; 0; 0;], [0; 0; 0;])
+#     end
+# end
+# levflag = zeros(nspan)
+
+# new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, psi, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+# end
+# end
+ 
+
+immutable ThreeDSurfSimple
     cref :: Float64
-    bref :: Float64
-    sref :: Float64
+    AR :: Float64
     uref :: Float64
-    patchdata :: Vector{patch}
+    pvt :: Float64
+    lespcrit :: Vector{Float64}
+    coord_file :: String
     ndiv :: Int8
     nspan :: Int8
     naterm :: Int8
-    nbterm :: Int8
-    kindef :: KinemDef3D
-    c :: Vector{Float64}
-    pvt :: Vector{Float64}
-    cam :: Array{Float64,2}
-    cam_slope :: Array{Float64,2}
-    theta :: Vector{Float64}
+    kindef :: KinemDef
     psi :: Vector{Float64}
-    x :: Array{Float64,2}
-    xle :: Vector{Float64}
     yle :: Vector{Float64}
-    zle :: Vector{Float64}
-    kinem :: Vector{KinemPar}
-    bnd_x :: Array{Float64,2}
-    bnd_z :: Array{Float64,2}
-    uind :: Array{Float64,2}
-    vind :: Array{Float64,2}
-    wind :: Array{Float64,2}
-    downwash :: Array{Float64,2}
-    a0 :: Vector{Float64}
-    aterm :: Array{Float64,2}
-    a0dot :: Vector{Float64}
-    adot :: Array{Float64,2}
-    a0prev :: Vector{Float64}
-    aprev :: Array{Float64,2}
-    bv :: Array{ThreeDVort,2}
-    lespcrit :: Vector{Float64}
-    levflag :: Vector{Int8}
+    s2d :: Vector{TwoDSurf}
     
-    function ThreeDSurf(cref, bref, sref, patchdata, kindef, uref=1., ndiv=70, naterm=35, nbterm = 21)
-        nspan = 0
-        for i = 1:length(patchdata)-1
-            nspan += patchdata[i].nspan
-        end
-        nspan = nspan + 1
-        lespcrit = zeros(nspan)
+    function ThreeDSurfSimple(AR, kindef, lespcrit = [10.;], nspan = 20, cref = 1., uref=1., ndiv=70, naterm=35)
+
+        bref = AR*cref
 
         psi = zeros(nspan)
-        cam = zeros(nspan,ndiv)
-        cam_slope = zeros(nspan,ndiv)
-        cam1 = zeros(ndiv)
-        cam_slope1 = zeros(ndiv)
-        cam2 = zeros(ndiv)
-        cam_slope2 = zeros(ndiv)
-        bnd_x = zeros(nspan,ndiv)
-        bnd_z = zeros(nspan,ndiv)
-        c = zeros(nspan)
-        pvt = zeros(nspan)
-	yle = zeros(nspan)
-	xle = zeros(nspan)
-	zle = zeros(nspan)	    
-       	twist = zeros(nspan)
 
-        kinem = KinemPar[]
-        
-	theta = zeros(ndiv)
-        x = zeros(nspan,ndiv)
-
-        dtheta = pi/(ndiv-1)
-        for ib = 1:ndiv
-            theta[ib] = real(ib-1.)*dtheta
-	    for is = 1:nspan	      
-  	        x[is,ib] = c[is]/2.*(1-cos(theta[ib]))
-	    end
-	end
-        
-	nspan = 0
-        for i = 1:length(patchdata) - 1
-            if i != 1
-                nspan += 1
-                psi[nspan] = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
-                yle[nspan] = patchdata[i].y
-                xle[nspan] = patchdata[i].x
-                zle[nspan] = patchdata[i].z
-                c[nspan] = patchdata[i].c
-                twist[nspan] = patchdata[i].twist
-                if (patchdata[i].coord_file != "FlatPlate")
-                    cam[nspan,:], cam_slope[nspan,:] = camber_calc(0.5*(1-cos(theta)), patchdata[i].coord_file)
-                end
-                lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
-                pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
-            end
-            startpsi = (patchdata[i].y - patchdata[1].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
-            lenpsi = (patchdata[i+1].y - patchdata[i].y)*pi/(patchdata[length(patchdata)].y - patchdata[1].y)
-            dpsi =  lenpsi/(patchdata[i].nspan + 1.)
-#            divspan = (patchdata[i+1].y - patchdata[i].y)/patchdata[i].nspan
-            for j = 1:patchdata[i].nspan
-                nspan += 1
-                psi[nspan] = startpsi + real(j)*dpsi
-                #                yle[nspan] = patchdata[i].y + (i-1)*divspan
-                yle[nspan] = -bref*cos(psi[nspan])/2.
-                xle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].x, patchdata[i+1].x, yle[nspan])
-                zle[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].z, patchdata[i+1].z, yle[nspan])
-                c[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].c, patchdata[i+1].c, yle[nspan])
-                twist[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].twist, patchdata[i+1].twist, yle[nspan])
-                if (patchdata[i].coord_file != "FlatPlate")
-                    cam1, cam_slope1 = camber_calc(0.5*(1-cos(theta)), patchdata[i].coord_file)
-                end
-                if (patchdata[i+1].coord_file != "FlatPlate")
-                    cam2, cam_slope2 = camber_calc(0.5*(1-cos(theta)), patchdata[i+1].coord_file)
-                end
-                for k = 1:ndiv
-                    cam[nspan,k] = interp(patchdata[i].y, patchdata[i+1].y, cam1[k], cam2[k], yle[nspan])*c[nspan]
-                    cam_slope[nspan,k] = interp(patchdata[i].y, patchdata[i+1].y, cam_slope1[k], cam_slope2[k], yle[nspan])*c[nspan]
-                end
-                lespcrit[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].lc, patchdata[i+1].lc, yle[nspan])
-                pvt[nspan] = interp(patchdata[i].y, patchdata[i+1].y, patchdata[i].pvt, patchdata[i+1].pvt, yle[nspan])
-            end
+	for i = 1:nspan
+            psi[i] = real(j)*(pi/2)/nspan
+            yle[i] = -bref*cos(psi[i])/2.
         end
         
-        inkim = KinemPar(0, 0, 0, 0, 0, 0)
-        for i = 1:nspan
-            push!(kinem, inkim)
+        for i = 1:surf.nspan
+            push!(s2d, TwoDSurf(coord_file, pvt,  kindef, lespcrit, cref, uref, ndiv, naterm))
         end
 
-
-        if (kindef.vartype == "Constant")
-            i = 1
-            if (typeof(kindef.alpha) == EldUpDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == EldRampReturnDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == ConstDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = 0.
-            elseif (typeof(kindef.alpha) == SinDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == CosDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            end
-                
-            if (typeof(kindef.h) == EldUpDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldUpIntDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldRampReturnDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == ConstDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = 0.
-            elseif (typeof(kindef.h) == SinDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == CosDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            end
-            
-            if (typeof(kindef.u) == EldUpDef)
-                kinem[i].u = kindef.u(0.)*uref
-                kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
-            elseif (typeof(kindef.u) == EldRampReturnDef)
-                kinem[i].u, kinem[i].udot = kindef.u(0.)
-                kinem[i].u = kinem[i].u*uref
-                kinem[i].udot = kinem[i].udot*uref*uref/cref
-            elseif (typeof(kindef.u) == ConstDef)
-                kinem[i].u = kindef.u(0.)*uref
-                kinem[i].udot = 0.
-            end
-            
-            for i = 2:nspan
-                kinem[i] = kinem[1]
-            end
-        elseif (typeof(kindef.vartype) == "Read")
-            # Provide the max amplitude as the input, and the read array goes from 0 to 1 as a function of yle
-            i = nspan
-            if (typeof(kindef.alpha) == EldUpDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == EldRampReturnDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == ConstDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = 0.
-            elseif (typeof(kindef.alpha) == SinDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            elseif (typeof(kindef.alpha) == CosDef)
-                kinem[i].alpha = kindef.alpha(0.)
-                kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
-            end
-            
-            if (typeof(kindef.h) == EldUpDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldUpIntDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldRampReturnDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == ConstDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = 0.
-            elseif (typeof(kindef.h) == SinDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == CosDef)
-                kinem[i].h = kindef.h(0.)*cref
-                kinem[i].hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            end
-            
-            if (typeof(kindef.u) == EldUpDef)
-                kinem[i].u = kindef.u(0.)*uref
-                kinem[i].udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/cref
-            elseif (typeof(kindef.u) == EldRampReturnDef)
-                kinem[i].u, kinem[i].udot = kindef.u(0.)
-                kinem[i].u = kinem[i].u*uref
-                kinem[i].udot = kinem[i].udot*uref*uref/cref
-            elseif (typeof(kindef.u) == ConstDef)
-                kinem[i].u = kindef.u(0.)*uref
-                kinem[i].udot = 0.
-            end
-
-addspl = Spline1D(kindef.add[:,1], kindef.add[:,2])
-
-if (kindef.vary == 1)
-    
-    for i = 1:nspan
-        kinem.h[i] = kinem.h[nspan]*evaluate(addspl,yle[i])
-    end
-elseif (kindef.vary == 2)
-    addspl = Spline1D(kinem.add[:,1], kinem.add[:,2])
-    for i = 1:nspan
-        kinem.alpha[i] = kinem.alpha[nspan]*evaluate(addspl,yle[i])
-    end 
-end
-
-end
-
-
-
-for j = 1:nspan
-    for i = 1:ndiv
-        bnd_x[j,i] = -((c[j] - pvt[j]*c[j])+((pvt[j]*c[j] - x[j,i])*cos(kinem[j].alpha))) + (cam[j,i]*sin(kinem[j].alpha))
-        bnd_z[j,i] = kinem[j].h + ((pvt[j]*c[j] - x[j,i])*sin(kinem[j].alpha))+(cam[j,i]*cos(kinem[j].alpha))
-    end
-end
-
-uind = zeros(nspan,ndiv)
-vind = zeros(nspan,ndiv)
-wind = zeros(nspan,ndiv)
-downwash = zeros(nspan,ndiv)
-a0 = zeros(nspan)
-a0dot = zeros(nspan)
-aterm = zeros(nspan,naterm)
-adot = zeros(nspan,3)
-a0prev = zeros(nspan)
-aprev = zeros(nspan,3)
-bv = Array(ThreeDVort,nspan,ndiv-1)
-
-for j = 1:nspan
-    for i = 1:ndiv-1
-        bv[j,i] = ThreeDVort([0; 0; 0;], [0; 0; 0;], 0.02*cref, [0; 0; 0;], [0; 0; 0;])
-    end
-end
-levflag = zeros(nspan)
-
-new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, psi, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d)
 end
 end
  
+
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1319,9 +1358,13 @@ function (kelv::KelvinConditionwFlap)(tev_iter::Array{Float64})
 end
 
 function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
-    val = zeros(kelv.surf3d.nspan)
+    val = zeros(2*kelv.surf3d.nspan)
     bc = zeros(kelv.surf3d.nspan)
-    
+    AR = kelv.surf3d.bref/kelv.surf3d.cref
+    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nspan)
+    rhs = zeros(kelv.surf3d.nspan)
+    a03d = zeros(kelv.surf3d.nspan)      
+
     #Assume symmetry condition for now
     for i = 1:kelv.surf3d.nspan
         nlev = length(kelv.field[i].lev)
@@ -1338,8 +1381,14 @@ function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
         update_a0anda1(kelv.surf[i])
 
         bc[i] = kelv.surf[i].a0[1] + 0.5*kelv.surf[i].aterm[1]
+
+        a03d[i] = 0
+        for n = 1:kelv.surf3d.nspan
+            nn = 2*n - 1
+            a03d[i] = a03d[i] - real(nn)*tev_iter[n+kelv.surf3d.nspan]*sin(nn*kelv.surf3d.psi[i])/sin(kelv.surf3d.psi[i])
+        end
         
-        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(bc[i] + a03d[i])
         
         for iv = 1:ntev
             val[i] = val[i] + kelv.field[i].tev[iv].s
@@ -1348,34 +1397,15 @@ function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
             val[i] = val[i] + kelv.field[i].lev[iv].s
         end
     end
-    
-    AR = kelv.surf3d.bref/kelv.surf3d.cref
-    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nbterm)
-    rhs = zeros(kelv.surf3d.nspan)
-    bcoeff = zeros(kelv.surf3d.nbterm)
-    
-    for j = 1:kelv.surf3d.nspan
-        for n = 1:kelv.surf3d.nbterm
-            lhs[j,n] = sin(n*kelv.surf3d.psi[j])*(sin(kelv.surf3d.psi[j]) + (n*pi/(2*AR)))
-        end
-        rhs[j] = pi*sin(kelv.surf3d.psi[j])*bc[j]/(2*AR)
-    end
-    bcoeff[:] = \(lhs, rhs)    
-    
-    a03d = zeros(kelv.surf3d.nspan)
-
-    for j = 1:kelv.surf3d.nspan
-        a03d[j] = 0
-        for n = 1:kelv.surf3d.nbterm
-            a03d[j] = a03d[j] - real(n)*bcoeff[n]*sin(n*kelv.surf3d.psi[j])/sin(kelv.surf3d.psi[j])
-        end
-    end
 
     for i = 1:kelv.surf3d.nspan
-        val[i] = val[i] + kelv.surf[i].uref*kelv.surf[i].c*pi*a03d[i]
+        for n = 1:kelv.surf3d.nbterm
+            nn = 2*n - 1
+            lhs[i,n] = sin(nn*kelv.surf3d.psi[i])*(sin(kelv.surf3d.psi[i]) + (nn*pi/(2*AR)))
+        end
+        rhs[i] = pi*sin(kelv.surf3d.psi[i])*bc[i]/(2*AR)
     end
-    #val[1] = 0
-    #val[kelv.surf3d.nspan] = 0
+
     return val
 end
 
@@ -1569,9 +1599,14 @@ function (kelv::KelvinKuttawFlap)(v_iter::Array{Float64})
 end
 
 function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
-    val = zeros(kelv.surf3d.nspan + kelv.nshed)
+    val = zeros(2*kelv.surf3d.nspan + kelv.nshed)
     bc = zeros(kelv.surf3d.nspan)
-
+    AR = kelv.surf3d.bref/kelv.surf3d.cref
+    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nspan)
+    rhs = zeros(kelv.surf3d.nspan)
+    bcoeff = zeros(kelv.surf3d.nspan)
+    a03d = zeros(kelv.surf3d.nspan)
+    
     cntr = kelv.surf3d.nspan + 1
     
     #Assume symmetry condition for now
@@ -1594,8 +1629,16 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
         update_a0anda1(kelv.surf[i])
 
         bc[i] = kelv.surf[i].a0[1] + 0.5*kelv.surf[i].aterm[1]
+
+        for i = 1:kelv.surf3d.nspan
+        a03d[i] = 0
+            for n = 1:kelv.surf3d.nspan
+                nn = 2*n - 1
+                a03d[i] = a03d[i] - real(nn)*tev_iter[n+kelv.surf3d.nspan+kelv.nshed]*sin(nn*kelv.surf3d.psi[i])/sin(kelv.surf3d.psi[i])
+            end
+        end
         
-        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(bc[i] + a03d[i])
         
         for iv = 1:ntev
             val[i] = val[i] + kelv.field[i].tev[iv].s
@@ -1610,40 +1653,19 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
             else
                 lesp_cond = -kelv.surf[i].lespcrit[1]
             end
-            val[cntr-1] = kelv.surf[i].a0[1] - lesp_cond
+            val[cntr-1] = kelv.surf[i].a0[1] + a03d[i] - lesp_cond
         end
     end
     
-    AR = kelv.surf3d.bref/kelv.surf3d.cref
-    lhs = zeros(kelv.surf3d.nspan,kelv.surf3d.nbterm)
-    rhs = zeros(kelv.surf3d.nspan)
-    bcoeff = zeros(kelv.surf3d.nbterm)
-    
-    for j = 1:kelv.surf3d.nspan
-        for n = 1:kelv.surf3d.nbterm
-            lhs[j,n] = sin(n*kelv.surf3d.psi[j])*(sin(kelv.surf3d.psi[j]) + (n*pi/(2*AR)))
-        end
-        rhs[j] = pi*sin(kelv.surf3d.psi[j])*bc[j]/(2*AR)
-    end
-    bcoeff[:] = \(lhs, rhs)    
-    
-    a03d = zeros(kelv.surf3d.nspan)
-
-    for j = 1:kelv.surf3d.nspan
-        a03d[j] = 0
-        for n = 1:kelv.surf3d.nbterm
-            a03d[j] = a03d[j] - real(n)*bcoeff[n]*sin(n*kelv.surf3d.psi[j])/sin(kelv.surf3d.psi[j])
-        end
-    end
-
-    cntr = kelv.surf3d.nspan + 1
     for i = 1:kelv.surf3d.nspan
-        val[i] = val[i] + kelv.surf[i].uref*kelv.surf[i].c*pi*a03d[i]
-        if kelv.surf[i].levflag[1] == 1
-            val[cntr] = val[cntr] + a03d[i]
-            cntr += 1
+        for n = 1:kelv.surf3d.nspan
+            nn = 2*n - 1
+            lhs[i,n] = sin(nn*kelv.surf3d.psi[i])*(sin(kelv.surf3d.psi[i]) + (nn*pi/(2*AR)))
         end
+        rhs[i] = pi*sin(kelv.surf3d.psi[i])*bc[i]/(2*AR)
     end
+
+    val[kelv.surf3d.nspan+kelv.nshed+1:2*kelv.surf3d.nspan+kelv.nshed] = lhs*tev_iter[kelv.surf3d.nspan+kelv.nshed+1:2*kelv.surf3d.nspan+kelv.nshed] - rhs
     
     return val
 end

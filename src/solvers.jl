@@ -1706,21 +1706,15 @@ function QScorrect_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: 
     
 end
 
-function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int64, dtstar :: Float64)
+function QSLLT_lautat(surf :: ThreeDSurfSimple, field :: ThreeDFieldSimple, nsteps :: Int64, dtstar :: Float64)
     
     mat = Array(Float64, 0, 4)
 
     mat = mat'
     
-    surf2d = TwoDSurf[]
-    field2d = TwoDFlowField[]
-    kinem2d = KinemDef[]
-
     dt = dtstar*surf.cref/surf.uref
 
     t = 0.
-
-    AR = surf.bref/surf.cref
 
     bc = zeros(surf.nspan)
     a03d = zeros(surf.nspan)
@@ -1732,69 +1726,49 @@ function QSLLT_lautat(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: In
     rhs = zeros(surf.nspan)
     bcoeff = zeros(surf.nbterm)
     
-    if surf.kindef.vartype == "Constant"
-
-        for i = 1:surf.nspan
-            # Kinematics at all strips is the same
-            
-            push!(kinem2d, KinemDef(surf.kindef.alpha, surf.kindef.h, surf.kindef.u))
-            push!(surf2d, TwoDSurf(surf.patchdata[1].coord_file, surf.patchdata[1].pvt, kinem2d[i], [surf.patchdata[1].lc;]))
-            #If 3D flow field is defined with disturbances or external vortices, these should be transferred to the 2D flowfield
-            push!(field2d, TwoDFlowField())
-        end
-    end
-
     for istep = 1:nsteps
         #Udpate current time
         t = t + dt
-
-        for i = 1:surf.nspan
-            #Update kinematic parameters
-            update_kinem(surf2d[i], t)
         
+        for i = 1:surf.nspan
+            #Define the flow field
+            push!(field.f2d, TwoDFlowField())
+            #Update kinematic parameters
+            update_kinem(surf.s2d[i], t)
+            
             #Update flow field parameters if any
-            update_externalvel(field2d[i], t)
-
+            update_externalvel(field.f2d[i], t)
+            
             #Update bound vortex positions
-            update_boundpos(surf2d[i], dt)
+            update_boundpos(surf.s2d[i], dt)
 
             #Add a TEV with dummy strength
-            place_tev(surf2d[i], field2d[i], dt)
+            place_tev(surf.s2d[i], field.f2d[i], dt)
         end
         
-        kelv = KelvinConditionLLTldvm(surf, surf2d, field2d)
+        kelv = KelvinConditionLLTldvm(surf, field)
         
         #Solve for TEV strength to satisfy Kelvin condition
         
-        soln = nlsolve(not_in_place(kelv), -0.01*ones(surf.nspan))
+        soln = nlsolve(not_in_place(kelv), [-0.01*ones(surf.nspan); zeros(surf.nspan)])
         
         for i = 1:surf.nspan
             field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
 
             #Update incduced velocities on airfoil
             update_indbound(surf2d[i], field2d[i])
-            
             #Calculate downwash
             update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
             
             #Calculate first two fourier coefficients
             update_a0anda1(surf2d[i])
-
-            bc[i] = surf2d[i].a0[1] + 0.5*surf2d[i].aterm[1]
         end
-
-        for i = 1:surf.nspan
-            for n = 1:surf.nbterm
-                lhs[i,n] = sin(n*surf.psi[i])*(sin(surf.psi[i]) + (n*pi/(2*AR)))
-            end
-            rhs[i] = pi*sin(surf.psi[i])*bc[i]/(2*AR)
-        end
-        bcoeff[:] = \(lhs, rhs)   
 
         for i = 1:surf.nspan
             a03d[i] = 0
-            for n = 1:surf.nbterm
-            a03d[i] = a03d[i] - real(n)*bcoeff[n]*sin(n*surf.psi[i])/sin(surf.psi[i])
+            for n = 1:surf.nspan
+                nn = 2*n - 1
+                a03d[i] = a03d[i] - real(nn)*soln.zero[n+surf.nspan]*sin(nn*surf.psi[i])/sin(surf.psi[i])
             end
         end
 
@@ -1888,9 +1862,9 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
     cd = zeros(surf.nspan)
     cm = zeros(surf.nspan)
 
-    lhs = zeros(surf.nspan, surf.nbterm)
+    lhs = zeros(surf.nspan, surf.nspan)
     rhs = zeros(surf.nspan)
-    bcoeff = zeros(surf.nbterm)
+    bcoeff = zeros(surf.nspan)
     
     if surf.kindef.vartype == "Constant"
 
@@ -1926,7 +1900,7 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
         
         #Solve for TEV strength to satisfy Kelvin condition
         
-        soln = nlsolve(not_in_place(kelv), -0.01*ones(surf.nspan))
+        soln = nlsolve(not_in_place(kelv), [-0.01*ones(surf.nspan); zeros(surf.nspan)])
         
         for i = 1:surf.nspan
             field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
@@ -1939,22 +1913,13 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
             
             #Calculate first two fourier coefficients
             update_a0anda1(surf2d[i])
-
-            bc[i] = surf2d[i].a0[1] + 0.5*surf2d[i].aterm[1]
         end
-
-        for i = 1:surf.nspan
-            for n = 1:surf.nbterm
-                lhs[i,n] = sin(n*surf.psi[i])*(sin(surf.psi[i]) + (n*pi/(2*AR)))
-            end
-            rhs[i] = pi*sin(surf.psi[i])*bc[i]/(2*AR)
-        end
-        bcoeff[:] = \(lhs, rhs)   
 
         for i = 1:surf.nspan
             a03d[i] = 0
-            for n = 1:surf.nbterm
-            a03d[i] = a03d[i] - real(n)*bcoeff[n]*sin(n*surf.psi[i])/sin(surf.psi[i])
+            for n = 1:surf.nspan
+                nn = 2*n - 1
+                a03d[i] = a03d[i] - real(nn)*soln.zero[n+surf.nspan]*sin(nn*surf.psi[i])/sin(surf.psi[i])
             end
         end
 
@@ -1982,53 +1947,45 @@ function QSLLT_ldvm(surf :: ThreeDSurf, field :: ThreeDFlowField, nsteps :: Int6
             kelvkutta = KelvinKuttaLLTldvm(surf,surf2d,field2d, nshed)
 
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
-            soln = nlsolve(not_in_place(kelvkutta), [-0.01*ones(surf.nspan); 0.01*ones(nshed)])
-        end
+            soln = nlsolve(not_in_place(kelvkutta), [-0.01*ones(surf.nspan); 0.01*ones(nshed); zeros(surf.nspan)])
 
-        cntr = surf.nspan + 1
-        
-        for i = 1:surf.nspan
-            field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
-        end
-        for i = 1:surf.nspan
-            if surf2d[i].levflag[1] == 1
-                field2d[i].lev[length(field2d[i].lev)].s = soln.zero[cntr]
-                cntr += 1
+            cntr = surf.nspan + 1
+            
+            for i = 1:surf.nspan
+                field2d[i].tev[length(field2d[i].tev)].s = soln.zero[i]
+            end
+            for i = 1:surf.nspan
+                if surf2d[i].levflag[1] == 1
+                    field2d[i].lev[length(field2d[i].lev)].s = soln.zero[cntr]
+                    cntr += 1
+                end
+            end
+            
+            for i = 1:surf.nspan
+                #Update incduced velocities on airfoil
+                update_indbound(surf2d[i], field2d[i])
+                
+                #Calculate downwash
+                update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
+                
+                #Calculate first two fourier coefficients
+                update_a0anda1(surf2d[i])
+            end
+            
+            for i = 1:surf.nspan
+                a03d[i] = 0
+                for n = 1:surf.nspan
+                    nn = 2*n - 1
+                    a03d[i] = a03d[i] - real(nn)*soln.zero[n+surf.nspan+nshed]*sin(nn*surf.psi[i])/sin(surf.psi[i])
+                end
+            end
+            
+            for i = 1:surf.nspan
+                #Update 3D effect on A0
+                surf2d[i].a0[1] = surf2d[i].a0[1] + a03d[i]
             end
         end
-
         for i = 1:surf.nspan
-            #Update incduced velocities on airfoil
-            update_indbound(surf2d[i], field2d[i])
-            
-            #Calculate downwash
-            update_downwash(surf2d[i], [field2d[i].u[1],field2d[i].w[1]])
-            
-            #Calculate first two fourier coefficients
-            update_a0anda1(surf2d[i])
-            
-            bc[i] = surf2d[i].a0[1] + 0.5*surf2d[i].aterm[1]
-        end
-
-        for i = 1:surf.nspan
-            for n = 1:surf.nbterm
-                lhs[i,n] = sin(n*surf.psi[i])*(sin(surf.psi[i]) + (n*pi/(2*AR)))
-            end
-            rhs[i] = pi*sin(surf.psi[i])*bc[i]/(2*AR)
-        end
-        bcoeff[:] = \(lhs, rhs)   
-
-        for i = 1:surf.nspan
-            a03d[i] = 0
-            for n = 1:surf.nbterm
-            a03d[i] = a03d[i] - real(n)*bcoeff[n]*sin(n*surf.psi[i])/sin(surf.psi[i])
-            end
-        end
-
-        for i = 1:surf.nspan
-            #Update 3D effect on A0
-            surf2d[i].a0[1] = surf2d[i].a0[1] + a03d[i]
-            
             #Update rest of Fourier terms
             update_a2toan(surf2d[i])
             

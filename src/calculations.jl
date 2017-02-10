@@ -16,6 +16,15 @@ function find_tstep(kin:: Array{CosDef})
     return dtstar
 end
 
+function find_tstep(kin:: Array{SinDef})
+    dtstar = 0.015
+    for i = 1:length(kin)
+        dt_tmp = 0.015*0.2/(kin[i].k*kin[i].amp)
+        dtstar = minimum([dt_tmp dtstar])
+    end
+    return dtstar
+end
+
 function find_tstep(kin:: EldUpDef)
     dtstar = 0.015
     dtstar = minimum([0.015*0.2/kin.K 0.015])

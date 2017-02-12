@@ -81,6 +81,8 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
 
 end
 
+
+
 function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
 
     if (size(mat,1) > 0)
@@ -161,6 +163,270 @@ function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 
     mat, surf, curfield, kelv_enf
 
 end
+
+function lautat(surf::TwoDSurfLV, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+    #Lumped vortex method
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+
+    #temp variables used in simualtion
+    uw = zeros(2)
+    uwx = zeros(surf.npanel)
+    uwz = zeros(surf.npanel)
+    utx = zeros(surf.npanel)
+    utz = zeros(surf.npanel)
+
+    cp = zeros(surf.npanel)
+    sum_gam = zeros(surf.npanel)
+    sum_gam_prev = zeros(surf.npanel)
+    
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update intertial coordinates - freestream is horizontal
+        #velocity and plunge velocity is vertical velocity.
+        
+        surf.X0[1] = surf.X0[1] - surf.kinem.u*dt
+        surf.X0[2] = surf.X0[2] + surf.kinem.hdot*dt
+                
+        # Update Global to Local Transformation
+        surf.tlg[1,1] = cos(surf.kinem.alpha)
+        surf.tlg[1,2] = -sin(surf.kinem.alpha)
+        surf.tlg[2,1] = sin(surf.kinem.alpha)
+        surf.tlg[2,2] = cos(surf.kinem.alpha)
+        
+        # Update Local to Global Transformation
+        surf.tgl[1,1] = cos(surf.kinem.alpha)
+        surf.tgl[1,2] = sin(surf.kinem.alpha)
+        surf.tgl[2,1] = -sin(surf.kinem.alpha)
+        surf.tgl[2,2] = cos(surf.kinem.alpha)
+                        
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+        
+        # Update Collocation Points and Vortex Points to Inertial Reference
+        for i=1:surf.npanel
+            (surf.lv[i].xc_I, surf.lv[i].zc_I) = surf.tgl*[surf.lv[i].xc; surf.lv[i].zc] + [surf.X0[1];surf.X0[2]]
+            (surf.lv[i].xv_I, surf.lv[i].zv_I) = surf.tgl*[surf.lv[i].xv; surf.lv[i].zv] + [surf.X0[1];surf.X0[2]]
+        end
+
+        # Normal Velocity is a combination of self-induced velocity, kinematic velocity and wake induced velocity.
+        
+        #Update IC - relative position of shed TEV changes with Ansari's 1/3 law
+        j = surf.npanel + 1
+        for i = 1:surf.npanel
+            (xloc, zloc) = surf.tlg*[curfield.tev[length(curfield.tev)].x; curfield.tev[length(curfield.tev)].z] - [surf.X0[1]; surf.X0[2]]
+            
+            dummytev = TwoDVort(xloc, zloc, 1.0, 0.02*surf.c, 0.0, 0.0)
+            ui, wi = ind_vel([dummytev;], surf.lv[i].xc, surf.lv[i].zc)
+            uw[1] = ui[1]
+            uw[2] = wi[1]
+            surf.IC[i,j] = dot(uw,[surf.lv[i].nx; surf.lv[i].nz])
+        end
+        
+        # Wake Induced Velocity and kinematics induced velocity are know quantities and can be summed together to form the RHS
+        # Establish RHS
+
+        #Update induced velocities on airfoil - except last wake vortex
+        update_indbound(surf, curfield)
+        
+        # Kinematics induced Velocity
+        for i = 1:surf.npanel
+            (utx[i], utz[i]) = surf.tlg*[+surf.kinem.u; -surf.kinem.hdot] + [-surf.kinem.alphadot*surf.lv[i].zc; surf.kinem.alphadot*(surf.lv[i].xc - surf.pvt)]
+        end
+        
+        for i = 1:surf.npanel
+            (uwx[i], uwz[i]) = [utx[i]; utz[i]] + [surf.lv[i].uind; surf.lv[i].wind]
+        end
+
+        #Right-Hand Side
+        for i = 1:surf.npanel
+            surf.rhs[i] = dot(-[uwx[i]; uwz[i]], [surf.lv[i].nx; surf.lv[i].nz])
+        end
+        surf.rhs[surf.npanel+1] = surf.gamma_prev[1]
+        
+        circsol = surf.IC \ surf.rhs
+        surf.gamma_prev[1] = surf.gamma[1]
+        surf.gamma[1] = 0
+        for i = 1:surf.npanel
+            surf.lv[i].s = circsol[i]
+            surf.gamma[1] = surf.gamma[1] + circsol[i]
+        end
+        
+        curfield.tev[length(curfield.tev)].s = circsol[surf.npanel+1]
+
+        for i = 1:surf.npanel
+            sum_gam_prev[i] = sum_gam[i]
+        end
+        
+        sum_gam[1] = surf.lv[1].s
+        for i = 2:surf.npanel
+            sum_gam[i] = sum_gam[i-1] + surf.lv[i].s
+        end
+
+        # Force calculations
+        cl = 0
+        cm = 0
+        cd = 0
+        for i = 1:surf.npanel
+            cp[i] = (1./(surf.uref*surf.uref))*(dot([utx[i] + uwx[i]; utz[i] + uwz[i]], [surf.lv[i].tx; surf.lv[i].tz])*surf.lv[i].s/surf.lv[i].l + (sum_gam[i]-sum_gam_prev[i])/dt)
+            cl = cl + cp[i]*surf.lv[i].l*surf.lv[i].nz/surf.c
+            cm = cm - cp[i]*surf.lv[i].l*surf.lv[i].nz*(surf.lv[i].xv - surf.pvt*surf.c)/(surf.c*surf.c)
+            cd = cd + uwz[i]*surf.lv[i].s + surf.lv[i].l*surf.lv[i].nx*(sum_gam[i] - sum_gam_prev[i])/dt
+        end
+        cd = 2*cd/(surf.uref*surf.uref*surf.c)
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.gamma[1], cl, cd, cm])
+    end
+    mat = mat'
+    mat, surf, curfield, kelv_enf
+end    
+    
+function lautat_wakeroll(surf::TwoDSurfLV, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+    #Lumped vortex method
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+
+    #temp variables used in simualtion
+    uw = zeros(2)
+    uwx = zeros(surf.npanel)
+    uwz = zeros(surf.npanel)
+    utx = zeros(surf.npanel)
+    utz = zeros(surf.npanel)
+
+    cp = zeros(surf.npanel)
+    sum_gam = zeros(surf.npanel)
+    sum_gam_prev = zeros(surf.npanel)
+    
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update intertial coordinates - freestream is horizontal
+        #velocity and plunge velocity is vertical velocity.
+        
+        surf.X0[1] = surf.X0[1] - surf.kinem.u*dt
+        surf.X0[2] = surf.X0[2] + surf.kinem.hdot*dt
+                
+        # Update Global to Local Transformation
+        surf.tlg[1,1] = cos(surf.kinem.alpha)
+        surf.tlg[1,2] = -sin(surf.kinem.alpha)
+        surf.tlg[2,1] = sin(surf.kinem.alpha)
+        surf.tlg[2,2] = cos(surf.kinem.alpha)
+        
+        # Update Local to Global Transformation
+        surf.tgl[1,1] = cos(surf.kinem.alpha)
+        surf.tgl[1,2] = sin(surf.kinem.alpha)
+        surf.tgl[2,1] = -sin(surf.kinem.alpha)
+        surf.tgl[2,2] = cos(surf.kinem.alpha)
+                        
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+        
+        # Update Collocation Points and Vortex Points to Inertial Reference
+        for i=1:surf.npanel
+            (surf.lv[i].xc_I, surf.lv[i].zc_I) = surf.tgl*[surf.lv[i].xc; surf.lv[i].zc] + [surf.X0[1];surf.X0[2]]
+            (surf.lv[i].xv_I, surf.lv[i].zv_I) = surf.tgl*[surf.lv[i].xv; surf.lv[i].zv] + [surf.X0[1];surf.X0[2]]
+        end
+
+        # Normal Velocity is a combination of self-induced velocity, kinematic velocity and wake induced velocity.
+        
+        #Update IC - relative position of shed TEV changes with Ansari's 1/3 law
+        j = surf.npanel + 1
+        for i = 1:surf.npanel
+            (xloc, zloc) = surf.tlg*[curfield.tev[length(curfield.tev)].x; curfield.tev[length(curfield.tev)].z] - [surf.X0[1]; surf.X0[2]]
+            
+            dummytev = TwoDVort(xloc, zloc, 1.0, 0.02*surf.c, 0.0, 0.0)
+            ui, wi = ind_vel([dummytev;], surf.lv[i].xc, surf.lv[i].zc)
+            uw[1] = ui[1]
+            uw[2] = wi[1]
+            surf.IC[i,j] = dot(uw,[surf.lv[i].nx; surf.lv[i].nz])
+        end
+        
+        # Wake Induced Velocity and kinematics induced velocity are know quantities and can be summed together to form the RHS
+        # Establish RHS
+
+        #Update induced velocities on airfoil - except last wake vortex
+        update_indbound(surf, curfield)
+        
+        # Kinematics induced Velocity
+        for i = 1:surf.npanel
+            (utx[i], utz[i]) = surf.tlg*[+surf.kinem.u; -surf.kinem.hdot] + [-surf.kinem.alphadot*surf.lv[i].zc; surf.kinem.alphadot*(surf.lv[i].xc - surf.pvt)]
+        end
+        
+        for i = 1:surf.npanel
+            (uwx[i], uwz[i]) = [utx[i]; utz[i]] + [surf.lv[i].uind; surf.lv[i].wind]
+        end
+
+        #Right-Hand Side
+        for i = 1:surf.npanel
+            surf.rhs[i] = dot(-[uwx[i]; uwz[i]], [surf.lv[i].nx; surf.lv[i].nz])
+        end
+        surf.rhs[surf.npanel+1] = surf.gamma_prev[1]
+        
+        circsol = surf.IC \ surf.rhs
+        surf.gamma_prev[1] = surf.gamma[1]
+        surf.gamma[1] = 0
+        for i = 1:surf.npanel
+            surf.lv[i].s = circsol[i]
+            surf.gamma[1] = surf.gamma[1] + circsol[i]
+        end
+        
+        curfield.tev[length(curfield.tev)].s = circsol[surf.npanel+1]
+
+        for i = 1:surf.npanel
+            sum_gam_prev[i] = sum_gam[i]
+        end
+        
+        sum_gam[1] = surf.lv[1].s
+        for i = 2:surf.npanel
+            sum_gam[i] = sum_gam[i-1] + surf.lv[i].s
+        end
+
+        #Wake rollup
+        wakeroll(surf, curfield, dt)
+        
+        
+        # Force calculations
+        cl = 0
+        cm = 0
+        cd = 0
+        for i = 1:surf.npanel
+            cp[i] = (1./(surf.uref*surf.uref))*(dot([utx[i] + uwx[i]; utz[i] + uwz[i]], [surf.lv[i].tx; surf.lv[i].tz])*surf.lv[i].s/surf.lv[i].l + (sum_gam[i]-sum_gam_prev[i])/dt)
+            cl = cl + cp[i]*surf.lv[i].l*surf.lv[i].nz/surf.c
+            cm = cm - cp[i]*surf.lv[i].l*surf.lv[i].nz*(surf.lv[i].xv - surf.pvt*surf.c)/(surf.c*surf.c)
+            cd = cd + uwz[i]*surf.lv[i].s + surf.lv[i].l*surf.lv[i].nx*(sum_gam[i] - sum_gam_prev[i])/dt
+        end
+        cd = 2*cd/(surf.uref*surf.uref*surf.c)
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.gamma[1], cl, cd, cm])
+    end
+    mat = mat'
+    mat, surf, curfield, kelv_enf
+end    
+    
+
 
 function lautat_wakeroll_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 11), kelv_enf = 0.)
 

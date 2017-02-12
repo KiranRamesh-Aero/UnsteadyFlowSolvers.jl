@@ -1,5 +1,3 @@
-
-
 module UNSflow
 
 using Dierckx
@@ -8,8 +6,8 @@ export Spline1D, derivative, evaluate
 using ForwardDiff
 export derivative
 
-using PyPlot
-export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers, axis
+#using PyPlot
+#export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers, axis
 
 using NLsolve
 export nlsolve, not_in_place
@@ -28,11 +26,11 @@ lautat_wakeroll_more, LLT_ldvm, update_externalvel
 
 export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree,
 MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef,
-ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfwFlap,
+ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfLV, TwoDSurfwFlap,
 TwoDSurf_2DOF, TwoDFreeSurf, TwoDVort, TwoDFlowField, KelvinCondition,
 KelvinKutta, EldRampReturnDef, EldUpIntDef, EldUpInttstartDef, SinDef,
 CosDef, TheoDef, TheoDefwFlap, TwoDFlowData, DelVortDef, patch,
-ThreeDSurfSimple, KinemDef3D, ThreeDVort, ThreeDFieldSimple,
+ThreeDSurfSimple, KinemDef3D, ThreeDVort, TwoDLVPanel, ThreeDFieldSimple,
 KelvinConditionLLTldvm, KelvinKuttaLLTldvm
 
 include("types.jl")

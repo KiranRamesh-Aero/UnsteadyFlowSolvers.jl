@@ -282,6 +282,27 @@ type ThreeDVort
     ds :: Vector{Float64}
 end
 # ---------------------------------------------------------------------------------------------
+#Panel used in the lumped vorte method
+type TwoDLVPanel
+    xv :: Float64
+    zv :: Float64
+    xv_I :: Float64
+    zv_I :: Float64
+    s :: Float64
+    l :: Float64
+    xc :: Float64
+    zc :: Float64
+    xc_I :: Float64
+    zc_I :: Float64
+    nx :: Float64
+    nz :: Float64
+    tx :: Float64
+    tz :: Float64
+    uind :: Float64
+    wind :: Float64
+    uind_I :: Float64
+    wind_I :: Float64
+end
 
 
 # ---------------------------------------------------------------------------------------------
@@ -657,6 +678,214 @@ immutable TwoDSurf
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
     end
 end
+
+#TwoD surface represented by Lumped Vortex Panels
+immutable TwoDSurfLV
+    c :: Float64
+    uref :: Float64
+    coord_file :: String
+    pvt :: Float64
+    npanel :: Int8
+    distype :: String
+    kindef :: KinemDef
+    cam :: Vector{Float64}
+    cam_slope :: Vector{Float64}
+    x :: Vector{Float64}
+    kinem :: KinemPar
+    X0 :: Vector{Float64}
+    tevloc :: Float64
+    a0 :: Vector{Float64}
+    a0dot :: Vector{Float64}
+    a0prev :: Vector{Float64}
+    lv :: Vector{TwoDLVPanel}
+    lespcrit :: Vector{Float64}
+    levflag :: Vector{Int8}
+    IC :: Array{Float64}
+    rhs :: Vector{Float64}
+    gamma :: Vector{Float64}
+    gamma_prev :: Vector{Float64}
+    tgl :: Array{Float64}
+    tlg :: Array{Float64}
+    
+    function TwoDSurfLV(coord_file, pvt, kindef;lespcrit=zeros(1), c=1., uref=1., npanel=70, distype="Cosine", tevloc=0.5)
+
+        x = zeros(npanel+1)
+        cam = zeros(npanel+1)
+        cam_slope = zeros(npanel+1)
+        # bnd_x = zeros(ndiv)
+        # bnd_z = zeros(ndiv)
+        kinem = KinemPar(0, 0, 0, 0, 0, 0)
+
+        if (distype == "linear")
+            dc = c/npanel
+            for i = 1:npanel+1
+                x[i] = real(i-1.)*dc
+            end
+
+            if (coord_file != "FlatPlate")
+                cam, cam_slope = camber_calc(x, coord_file)
+            end
+            
+            camspl = Spline1D(x, cam)
+            cam_slopespl = Spline1D(x, cam_slope)
+            
+            lv = TwoDLVPanel[]
+            for i = 1:npanel
+                push!(lv, TwoDLVPanel(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.) )
+                #Length of panel
+                lv[i].l = sqrt((x[i+1] - x[i])^2 + (cam[i+1] - cam[i])^2)
+                # Vortex Points (1/4c) (body frame)
+                lv[i].xv = x[i] + dc/4; #linspace(0,c-dc,N) + dc/4;
+                lv[i].zv = evaluate(camspl, lv[i].xv)
+                # collocation Points (3/4c) (body frame)
+                lv[i].xc = x[i] + 3*dc/4; #linspace(0,c-dc,N) + 3*dc/4;
+                lv[i].zc = evaluate(camspl, lv[i].xc)
+                deta = evaluate(cam_slopespl, lv[i].xc)
+                den = sqrt(deta^2 + 1)
+                # Normal and Tangent Vectors at Collocation Points (ref to body frame)
+                lv[i].nx = -deta/ den
+                lv[i].nz = 1/den
+                lv[i].tx = lv[i].nz
+                lv[i].tz = -lv[i].nx
+            end
+
+        elseif (distype == "Cosine")
+            theta = zeros(npanel+1)
+            dtheta = pi/(npanel)
+            for i = 1:npanel+1
+                theta[i] = real(i-1.)*dtheta
+                x[i] = c/2.*(1-cos(theta[i]))
+            end
+            
+            if (coord_file != "FlatPlate")
+                cam, cam_slope = camber_calc(x, coord_file)
+            end
+            
+            camspl = Spline1D(x, cam)
+            cam_slopespl = Spline1D(x, cam_slope)
+
+            lv = TwoDLVPanel[]
+            for i = 1:npanel
+                push!(lv, TwoDLVPanel(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.) )
+                #Length of panel
+                lv[i].l = sqrt((x[i+1] - x[i])^2 + (cam[i+1] - cam[i])^2)
+                # Vortex Points (1/4c) (body frame)
+                dc = x[i+1] - x[i]
+                lv[i].xv = x[i] + dc/4; #linspace(0,c-dc,N) + dc/4;
+                lv[i].zv = evaluate(camspl, lv[i].xv) 
+                # collocation Points (3/4c) (body frame)
+                lv[i].xc = x[i] + 3*dc/4; #linspace(0,c-dc,N) + 3*dc/4;
+                lv[i].zc = evaluate(camspl, lv[i].xc)
+                deta = evaluate(cam_slopespl, lv[i].xc)
+                den = sqrt(deta^2 + 1.)
+                # Normal and Tangent Vectors at Collocation Points (ref to body frame)
+                lv[i].nx = -deta/ den
+                lv[i].nz = 1./den
+                lv[i].tx = lv[i].nz
+                lv[i].tz = -lv[i].nx
+            end
+        else
+            error("Invalid panel distribution type")
+        end
+        
+        # Self-Induced Velocity is constant, as long as the airfoil doesn't change geometry
+        #Influence coefficient is a constant
+        IC = zeros(npanel+1,npanel+1)
+        uw = zeros(2)
+        for i = 1:npanel
+            for j = 1:npanel+1
+                if j > npanel
+                    #For varying time steps this column be updated at every time step
+                    dtref = 0.015*c/uref
+                    xloc = x[npanel+1] + tevloc*uref*dtref
+                    zloc = cam[npanel+1]
+                    dummytev = TwoDVort(xloc, zloc, 1.0, 0.0, 0.0, 0.0)
+                    ui, wi = ind_vel([dummytev;], lv[i].xc, lv[i].zc)
+                    uw[1] = ui[1]
+                    uw[2] = wi[1]
+                    IC[i,j] = dot(uw,[lv[i].nx; lv[i].nz])
+                else
+                    dummyj = TwoDVort(lv[j].xv, lv[j].zv, 1.0, 0.0, 0.0, 0.0) 
+                    ui, wi =ind_vel([dummyj;], lv[i].xc, lv[i].zc)
+                    uw[1] = ui[1]
+                    uw[2] = wi[1]
+                    IC[i,j] = dot(uw, [lv[i].nx; lv[i].nz])
+                end
+            end
+        end
+        i = npanel+1
+        for j = 1:npanel+1
+            IC[i,j]= 1.
+        end
+
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+        
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            
+            kinem.h= kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+if (typeof(kindef.u) == EldUpDef)
+    kinem.u = kindef.u(0.)*uref
+    kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+elseif (typeof(kindef.u) == EldRampReturnDef)
+    kinem.u, kinem.udot = kindef.u(0.)
+    kinem.u = kinem.u*uref
+    kinem.udot = kinem.udot*uref*uref/c
+elseif (typeof(kindef.u) == ConstDef)
+    kinem.u = kindef.u(0.)*uref
+    kinem.udot = 0.
+end
+
+tlg = [cos(kinem.alpha) -sin(kinem.alpha); sin(kinem.alpha) cos(kinem.alpha)]
+tgl = transpose(tlg)
+
+X0 = zeros(2) 
+X0[2] = kinem.h
+
+rhs = zeros(npanel+1)
+a0 = zeros(npanel)
+a0dot = zeros(npanel)
+a0prev = zeros(npanel)
+levflag = [0]
+gamma = [0.]
+gamma_prev = [0.]
+
+new(c, uref, coord_file, pvt, npanel, distype, kindef, cam, cam_slope, x, kinem, X0, tevloc, a0, a0dot, a0prev, lv, lespcrit,levflag, IC, rhs, gamma, gamma_prev, tgl, tlg)
+    end
+end
+
 
 
 immutable TwoDSurf_2DOF
@@ -1092,7 +1321,7 @@ end
 immutable ThreeDSurfSimple
     cref :: Float64
     AR :: Float64
-    uref :: Float64
+    uref :: Float64 
     pvt :: Float64
     lespcrit :: Vector{Float64}
     coord_file :: String

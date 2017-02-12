@@ -28,6 +28,14 @@ function view_vorts(surf::TwoDSurfwFlap, field::TwoDFlowField)
 colorbar(sc)
 end
 
+function view_vorts(surf::TwoDSurfLV, field::TwoDFlowField)
+     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.s,field.tev),cmap=ColorMap("jet"),edgecolors="none")
+    sc = scatter(map(q->q.x, field.lev),map(q->q.z,field.lev),s=20,c=map(q->q.s,field.lev),cmap=ColorMap("jet"),edgecolors="none")
+    plot(map(q->q.xv, surf.lv),map(q->q.zv,surf.lv),color = "black",linewidth=2.0)
+colorbar(sc)
+end
+
+
 function view_vorts(field::Vector{TwoDVort})
     scatter(map(q->q.x, field),map(q->q.z,field),s=20,c=map(q->q.s,field),cmap=ColorMap("jet"),edgecolors="none")
     colorbar(sc)

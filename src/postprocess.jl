@@ -106,8 +106,10 @@ function calc_forces_more(surf::TwoDSurf)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
     #Pitching moment is clockwise or nose up positive
-    cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
-    return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs
+    cm_p = 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.))
+    cm = cn*surf.pvt -  cm_p - nonl_m
+    
+    return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs, cnc, cnnc, nonl, cn*surf.pvt, cm_p, nonl_m
 end
 
 function calc_forces_E(surf::TwoDSurf, lev :: Float64, dt :: Float64)
@@ -427,4 +429,56 @@ function anim_flow(outfolder, freq)
 
     run(`ffmpeg -r 25 -i $outfolder/%d.png $outfolder/anim.mpg`)
     run(`open $outfolder/anim.mpg`)
+end
+
+
+function write_stamp(surf :: TwoDSurf, curfield :: TwoDFlowField, t :: Float64, kelv_enf :: Float64, g:: JLD.JldGroup)
+
+    cl, cd, cm, gamma, cn, cs, cnc, cnnc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+    
+    tevmat = zeros(length(curfield.tev), 3)
+    for i = 1:length(curfield.tev)
+        tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
+    end
+    g["tev"] = tevmat
+    levmat = zeros(length(curfield.tev), 3)
+    for i = 1:length(curfield.lev)
+        levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
+    end
+    g["lev"] = levmat
+    bvmat = zeros(length(surf.bv), 3)
+    for i = 1:length(surf.bv)
+        bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
+    end
+    g["bv"] = bvmat
+    extvmat = zeros(length(curfield.extv), 3)
+    for i = 1:length(curfield.extv)
+        extvmat[i,:] = [curfield.extv[i].s curfield.extv[i].x curfield.extv[i].z]
+    end
+    g["extv"] = extvmat
+    g["t"] = t
+    g["alpha"] = surf.kinem.alpha
+    g["h"] = surf.kinem.h
+    g["u"] = surf.kinem.u
+    g["alphadot"] = surf.kinem.alphadot
+    g["hdot"] = surf.kinem.hdot
+    g["udot"] = surf.kinem.udot
+    g["a0"] = surf.a0[1]
+    g["a0dot"] = surf.a0dot[1]
+    g["aterm"] = surf.aterm
+    g["adot"] = surf.adot
+    g["levflag"] = surf.levflag[1]
+    g["kelv_enf"] = kelv_enf
+    g["cl"] = cl
+    g["cd"] = cd
+    g["cm"] = cm
+    g["gamma"] = gamma
+    g["cn"] = cn
+    g["cs"] = cs
+    g["cnc"] = cnc
+    g["cnnc"] = cnnc
+    g["nonl_n"] = nonl
+    g["cm_n"] = cm_n
+    g["cm_pvt"] = cm_pvt
+    g["nonl_m"] = nonl_m
 end

@@ -1,4 +1,4 @@
-function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0., writefile = "Nil")
 
     if (size(mat,1) > 0)
         t = mat[end,1]
@@ -10,6 +10,22 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
 
     dt = dtstar*surf.c/surf.uref
 
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+    
+    
     #Intialise flowfield
     for istep = 1:nsteps
         #Udpate current time
@@ -70,10 +86,22 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
 
 
         #wakeroll(surf, curfield)
-
-        cl, cd, cm = calc_forces(surf)
-
+        if writefile == "Nil"
+            cl, cd, cm = calc_forces(surf)
+        else
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+        end
+        
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        
+        #If required, write an archive file
+        if writefile != "Nil"
+            jldopen(writefile, "r+") do file
+                g = g_create(file, "t$istep")
+                g = write_stamp(surf, curfield, t, kelv_enf, g)
+            end
+        end
+        
     end
     mat = mat'
 

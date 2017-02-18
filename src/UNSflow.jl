@@ -12,6 +12,11 @@ export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplo
 using NLsolve
 export nlsolve, not_in_place
 
+using JLD
+export jldopen
+
+using HDF5
+export g_create
 
 
 export camber_calc, update_boundpos, update_kinem, update_indbound,
@@ -22,7 +27,7 @@ lesp_design_max, transfer_cm, theodorsen, anim_flow,
 drone_trajectory_problem, simple_LLT, find_tstep, ldvm_E, update_adot,
 ldvm_more, ldvm_E_more, calc_forces_more, calc_forces_E_more, interp,
 QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
-lautat_wakeroll_more, LLT_ldvm, update_externalvel
+lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp
 
 export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree,
 MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef,

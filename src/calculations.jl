@@ -406,6 +406,7 @@ end
 # END kinem function
 # ---------------------------------------------------------------------------------------------
 
+
 function update_kinem(surf::TwoDSurfLV, t)
 
     # Pitch kinematics
@@ -476,22 +477,59 @@ end
 # END kinem function
 # ---------------------------------------------------------------------------------------------
 
-function update_kinem(surf::TwoDSurf_2DOF, dt)
+function update_kinem(surf::TwoDSurf_2DOF, dt, cl, cm)
+    #Update previous terms 
+    surf.kinem.alpha_pr = surf.kinem.alpha
+    surf.kinem.h_pr = surf.kinem.h
+    
+    surf.kinem.alphadot_pr3 = surf.kinem.alphadot_pr2
+    surf.kinem.alphadot_pr2 = surf.kinem.alphadot_pr
+    surf.kinem.alphadot_pr = surf.kinem.alphadot
+    
+    surf.kinem.hdot_pr3 = surf.kinem.hdot_pr2
+    surf.kinem.hdot_pr2 = surf.kinem.hdot_pr
+    surf.kinem.hdot_pr = surf.kinem.hdot
+    
+    surf.kinem.alphaddot_pr3 = surf.kinem.alphaddot_pr2
+    surf.kinem.alphaddot_pr2 = surf.kinem.alphaddot_pr
+        
+    surf.kinem.hddot_pr3 = surf.kinem.hddot_pr2
+    surf.kinem.hddot_pr2 = surf.kinem.hddot_pr
+
+    # Calculate hddot and alphaddot from forces based on 2DOF structural system
+    m11 = 2./surf.c
+    m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
+    m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
+    m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
+    
+    R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
+    
+    R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
+    
+    surf.kinem.hddot_pr = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
+    surf.kinem.alphaddot_pr = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
+
+    
     #Kinematics are updated according to the 2DOF response
     surf.kinem.alphadot = surf.kinem.alphadot_pr + (dt/12.)*(23*surf.kinem.alphaddot_pr - 16*surf.kinem.alphaddot_pr2 + 5*surf.kinem.alphaddot_pr3)
     surf.kinem.hdot = surf.kinem.hdot_pr + (dt/12)*(23*surf.kinem.hddot_pr-16*surf.kinem.hddot_pr2 + 5*surf.kinem.hddot_pr3)
     surf.kinem.alpha = surf.kinem.alpha_pr + (dt/12)*(23*surf.kinem.alphadot_pr-16*surf.kinem.alphadot_pr2 + 5*surf.kinem.alphadot_pr3)
     surf.kinem.h = surf.kinem.h_pr + (dt/12)*(23*surf.kinem.hdot_pr - 16*surf.kinem.hdot_pr2 + 5*surf.kinem.hdot_pr3)
+    return surf
 end
 
 
 function update_kinem(surf::TwoDFreeSurf, dt)
     #Kinematics are updated according to the 2DOF response
+
+    
+
     surf.kinem.alphadot = surf.kinem.alphadot_pr + (dt/12.)*(23*surf.kinem.alphaddot_pr - 16*surf.kinem.alphaddot_pr2 + 5*surf.kinem.alphaddot_pr3)
     surf.kinem.hdot = surf.kinem.hdot_pr + (dt/12)*(23*surf.kinem.hddot_pr-16*surf.kinem.hddot_pr2 + 5*surf.kinem.hddot_pr3)
     surf.kinem.alpha = surf.kinem.alpha_pr + (dt/12)*(23*surf.kinem.alphadot_pr-16*surf.kinem.alphadot_pr2 + 5*surf.kinem.alphadot_pr3)
     surf.kinem.h = surf.kinem.h_pr + (dt/12)*(23*surf.kinem.hdot_pr - 16*surf.kinem.hdot_pr2 + 5*surf.kinem.hdot_pr3)
     surf.kinem.u = surf.kinem.u_pr + (dt/12)*(23*surf.kinem.udot_pr - 16*surf.kinem.udot_pr2 + 5*surf.kinem.udot_pr3)
+    return surf
 end
 
 
@@ -636,27 +674,29 @@ end
 
 # ---------------------------------------------------------------------------------------------
 # Update KinemPar2DOF for 2DOF simulations
-function update_kinem2DOF(surf::TwoDSurf_2DOF)
-    surf.kinem.alpha_pr = surf.kinem.alpha
-    surf.kinem.alpha_pr2 = surf.kinem.alpha_pr
-    surf.kinem.alpha_pr3 = surf.kinem.alpha_pr2
-    surf.kinem.h_pr = surf.kinem.h
-    surf.kinem.h_pr2 = surf.kinem.h_pr
-    surf.kinem.h_pr3 = surf.kinem.h_pr2
-    surf.kinem.alphadot_pr = surf.kinem.alphadot
-    surf.kinem.alphadot_pr2 = surf.kinem.alphadot_pr
-    surf.kinem.alphadot_pr3 = surf.kinem.alphadot_pr2
-    surf.kinem.hdot_pr = surf.kinem.hdot
-    surf.kinem.hdot_pr2 = surf.kinem.hdot_pr
-    surf.kinem.hdot_pr3 = surf.kinem.hdot_pr2
-    surf.kinem.alphaddot_pr = surf.kinem.alphaddot
-    surf.kinem.alphaddot_pr2 = surf.kinem.alphaddot_pr
-    surf.kinem.alphaddot_pr3 = surf.kinem.alphaddot_pr2
-    surf.kinem.hddot_pr = surf.kinem.hddot
-    surf.kinem.hddot_pr2 = surf.kinem.hddot_pr
-    surf.kinem.hddot_pr3 = surf.kinem.hddot_pr2
-    return surf
-end
+# function update_kinem2DOF(surf::TwoDSurf_2DOF)
+#     surf.kinem.alpha_pr = surf.kinem.alpha
+#     surf.kinem.h_pr = surf.kinem.h
+
+#     surf.kinem.alphadot_pr3 = surf.kinem.alphadot_pr2
+#     surf.kinem.alphadot_pr2 = surf.kinem.alphadot_pr
+#     surf.kinem.alphadot_pr = surf.kinem.alphadot
+   
+#     surf.kinem.hdot_pr3 = surf.kinem.hdot_pr2
+#     surf.kinem.hdot_pr2 = surf.kinem.hdot_pr
+#     surf.kinem.hdot_pr = surf.kinem.hdot
+
+#     surf.kinem.alphaddot_pr3 = surf.kinem.alphaddot_pr2
+#     surf.kinem.alphaddot_pr2 = surf.kinem.alphaddot_pr
+#     surf.kinem.alphaddot_pr = surf.kinem.alphaddot
+
+#     surf.kinem.hddot_pr3 = surf.kinem.hddot_pr2
+#     surf.kinem.hddot_pr2 = surf.kinem.hddot_pr
+#     surf.kinem.hddot_pr = surf.kinem.hddot
+ 
+
+#     return surf
+# end
 # ---------------------------------------------------------------------------------------------
 # Update KinemPar2DOF for Free simulations
 function update_kinem2DOF(surf::TwoDFreeSurf)
@@ -684,20 +724,20 @@ end
 
 # ---------------------------------------------------------------------------------------------
 # Calculate hddot and alphaddot from forces based on 2DOF structural system
-function calc_struct2DOF(surf::TwoDSurf_2DOF, cl::Float64, cm::Float64)
-    m11 = 2./surf.c
-    m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
-    m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
-    m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
+# function calc_struct2DOF(surf::TwoDSurf_2DOF, cl::Float64, cm::Float64)
+#     m11 = 2./surf.c
+#     m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
+#     m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
+#     m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
 
-    R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
+#     R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
 
-    R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
+#     R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
 
-    surf.kinem.hddot = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
-    surf.kinem.alphaddot = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
-    return surf
-end
+#     surf.kinem.hddot_pr = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
+#     surf.kinem.alphaddot_pr = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
+#     return surf
+# end
 
 function calc_moveFree(surf::TwoDFreeSurf, cl::Float64, cd :: Float64,
 cm :: Float64, cf :: Float64)

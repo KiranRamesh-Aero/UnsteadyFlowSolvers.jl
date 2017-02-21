@@ -68,11 +68,7 @@ type KinemPar2DOF
     alphaddot :: Float64
     hddot :: Float64
     alpha_pr :: Float64
-    alpha_pr2 :: Float64
-    alpha_pr3 :: Float64
     h_pr :: Float64
-    h_pr2 :: Float64
-    h_pr3 :: Float64
     alphadot_pr :: Float64
     alphadot_pr2 :: Float64
     alphadot_pr3 :: Float64
@@ -85,6 +81,10 @@ type KinemPar2DOF
     hddot_pr :: Float64
     hddot_pr2 :: Float64
     hddot_pr3 :: Float64
+
+    function KinemPar2DOF(alpha, h, alphadot, hdot, u)
+        new(alpha, h, alphadot, hdot, u, 0., 0., 0., alpha, h, alphadot, alphadot, alphadot, hdot, hdot, hdot, 0., 0., 0., 0., 0., 0.)
+    end
 end
 
 type KinemPar2DFree

@@ -1292,15 +1292,18 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
     #t = 0.
     #kelv_enf = 0
 
+    cl = 0.
+    cm = 0.
+    
     #Intialise flowfield
     for istep = 1:nsteps
         #Udpate current time
         t = t + dt
 
         #Update kinematic parameters (based on 2DOF response)
-        if (t > dt) # Allow initial condition
-            update_kinem(surf, dt)
-        end
+        #if (t > dt) # Allow initial condition
+        update_kinem(surf, dt, cl, cm)
+        #end
         #Update bound vortex positions
         update_boundpos(surf, dt)
 
@@ -1363,39 +1366,38 @@ function ldvm(surf::TwoDSurf_2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500,
         #Calculate bound vortex strengths
         update_bv(surf)
 
+        wakeroll(surf, curfield, dt)
+
         #Remove vortices that are far away from airfoil
         if (delvort.flag == 1)
             if length(curfield.tev) > delvort.limit
                 if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
                     kelv_enf = kelv_enf + curfield.tev[1].s
-                    for i = 1:length(curfield.tev)-1
-                        curfield.tev[i] = curfield.tev[i+1]
-                    end
-                    pop!(curfield.tev)
+                    shift!(curfield.tev)
                 end
             end
             if length(curfield.lev) > delvort.limit
                 if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
                     kelv_enf = kelv_enf + curfield.lev[1].s
-                    for i = 1:length(curfield.lev)-1
-                        curfield.lev[i] = curfield.lev[i+1]
-                    end
-                    pop!(curfield.lev)
+                    shift!(curfield.lev)
                 end
             end
         end
 
-        wakeroll(surf, curfield, dt)
+        
 
-        #Update kinematic terms in KinemPar2DOF
-        update_kinem2DOF(surf)
-
+        
         #Calculate forces
         cl, cd, cm = calc_forces(surf)
 
+        #Update other kinematic terms in KinemPar2DOF
+        #update_kinem2DOF(surf)
+        
         #Using the force data, update - hddot and alphaddot
-        calc_struct2DOF(surf, cl, cm)
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        #calc_struct2DOF(surf, cl, cm)
+
+        #Write out nondimensional quantities
+        mat = hcat(mat,[t*surf.uref/surf.c, surf.kinem.alpha, surf.kinem.h/surf.c, surf.kinem.u, surf.a0[1], cl, cd, cm])
         #mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm]
     end
     mat = mat'

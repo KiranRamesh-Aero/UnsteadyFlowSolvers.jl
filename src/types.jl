@@ -325,6 +325,26 @@ immutable TwoDFlowField
     end
 end
 
+immutable TwoDFlowFieldMultSurf
+    nsurf :: Int
+    velX :: MotionDef
+    velZ :: MotionDef
+    u :: Vector{Float64}
+    w :: Vector{Float64}
+    tev :: Vector{Vector{TwoDVort}}
+    lev :: Vector{Vector{TwoDVort}}
+    extv :: Vector{TwoDVort}
+    function TwoDFlowFieldMultSurf(nsurf, velX = ConstDef(0.), velZ = ConstDef(0.))
+        u = [0;]
+        w = [0;]
+        tev = TwoDVort[]
+        lev = TwoDVort[]
+        extv = TwoDVort[]
+        new(nsurf, velX, velZ, u, w, tev, lev, extv)
+    end
+end
+
+
 #Definition of flowfield in 3D
 immutable ThreeDFieldSimple
     f2d :: Vector{TwoDFlowField}
@@ -588,8 +608,9 @@ immutable TwoDSurf
     bv :: Vector{TwoDVort}
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
-
-    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1), c=1., uref=1., ndiv=70, naterm=35)
+    initpos :: Vector{Float64}
+    
+    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.])
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -658,8 +679,8 @@ immutable TwoDSurf
         end
 
         for i = 1:ndiv
-            bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
-            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
+            bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha)) + initpos[1]
+            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha)) + initpos[2]
         end
         uind = zeros(ndiv)
         wind = zeros(ndiv)
@@ -675,7 +696,7 @@ immutable TwoDSurf
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
         levflag = [0]
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos)
     end
 end
 
@@ -1164,7 +1185,7 @@ end
 
 
 #         if (kindef.vartype == "Constant")
-#             i = 1
+                  #             i = 1
 #             if (typeof(kindef.alpha) == EldUpDef)
 #                 kinem[i].alpha = kindef.alpha(0.)
 #                 kinem[i].alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/cref
@@ -1425,7 +1446,7 @@ function (eld::EldUpInttstartDef)(t)
     amp = 0
     for i = 1:nsteps
       tmpt = (i-1)*dt
-      if (eld.amp == 0.)
+                  if (eld.amp == 0.)
       	 hdot = 0.
       else
          hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)
@@ -1448,6 +1469,11 @@ end
 immutable KelvinCondition
     surf :: TwoDSurf
     field :: TwoDFlowField
+end
+
+immutable KelvinConditionMultSurf
+    surf :: Vector{TwoDSurf}
+    field :: TwoDFlowFieldMultSurf
 end
 
 immutable KelvinConditionwFlap
@@ -1502,6 +1528,46 @@ function (kelv::KelvinCondition)(tev_iter::Array{Float64})
 
     return val
 end
+
+function (kelv::KelvinConditionMultSurf)(tev_iter::Array{Float64})
+
+    val = zeros(kelv.field.nsurf)
+    ntev = length(kelv.field.tev)
+    nlev = length(kelv.field.lev)
+    
+    #Update the TEV strength
+    for i = 1:kelv.field.nsurf
+        kelv.field.tev[ntev][i].s = tev_iter[i]
+    end
+    
+    
+    #Update induced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
+        
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+    
+    for i = 1:kelv.field.nsurf
+        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+
+        for iv = 1:ntev
+            val[i] = val[i] + kelv.field.tev[iv][i].s
+        end
+        for iv = 1:nlev
+            val[i] = val[i] + kelv.field.lev[iv][i].s
+        end
+    end
+
+    #Add kelv_enforced if necessary - merging will be better
+    # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
+    # if the condition is satified
+
+    return val
+end
+
 
 
 
@@ -1912,4 +1978,307 @@ function (kelv::KelvinKuttaLLTldvm)(tev_iter::Array{Float64})
 end
 
 # END KelvinKutta
+# ---------------------------------------------------------------------------------------------
+#Types for 3D vortex ring method
+type ThreeDSurfVRingGrid
+    xv :: Float64
+    yv :: Float64
+    zv :: Float64
+    xv_I :: Float64
+    yv_I :: Float64
+    zv_I :: Float64
+end
+
+type  ThreeDSurfVRingPanel
+    s :: Float64
+    xc :: Float64
+    yc :: Float64
+    zc :: Float64
+    xc_I :: Float64
+    yc_I :: Float64
+    zc_I :: Float64
+    nx :: Float64
+    ny :: Float64
+    nz :: Float64
+end
+
+
+
+# ---------------------------------------------------------------------------------------------
+immutable ThreeDSurfVR
+    cref :: Float64
+    AR :: Float64
+    uref :: Float64 
+    pvt :: Float64
+    lespcrit :: Vector{Float64}
+    coord_file :: String
+    nspan :: Int
+    nchord :: Int
+    kinem :: KinemPar
+    kindef :: KinemDef
+    a0 :: Vector{Float64}
+    vr_g :: Vector{ThreeDSurfVRingGrid}
+    vr_p :: Vector{ThreeDSurfVRingPanel}
+    distype :: String
+    IC :: Array{Float64}
+    IC_W :: Array{Float64}
+    rhs:: Vector{Float64}
+    tgl :: Array{Float64}
+    tlg :: Array{Float64}
+    X0 :: Vector{Float64}
+    tevloc :: Float64
+    x :: Array{Float64}
+    y :: Array{Float64}
+    z :: Array{Float64}
+    
+    function ThreeDSurfVR(AR, kindef, coord_file, pvt, lespcrit = [10.;]; nspan = 20, nchord = 10, cref = 1., uref=1., distype = "Linear", tevloc = 0.2)
+        
+        bref = AR*cref
+        sref = cref*bref
+
+        kinem = KinemPar(0, 0, 0, 0, 0, 0)
+
+        #Rectangular wing is assumed - to be updated
+        if distype == "Linear" || distype == "linear"
+            x = zeros(nchord+1, nspan+1)
+            y = zeros(nchord+1, nspan+1)
+            z = zeros(nchord+1, nspan+1)
+
+            # Panel edges
+            for i = 1:nchord+1
+                for j = 1:nspan+1
+                    x[i,j] = real(i - 1.)*cref/nchord
+                    y[i,j] = 0.5*real(j - 1.)*bref/nspan
+                    z[i,j] = 0.
+                end
+            end
+            
+            #Votex rings definitions
+            vr_g = ThreeDSurfVRingGrid[]
+            vr_p = ThreeDSurfVRingPanel[]            
+            
+            sp = sref/(nspan*nchord) # Panel area
+            bp = bref/nspan # Panels span
+            cp = cref/nchord # Panels chord
+
+            #Set panel properties of the rings
+            for i = 1:nchord
+                for j = 1:nspan
+                    
+                    # Collocation Points
+                    xc = 3.*cp/4. + x[i,j]
+                    yc = bp/2. + y[i,j]
+                    zc = z[i,j]
+                    
+                    # Normal and Tangent Vectors at Collocation Points
+                    a_k = [x[i+1,j+1] - x[i,j]; y[i+1,j+1] - y[i,j]; z[i+1,j+1] - z[i,j]]
+                    b_k = [x[i,j+1] - x[i+1,j]; y[i,j+1] - y[i+1,j]; z[i,j+1] - z[i+1,j]]
+                    (nx, ny, nz) = cross(a_k,b_k)/norm(cross(a_k,b_k))
+                    
+                    push!(vr_p, ThreeDSurfVRingPanel(0., xc, yc, zc, 0., 0., 0., nx, ny, nz)) 
+                end
+            end
+
+            #Set grid properties of the rings
+            for i = 1:nchord
+                for j = 1:nspan + 1
+                    # Vortex Ring Vertice Position
+                    xv = cp/4. + x[i,j]
+                    yv = y[i,j]
+                    zv = z[i,j]
+                    
+                    push!(vr_g, ThreeDSurfVRingGrid(xv, yv, zv, 0., 0., 0.)) 
+                end
+            end
+            
+            #Set the wake properties
+            i = nchord + 1 #chord+1 is the wake vortex used in IC calculation
+            dtref = 0.015*cref/uref
+            for j = 1:nspan+1
+                xv = x[i,j] + tevloc*uref*dtref
+                yv = y[i,j]
+                zv = z[i,j]
+                push!(vr_g, ThreeDSurfVRingGrid(xv, yv, zv, 0., 0., 0.))
+            end                      
+            
+        elseif distype == "Cosine" || distype == "cosine"
+            # Panel edges
+            thetax = zeros(nchord+1)
+            dthetax = pi/nchord
+            thetay = zeros(nspan+1)
+            dthetay = pi/nspan
+            x = zeros(nchord+1, nspan+1)
+            y = zeros(nchord+1, nspan+1)
+            z = zeros(nchord+1, nspan+1)
+            
+            for i = 1:nchord+1
+                for j = 1:nspan+1
+                    thetax[i] = real(i - 1.)*dthetax
+                    thetay[j] = real(j - 1.)*dthetay
+                    x[i,j] = (cref/2.)*(1 - cos(thetax[i]))
+                    y[i,j] = (bref/4.)*(1 - cos(thetay[j]))
+                    z[i,j] = 0.
+                end
+            end
+            
+            #Votex rings definitions
+            vr_g = ThreeDSurfVRingGrid[]
+            vr_p = ThreeDSurfVRingPanel[]            
+            
+            for i = 1:nchord
+                for j = 1:nspan
+                  
+                    bp = y[i,j+1] - y[i,j]
+                    cp = x[i+1,j] - x[i,j]
+                    
+                    # Collocation Points
+                    xc = 3.*cp/4. + x[i,j]
+                    yc = bp/2. + y[i,j]
+                    zc = z[i,j]
+                    
+                    # Normal and Tangent Vectors at Collocation Points
+                    a_k = [x[i+1,j+1] - x[i,j]; y[i+1,j+1] - y[i,j]; z[i+1,j+1] - z[i,j]]
+                    b_k = [x[i,j+1] - x[i+1,j]; y[i,j+1] - y[i+1,j]; z[i,j+1] - z[i+1,j]]
+                    (nx, ny, nz) = cross(a_k,b_k)/norm(cross(a_k,b_k))
+                    
+                    push!(vr_p, ThreeDSurfVRingPanel( 0., xc, yc, zc, 0., 0., 0., nx, ny, nz)) 
+                end
+            end
+
+            # Vortex Ring Vertice Position
+            for i = 1:nchord
+                for j = 1:nspan + 1
+                    xv = cp/4. + x[i,j]
+                    yv = y[i,j]
+                    zv = z[i,j]
+                    push!(vr_g, ThreeDSurfVRingGrid(xv, yv, zv, 0., 0., 0.))
+                end
+            end
+
+            #Set the wake properties
+            i = nchord + 1 #chord+1 is the wake vortex used in IC calculation
+            dtref = 0.015*cref/uref
+            for j = 1:nspan+1
+                xv = x[i,j] + tevloc*uref*dtref
+                yv = y[i,j]
+                zv = z[i,j]
+                push!(vr_g, ThreeDSurfVRingGrid(xv, yv, zv, 0., 0., 0.))
+            end
+                
+        else
+            error("Invalid distribution type")
+        end    
+                       
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+        
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            
+            kinem.h= kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*cref
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+if (typeof(kindef.u) == EldUpDef)
+    kinem.u = kindef.u(0.)*uref
+    kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+elseif (typeof(kindef.u) == EldRampReturnDef)
+    kinem.u, kinem.udot = kindef.u(0.)
+    kinem.u = kinem.u*uref
+    kinem.udot = kinem.udot*uref*uref/c
+elseif (typeof(kindef.u) == ConstDef)
+    kinem.u = kindef.u(0.)*uref
+    kinem.udot = 0.
+end
+
+phi = 0.
+theta = kinem.alpha
+psi = 0.
+
+p = 0.
+q = kinem.alphadot
+R = 0.
+
+tlg = [1. 0. 0.; 0 cos(phi) sin(phi); 0 -sin(phi) cos(phi)]*[cos(theta) 0 -sin(theta); 0 1 0; sin(theta) 0 cos(theta)]*[cos(psi) sin(psi) 0; -sin(psi) cos(psi) 0; 0 0 1]
+tgl = transpose(tlg)
+                    
+rhs = zeros(nchord*nspan)
+levflag = [9]
+a0 = zeros(nspan)
+
+X0 = zeros(3)
+X0[3] = kinem.h
+
+IC = zeros(nchord*nspan, nspan*nchord)
+IC_W = zeros(nchord*nspan, nspan*nchord)
+
+new(cref, AR, uref, pvt, lespcrit, coord_file,  nspan, nchord, kinem, kindef, a0, vr_g, vr_p, distype, IC, IC_W, rhs, tgl, tlg, X0, tevloc, x, y, z)
+end
+end
+# ---------------------------------------------------------------------------------------------
+
+type ThreeDWakeVRingGrid
+    xv_I :: Float64
+    yv_I :: Float64
+    zv_I :: Float64
+end    
+
+immutable ThreeDFlowFieldVR
+    nspan :: Int
+    velX :: MotionDef
+    velY :: MotionDef
+    velZ :: MotionDef
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+    tev :: Vector{ThreeDWakeVRingGrid}
+    tev_s :: Vector{Float64}
+    lev :: Vector{ThreeDWakeVRingGrid}
+    lev_s :: Vector{Float64}
+    extv :: Vector{ThreeDWakeVRingGrid}
+    extv_s :: Vector{Float64}
+    
+    # Wake rings are stored as ordered vectors instead of arrays for ease of dynamic memory allocation
+    
+    function ThreeDFlowFieldVR(nspan, velX = ConstDef(0.), velY = ConstDef(0.), velZ = ConstDef(0.))
+        u = [0;]
+        v = [0;]
+        w = [0;]
+        tev = ThreeDWakeVRingGrid[]
+        lev = ThreeDWakeVRingGrid[]
+        extv = ThreeDWakeVRingGrid[]
+        tev_s = Float64[]
+        lev_s = Float64[]
+        extv_s = Float64[]
+        new(nspan, velX, velY, velZ, u, v, w, tev, tev_s, lev, lev_s, extv, extv_s)
+    end
+end
 # ---------------------------------------------------------------------------------------------

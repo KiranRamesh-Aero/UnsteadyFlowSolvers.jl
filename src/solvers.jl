@@ -109,7 +109,89 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500; dt
 
 end
 
+function lautat(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, nsteps::Int64 = 500; dtstar::Float64 = 0.015)
 
+    
+    #Deleting vortices is not currently supported
+    #Resuming simulations is not currently supproted
+    #Writefile is not currently supported
+    #Move these to arguments when these are started
+
+    nsurf = length(surf)
+    mat = Array(Float64, nsteps, 8, nsurf)
+    
+    t = 0.
+    
+    dt = 100
+    for i = 1:length(surf)
+        dt = min(dt, dtstar*surf[i].c/surf[i].uref)
+    end
+    #Calculate tstep based on frequency as well.
+    
+    cl = zeros(nsurf)
+    cd = zeros(nsurf)
+    cm = zeros(nsurf)
+    
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+        
+        kelv = KelvinConditionMultSurf(surf, curfield)
+        
+        #Solve for TEV strength to satisfy Kelvin condition
+        soln = nlsolve(not_in_place(kelv), -0.01*ones(nsurf))
+        
+        for i = 1:nsurf
+            curfield.tev[length(curfield.tev)][i].s = soln.zero[i]
+        end
+        
+        #Calculate adot
+        update_a2a3adot(surf, dt)
+        
+        for i = 1:nsurf
+            surf[i].a0prev[1] = surf[i].a0[1]
+            for ia = 1:3
+                surf[i].aprev[ia] = surf[i].aterm[ia]
+            end
+        end
+        
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+        
+        #Calculate bound vortex strengths
+        update_bv(surf)
+        
+        wakeroll(surf, curfield, dt)
+        
+        cl, cd, cm = calc_forces(surf)
+        
+        for i = 1:nsurf
+            mat[istep,1,i] = t
+            mat[istep,2,i] = surf[i].kinem.alpha
+            mat[istep,3,i] = surf[i].kinem.h
+            mat[istep,4,i] = surf[i].kinem.u
+            mat[istep,5,i] = surf[i].a0[1]
+            mat[istep,6,i] = cl[i]
+            mat[istep,7,i] = cd[i]
+            mat[istep,8,i] = cm[i]
+        end
+    end
+    
+    mat, surf, curfield
+end
 
 function lautat_wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
 
@@ -655,7 +737,7 @@ function theodorsen(theo::TheoDefwFlap)
 end
 
 
-function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0.)
+function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0., writefile = "Nil")
 
     if (size(mat,1) > 0)
         t = mat[end,1]
@@ -667,8 +749,23 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    #t = 0.
-
+   
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+    
+    
     #Intialise flowfield
     for istep = 1:nsteps
         #Udpate current time
@@ -766,17 +863,29 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         wakeroll(surf, curfield, dt)
 
         #cl, cd, cm, cn, cs = calc_forces(surf)
-        cl, cd, cm = calc_forces(surf)
-        #bnd_circ = (surf.a0[1] + surf.aterm[1]/2.)
-        #mat[istep,:] = [t surf.kinem.alpha surf.kinem.h surf.kinem.u surf.a0[1] cl cd cm bnd_circ cn cs]
+
+        if writefile == "Nil"
+            cl, cd, cm = calc_forces(surf)
+        else
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+        end
+
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+
+        #If required, write an archive file
+        if writefile != "Nil"
+            jldopen(writefile, "r+") do file
+                g = g_create(file, "t$istep")
+                g = write_stamp(surf, curfield, t, kelv_enf, g)
+            end
+        end
     end
 
     mat = mat'
     mat, surf, curfield, kelv_enf
 end
 
-function ldvm_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 11), kelv_enf = 0.)
+function ldvm_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 11), kelv_enf = 0.)
 
     if (size(mat,1) > 0)
         t = mat[end,1]

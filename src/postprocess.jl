@@ -194,6 +194,47 @@ function calc_forces_E(surf::TwoDSurf, lev :: Float64, dt :: Float64)
     return cl, cd, cm
 end
 
+function calc_forces_E(surf::Vector{TwoDSurf}, lev :: Vector{Float64}, dt :: Float64, shedv :: Vector{Int})
+    nsurf = length(surf)
+    cl = zeros(nsurf)
+    cd = zeros(nsurf)
+    cm = zeros(nsurf)
+
+    for i = 1:nsurf
+        # First term in eqn (2.30) Ramesh et al. in coefficient form
+        cnc = 2*pi*(surf[i].kinem.u*cos(surf[i].kinem.alpha)/surf[i].uref + surf[i].kinem.hdot*sin(surf[i].kinem.alpha)/surf[i].uref)*(surf[i].a0[1] + surf[i].aterm[1]/2.)
+        # Suction force given in eqn (2.31) Ramesh et al.
+        cs = 2*pi*surf[i].a0[1]*surf[i].a0[1]
+        
+        #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+        nonl=0 
+        nonl_m=0
+        for ib = 1:surf[i].ndiv-1
+            nonl = nonl + (surf[i].uind[ib]*cos(surf[i].kinem.alpha) - surf[i].wind[ib]*sin(surf[i].kinem.alpha))*surf[i].bv[ib].s
+            nonl_m = nonl_m + (surf[i].uind[ib]*cos(surf[i].kinem.alpha) - surf[i].wind[ib]*sin(surf[i].kinem.alpha))*surf[i].x[ib]*surf[i].bv[ib].s
+        end
+        nonl = nonl*2./(surf[i].uref*surf[i].uref*surf[i].c)
+        nonl_m = nonl_m*2./(surf[i].uref*surf[i].uref*surf[i].c*surf[i].c)
+        
+        if i in shedv
+            # Second term in eqn (2.30) Ramesh et al. in coefficient form
+            cnnc = 2*pi*(3*surf[i].c*surf[i].a0dot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[2]/(8*surf[i].uref)) + (2*lev[i]/(dt*surf[i].uref*surf[i].uref)) 
+        else
+            cnnc = 2*pi*(3*surf[i].c*surf[i].a0dot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[2]/(8*surf[i].uref))
+        end
+        # Normal force coefficient
+        cn = cnc + cnnc + nonl
+        
+        # Lift and drag coefficients
+        cl[i] = cn*cos(surf[i].kinem.alpha) + cs*sin(surf[i].kinem.alpha)
+        cd[i] = cn*sin(surf[i].kinem.alpha)-cs*cos(surf[i].kinem.alpha)
+        
+        #Pitching moment is clockwise or nose up positive
+        cm[i] = cn*surf[i].pvt - 2*pi*((surf[i].kinem.u*cos(surf[i].kinem.alpha)/surf[i].uref + surf[i].kinem.hdot*sin(surf[i].kinem.alpha)/surf[i].uref)*(surf[i].a0[1]/4. + surf[i].aterm[1]/4. - surf[i].aterm[2]/8.) + (surf[i].c/surf[i].uref)*(7.*surf[i].a0dot[1]/16. + 3.*surf[i].adot[1]/16. + surf[i].adot[2]/16. - surf[i].adot[3]/64.)) - nonl_m - lev[i]*(2*surf[i].pvt - 1)/(dt*surf[i].uref*surf[i].uref)
+    end
+    return cl, cd, cm
+end
+
 function calc_forces_E_more(surf::TwoDSurf, lev :: Float64, dt :: Float64)
 
     # First term in eqn (2.30) Ramesh et al. in coefficient form

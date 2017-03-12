@@ -801,7 +801,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         update_a0anda1(surf)
 
         lesp = surf.a0[1]
-
+        
         #Update adot
         update_a2a3adot(surf,dt)
 
@@ -885,6 +885,219 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat, surf, curfield, kelv_enf
 end
 
+
+function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, nsteps::Int64 = 500; dtstar::Float64 = 0.015)
+
+    #Deleting vortices is not currently supported
+    #Resuming simulations is not currently supproted
+    #Writefile is not currently supported
+    #Move these to arguments when these are started
+    
+    #Some functions have been given shed_ind as an optional parameter with multiple dispatch - to be called for lautat and ldvm. This is confusing programming practice and should be changed. 
+    
+    
+    nsurf = length(surf)
+    mat = Array(Float64, nsteps, 8, nsurf)
+    
+    t = 0.
+    
+    dt = 100
+    for i = 1:length(surf)
+        dt = min(dt, dtstar*surf[i].c/surf[i].uref)
+    end
+    #Calculate tstep based on frequency as well.
+    
+    cl = zeros(nsurf)
+    cd = zeros(nsurf)
+    cm = zeros(nsurf)
+    lesp = zeros(nsurf)
+    
+    eps = 1e-6
+    
+    #shed_ind should be a vector of vectors with rows corresponding to lev count and columns corresponding to surfaces.
+    shed_ind = Vector{Int}[]
+    
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        iter = 0
+        while true
+            iter += 1
+            if iter > 1
+                tev_prev = map(q->q.s, curfield.tev[end])
+                pop!(curfield.tev)
+            end
+            
+            #Add a TEV with dummy strength
+            place_tev(surf, curfield, dt)
+            
+            for i = 1:nsurf
+                kelv = KelvinConditionMultSurfSep(surf, curfield, shed_ind, i)
+                soln = nlsolve(not_in_place(kelv), [-0.01])
+                curfield.tev[end][i].s = soln.zero[1]
+            end
+            
+            if iter > 1
+                teverr = mean(abs(map(q->q.s, curfield.tev[end]) - tev_prev))
+                #println(iter, teverr, map(q->q.s, curfield.tev[end]), tev_prev)
+                if (teverr < eps)
+                    #TEV conditions alone actually implies the others and would be sufficient
+                    break
+                end
+                if (iter > 10)
+                    println("1D convergence failed")
+                    break
+                end
+            end
+        end
+        
+        # #Check for LESP condition
+        # #Update values with converged value of shed tev
+        # #Update incduced velocities on airfoil
+        update_indbound(surf, curfield, shed_ind)
+        
+        # #Calculate downwash
+        update_downwash(surf, [curfield.u[1],curfield.w[1]])
+        
+        # #Calculate first two fourier coefficients
+        update_a0anda1(surf)
+        
+        update_a2a3adot(surf, dt) 
+        
+        #2D iteration if LESP_crit is exceeded
+        shedv = Int[]
+        for i = 1:nsurf
+            if (abs(surf[i].a0[1])>surf[i].lespcrit[1])
+                push!(shedv, i)
+            end
+        end
+        nshed = length(shedv)
+        
+        if nshed > 0
+            iter = 0
+            while true
+                iter += 1
+                
+                # Remove the previous lev and tev if this is a further iteration
+                if iter > 1
+                    tev_prev = map(q->q.s, curfield.tev[end])
+                    lev_prev = map(q->q.s, curfield.lev[end])
+                    
+                    pop!(curfield.tev)
+                    pop!(curfield.lev)
+                    pop!(shed_ind)
+                else
+                    pop!(curfield.tev)
+                end
+                push!(shed_ind, shedv)
+                
+                #Add a TEV with dummy strength
+                place_tev(surf, curfield, dt)
+            
+                #Add a LEV with dummy strength
+                place_lev(surf, curfield, dt, shed_ind)
+                
+                for i = 1:nsurf
+                    if i in shed_ind[end]
+                        kelvkutta = KelvinKuttaMultSurfSep(surf, curfield, shed_ind, i)
+                        #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
+                    
+                        soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
+                        
+                        #Assign the solution
+                        curfield.tev[end][i].s = soln.zero[1]
+                        curfield.lev[end][i].s = soln.zero[2]
+                    else
+                        kelv= KelvinConditionMultSurfSep(surf, curfield, shed_ind, i)
+                        soln = nlsolve(not_in_place(kelv), [-0.01])
+                        
+                        #Assign the solution
+                        curfield.tev[end][i].s = soln.zero[1]
+                    end
+                end
+                
+                #check for convergence
+                #Shed indices must be the same
+                shedv = Int[]
+                for i = 1:nsurf
+                    if (abs(surf[i].a0[1])>surf[i].lespcrit[1] || i in shed_ind[end])
+                        push!(shedv, i)
+                    end
+                end
+                nshed = length(shedv)
+                
+                # TEV and LEV iterations should be converged 
+                
+                if iter > 1 
+                    teverr = mean(abs(map(q->q.s, curfield.tev[end]) - tev_prev))
+                    leverr = mean(abs(map(q->q.s, curfield.lev[end]) - lev_prev))
+                    if (teverr < eps && leverr < eps)
+                        #TEV conditions alone actually implies the others and would be sufficient
+                        break
+                    end
+                    
+                    if (iter > 10)
+                        println("2D convergence failed")
+                        break
+                    end
+                    
+                end
+            end  
+            
+            #Set the levflag parameter after the iteration is over
+            for i = 1:nsurf
+                if i in shed_ind[end]
+                    surf[i].levflag[1] = 1
+                else
+                    surf[i].levflag[1] = 0
+                end
+            end
+        end
+
+#Update rest of Fourier terms
+update_a2toan(surf)
+
+for i = 1:nsurf
+    surf[i].a0prev[1] = surf[i].a0[1]
+    for ia = 1:3
+        surf[i].aprev[ia] = surf[i].aterm[ia]
+    end
+end
+
+#Calculate bound vortex strengths
+update_bv(surf)
+
+wakeroll(surf, curfield, dt, shed_ind)
+
+cl, cd, cm = calc_forces(surf)
+
+for i = 1:nsurf
+    mat[istep,1,i] = t
+    mat[istep,2,i] = surf[i].kinem.alpha
+    mat[istep,3,i] = surf[i].kinem.h
+    mat[istep,4,i] = surf[i].kinem.u
+    mat[istep,5,i] = surf[i].a0[1]
+    mat[istep,6,i] = cl[i]
+    mat[istep,7,i] = cd[i]
+    mat[istep,8,i] = cm[i]
+end
+end
+
+mat, surf, curfield
+end
+
+    
 function ldvm_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 11), kelv_enf = 0.)
 
     if (size(mat,1) > 0)

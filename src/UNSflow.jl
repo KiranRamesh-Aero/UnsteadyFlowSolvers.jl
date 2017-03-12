@@ -27,7 +27,7 @@ lesp_design_max, transfer_cm, theodorsen, anim_flow,
 drone_trajectory_problem, simple_LLT, find_tstep, ldvm_E, update_adot,
 ldvm_more, ldvm_E_more, calc_forces_more, calc_forces_E_more, interp,
 QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
-lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp, vortxl, voring, voring_I, get_gridprop
+lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp, vortxl, voring, voring_I, get_gridprop, calc_forces_E
 
 export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree,
 MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef,
@@ -39,7 +39,7 @@ ThreeDSurfSimple, KinemDef3D, ThreeDVort, TwoDLVPanel,
 ThreeDFieldSimple, KelvinConditionLLTldvm, KelvinKuttaLLTldvm,
 ThreeDSurfVRingGrid, ThreeDSurfVRingPanel, ThreeDSurfVR,
 ThreeDFlowFieldVR, ThreeDWakeVRingGrid,
-TwoDFlowFieldMultSurf, KelvinConditionMultSurf
+TwoDFlowFieldMultSurf, KelvinConditionMultSurf, KelvinKuttaMultSurf, KelvinKuttaMultSurfSep, KelvinConditionMultSurfSep
 
 include("types.jl")
 include("calculations.jl")

@@ -160,6 +160,16 @@ function update_adot(surf::TwoDSurf,dt)
     return surf
 end
 
+function update_adot(surf::Vector{TwoDSurf},dt)
+    for i = 1:length(surf)
+        surf[i].a0dot[1] = (surf[i].a0[1] - surf[i].a0prev[1])/dt
+        for ia = 1:3
+            surf[i].adot[ia] = (surf[i].aterm[ia]-surf[i].aprev[ia])/dt
+        end
+    end
+    return surf
+end
+
 function update_adot(surf::TwoDSurf_2DOF,dt)
     surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
     for ia = 1:3
@@ -202,7 +212,7 @@ function update_indbound(surf::TwoDSurf, curfield::TwoDFlowField)
     return surf
 end
 
-function update_indbound(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf)
+function update_indbound(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, shed_ind::Vector{Vector{Int}})
 
     
     for i = 1:curfield.nsurf
@@ -213,7 +223,7 @@ function update_indbound(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf
             surf[i].uind[j] = 0.
             surf[i].wind[j] = 0.
         end
-
+        
         for n = 1:length(curfield.tev)
             uind, wind = ind_vel(curfield.tev[n], surf[i].bnd_x, surf[i].bnd_z)
             for j = 1:surf[i].ndiv
@@ -223,13 +233,68 @@ function update_indbound(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf
         end
         
         for n = 1:length(curfield.lev)
-            uind, wind = ind_vel(curfield.lev[n], surf[i].bnd_x, surf[i].bnd_z)
+            tempv = TwoDVort[]
+            for ii = 1:curfield.nsurf
+                if ii in shed_ind[n]
+                    push!(tempv,curfield.lev[n][ii])
+                end
+            end       
+            uind, wind = ind_vel(tempv, surf[i].bnd_x, surf[i].bnd_z)
             for j = 1:surf[i].ndiv
                 surf[i].uind[j] += uind[j]
                 surf[i].wind[j] += wind[j]
             end
         end
+
+        for n = 1:curfield.nsurf
+            if n != i
+                #Calculate bv for this surface
+                #update_bv(surf[n])
+                uind, wind = ind_vel(surf[n].bv, surf[i].bnd_x, surf[i].bnd_z)
+                for j = 1:surf[i].ndiv
+                    surf[i].uind[j] += uind[j]
+                    surf[i].wind[j] += wind[j]
+                end
+            end
+        end
+
     end
+    return surf
+end
+
+function update_indbound(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf)
+    
+    for i = 1:curfield.nsurf
+        uind = zeros(surf[i].ndiv)
+        wind = zeros(surf[i].ndiv)
+   
+        for j = 1:surf[i].ndiv
+            surf[i].uind[j] = 0.
+            surf[i].wind[j] = 0.
+        end
+        
+        for n = 1:length(curfield.tev)
+            uind, wind = ind_vel(curfield.tev[n], surf[i].bnd_x, surf[i].bnd_z)
+            for j = 1:surf[i].ndiv
+                surf[i].uind[j] += uind[j]
+                surf[i].wind[j] += wind[j]
+            end
+        end
+
+        #Add influence of other surfaces
+        for n = 1:curfield.nsurf
+            if n != i
+                #Calculate bv for this surface
+                #update_bv(surf[n])
+                uind, wind = ind_vel(surf[n].bv, surf[i].bnd_x, surf[i].bnd_z)
+                for j = 1:surf[i].ndiv
+                    surf[i].uind[j] += uind[j]
+                    surf[i].wind[j] += wind[j]
+                end
+            end
+        end
+    end            
+
     return surf
 end
 
@@ -562,9 +627,8 @@ function update_kinem(surf::Vector{TwoDSurf}, t)
             surf[i].kinem.u = surf[i].kindef.u(t)*surf[i].uref
         surf[i].kinem.udot = 0.
         end
-        # ---------------------------------------------------------------------------------------------
-        return surf
     end
+    return surf
 end
 # END kinem function
 # ---------------------------------------------------------------------------------------------
@@ -1138,7 +1202,7 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
     return curfield
 end
 
-function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, dt)
+function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, dt, shed_ind)
     #Clean induced velocities
     for i = 1:length(curfield.tev)
         for j = 1:curfield.nsurf
@@ -1149,31 +1213,39 @@ function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, dt)
     
     for i = 1:length(curfield.lev)
         for j = 1:curfield.nsurf
-            curfield.lev[i][j].vx = 0
-            curfield.lev[i][j].vz = 0
-        end
-    end
-
-    #Velocities induced by free vortices on each other
-    mutual_ind([curfield.tev; curfield.lev], curfield.nsurf)
-
-    #Add the influence of velocities induced by bound vortices
-    for i = 1:length(curfield.tev)
-        for j = 1:curfield.nsurf
-            utemp, wtemp = ind_vel(surf[j].bv, curfield.tev[i][j].x, curfield.tev[i][j].z)
-            curfield.tev[i][j].vx += utemp[1]
-            curfield.tev[i][j].vz += wtemp[1]
-        end
-    end
-
-    for i = 1:length(curfield.lev)
-        for j = 1:curfield.nsurf
-            utemp, wtemp = ind_vel(surf[j].bv, curfield.lev[i][j].x, curfield.lev[i][j].z)
-            curfield.lev[i][j].vx += utemp
-            curfield.lev[i][j].vz += wtemp
+            if j in shed_ind[i]
+                curfield.lev[i][j].vx = 0
+                curfield.lev[i][j].vz = 0
+            end
         end
     end
     
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev], curfield.nsurf, shed_ind)
+
+    #Add the influence of velocities induced by bound vortices
+    for i = 1:length(curfield.tev)
+        for k = 1:curfield.nsurf
+            for j = 1:curfield.nsurf
+                utemp, wtemp = ind_vel(surf[j].bv, curfield.tev[i][k].x, curfield.tev[i][k].z)
+                curfield.tev[i][k].vx += utemp[1]
+                curfield.tev[i][k].vz += wtemp[1]
+            end
+        end
+    end
+    
+    for i = 1:length(curfield.lev)
+        for k = 1:curfield.nsurf
+            if k in shed_ind[i]
+                for j = 1:curfield.nsurf
+                    utemp, wtemp = ind_vel(surf[j].bv, curfield.lev[i][k].x, curfield.lev[i][k].z)
+                    curfield.lev[i][k].vx += utemp[1]
+                    curfield.lev[i][k].vz += wtemp[1]
+                end
+            end
+        end
+    end
+        
     #Convect free vortices with their induced velocities
     for i = 1:length(curfield.tev)
         for j = 1:curfield.nsurf 
@@ -1183,8 +1255,42 @@ function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, dt)
     end
     for i = 1:length(curfield.lev)
         for j = 1:curfield.nsurf 
-            curfield.lev[i][j].x += dt*curfield.lev[i][j].vx
-            curfield.lev[i][j].z += dt*curfield.lev[i][j].vz
+            if j in shed_ind[i]
+                curfield.lev[i][j].x += dt*curfield.lev[i][j].vx
+                curfield.lev[i][j].z += dt*curfield.lev[i][j].vz
+            end
+        end
+    end
+    return curfield
+end
+
+function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowFieldMultSurf, dt)
+    #Without LEVs
+    #Clean induced velocities
+    for i = 1:length(curfield.tev)
+        for j = 1:curfield.nsurf
+            curfield.tev[i][j].vx = 0
+            curfield.tev[i][j].vz = 0
+        end
+    end
+
+    #Velocities induced by free vortices on each other
+    mutual_ind(curfield.tev, curfield.nsurf)
+
+    #Add the influence of velocities induced by bound vortices
+    for i = 1:length(curfield.tev)
+        for j = 1:curfield.nsurf
+            utemp, wtemp = ind_vel(surf[j].bv, curfield.tev[i][j].x, curfield.tev[i][j].z)
+            curfield.tev[i][j].vx += utemp[1]
+            curfield.tev[i][j].vz += wtemp[1]
+        end
+    end
+    
+    #Convect free vortices with their induced velocities
+    for i = 1:length(curfield.tev)
+        for j = 1:curfield.nsurf 
+            curfield.tev[i][j].x += dt*curfield.tev[i][j].vx
+            curfield.tev[i][j].z += dt*curfield.tev[i][j].vz
         end
     end
     return curfield
@@ -1479,6 +1585,36 @@ function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
     return field
 end
 
+function place_lev(surf::Vector{TwoDSurf}, field::TwoDFlowFieldMultSurf,dt, shed_ind::Vector{Vector{Int}})
+    
+    nlev = length(field.lev)
+    tempv = TwoDVort[]
+    dummyV = TwoDVort(0.,0.,0.,0.,0.,0.)
+    #These dummy vortices are placed in the LEV array when that surface doesnt shed levs. These wont be used in any calculations but they still occupy memory. 
+    
+    for i = 1:field.nsurf
+        if i in shed_ind[nlev+1]
+            le_vel_x = surf[i].kinem.u - surf[i].kinem.alphadot*sin(surf[i].kinem.alpha)*surf[i].pvt*surf[i].c + surf[i].uind[1]
+            le_vel_z = -surf[i].kinem.alphadot*cos(surf[i].kinem.alpha)*surf[i].pvt*surf[i].c- surf[i].kinem.hdot + surf[i].wind[1]
+            
+            if (surf[i].levflag[1] == 0)
+                xloc = surf[i].bnd_x[1] + 0.5*le_vel_x*dt
+                zloc = surf[i].bnd_z[1] + 0.5*le_vel_z*dt
+            else
+                xloc = surf[i].bnd_x[1]+(1./3.)*(field.lev[nlev][i].x - surf[i].bnd_x[1])
+                zloc = surf[i].bnd_z[1]+(1./3.)*(field.lev[nlev][i].z - surf[i].bnd_z[1])
+            end
+            push!(tempv,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))
+        else
+            push!(tempv,dummyV)
+        end
+    end
+
+    push!(field.lev, tempv)
+    return field
+end
+
+
 function place_lev(surf::TwoDSurf_2DOF,field::TwoDFlowField,dt)
     nlev = length(field.lev)
 
@@ -1563,7 +1699,7 @@ end
 function mutual_ind(vorts::Vector{Vector{TwoDVort}}, nsurf :: Int)
     for i = 1:length(vorts)
         for k = 1:nsurf
-            for j = 1:length(vorts)
+            for j = i+1:length(vorts)
                 for l = 1:nsurf
                     
                     dx = vorts[i][k].x - vorts[j][l].x
@@ -1579,6 +1715,72 @@ function mutual_ind(vorts::Vector{Vector{TwoDVort}}, nsurf :: Int)
                     
                     vorts[i][k].vx += dz * vorts[j][l].s * magitr
                     vorts[i][k].vz -= dx * vorts[j][l].s * magitr
+                end
+            end
+        end
+    end
+    return vorts
+end
+
+function mutual_ind(vorts::Vector{Vector{TwoDVort}}, nsurf :: Int, shed_ind::Vector{Vector{Int}})
+    nlev = length(shed_ind)
+    ntev = length(vorts) - nlev
+    
+    for i = 1:length(vorts)
+        if i <= ntev
+            for k = 1:nsurf
+                #If it's a TEV, no need to check shed_ind
+                for j = i+1:length(vorts)
+                    if j <= ntev
+                        for l = 1:nsurf
+                            dx = vorts[i][k].x - vorts[j][l].x
+                            dz = vorts[i][k].z - vorts[j][l].z
+                            #source- tar
+                            dsq = dx*dx + dz*dz
+                            magitr = 1./(2*pi*sqrt(vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc + dsq*dsq))
+                            magjtr = 1./(2*pi*sqrt(vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc + dsq*dsq))
+                            
+                            vorts[j][l].vx -= dz * vorts[i][k].s * magjtr
+                            vorts[j][l].vz += dx * vorts[i][k].s * magjtr
+                            
+                            vorts[i][k].vx += dz * vorts[j][l].s * magitr
+                            vorts[i][k].vz -= dx * vorts[j][l].s * magitr
+                        end
+                    else
+                        for l in shed_ind[j - ntev]
+                            dx = vorts[i][k].x - vorts[j][l].x
+                            dz = vorts[i][k].z - vorts[j][l].z
+                            #source- tar
+                            dsq = dx*dx + dz*dz
+                            magitr = 1./(2*pi*sqrt(vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc + dsq*dsq))
+                            magjtr = 1./(2*pi*sqrt(vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc + dsq*dsq))
+                            
+                            vorts[j][l].vx -= dz * vorts[i][k].s * magjtr
+                            vorts[j][l].vz += dx * vorts[i][k].s * magjtr
+                            
+                            vorts[i][k].vx += dz * vorts[j][l].s * magitr
+                            vorts[i][k].vz -= dx * vorts[j][l].s * magitr
+                        end
+                    end
+                end
+            end
+        else
+            for k in shed_ind[i - ntev]
+                for j = i+1:length(vorts)
+                    for l in shed_ind[j - ntev]
+                        dx = vorts[i][k].x - vorts[j][l].x
+                        dz = vorts[i][k].z - vorts[j][l].z
+                        #source- tar
+                        dsq = dx*dx + dz*dz
+                        magitr = 1./(2*pi*sqrt(vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc*vorts[j][l].vc + dsq*dsq))
+                        magjtr = 1./(2*pi*sqrt(vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc*vorts[i][k].vc + dsq*dsq))
+                        
+                        vorts[j][l].vx -= dz * vorts[i][k].s * magjtr
+                        vorts[j][l].vz += dx * vorts[i][k].s * magjtr
+                        
+                        vorts[i][k].vx += dz * vorts[j][l].s * magitr
+                        vorts[i][k].vz -= dx * vorts[j][l].s * magitr
+                    end
                 end
             end
         end

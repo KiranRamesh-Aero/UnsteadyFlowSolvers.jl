@@ -1476,6 +1476,13 @@ immutable KelvinConditionMultSurf
     field :: TwoDFlowFieldMultSurf
 end
 
+immutable KelvinConditionMultSurfSep
+    surf :: Vector{TwoDSurf}
+    field :: TwoDFlowFieldMultSurf
+    shed_ind :: Vector{Vector{Int}}
+    i :: Int
+end
+
 immutable KelvinConditionwFlap
     surf :: TwoDSurfwFlap
     field :: TwoDFlowField
@@ -1550,6 +1557,9 @@ function (kelv::KelvinConditionMultSurf)(tev_iter::Array{Float64})
     #Calculate first two fourier coefficients
     update_a0anda1(kelv.surf)
     
+    #Update rest of Fourier terms - for bv calculation
+    #update_a2toan(kelv.surf)
+    
     for i = 1:kelv.field.nsurf
         val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
 
@@ -1569,6 +1579,43 @@ function (kelv::KelvinConditionMultSurf)(tev_iter::Array{Float64})
 end
 
 
+function (kelv::KelvinConditionMultSurfSep)(tev_iter::Array{Float64})
+    i = kelv.i
+
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+
+    kelv.field.tev[ntev][i].s = tev_iter[1]
+    
+    #Update induced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field, kelv.shed_ind)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    #Update rest of Fourier terms - for bv calculation
+    #update_a2toan(kelv.surf)
+        
+    val = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+    
+    for iv = 1:ntev
+        val = val + kelv.field.tev[iv][i].s
+    end
+    for iv = 1:nlev
+        if i in kelv.shed_ind[iv]
+            val = val + kelv.field.lev[iv][i].s
+        end
+    end
+    
+    #Add kelv_enforced if necessary - merging will be better
+    # val is the value of Gam_b + sum Gam_tev + Gam_lev which will equal zero
+    # if the condition is satified
+
+    return val
+end
 
 
 function (kelv::KelvinCondition2DOF)(tev_iter::Array{Float64})
@@ -1729,6 +1776,19 @@ immutable KelvinKutta
     field :: TwoDFlowField
 end
 
+immutable KelvinKuttaMultSurfSep
+    surf :: Vector{TwoDSurf}
+    field :: TwoDFlowFieldMultSurf
+    shed_ind :: Vector{Vector{Int}}
+    i :: Int
+end
+
+immutable KelvinKuttaMultSurf
+    surf :: Vector{TwoDSurf}
+    field :: TwoDFlowFieldMultSurf
+    shed_ind :: Vector{Vector{Int}}
+end
+
 immutable KelvinKutta2DOF
     surf :: TwoDSurf_2DOF
     field :: TwoDFlowField
@@ -1788,6 +1848,109 @@ function (kelv::KelvinKutta)(v_iter::Array{Float64})
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
+
+function (kelv::KelvinKuttaMultSurf)(v_iter::Array{Float64})
+    nshed = length(kelv.shed_ind[length(kelv.shed_ind)])
+    val = zeros(kelv.field.nsurf + nshed)
+    
+    #Update the TEV and LEV strengths
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+
+    for i = 1:kelv.field.nsurf
+        kelv.field.tev[ntev][i].s = v_iter[i]
+    end
+    idx = kelv.field.nsurf
+    for i in kelv.shed_ind[nlev]
+        idx += 1
+        kelv.field.lev[nlev][i].s = v_iter[idx]
+    end
+    
+    #Update induced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field, kelv.shed_ind)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
+    
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+    
+    #Update rest of Fourier terms - for bv calculation
+    update_a2toan(kelv.surf)
+    
+    
+    for i = 1:kelv.field.nsurf
+        val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+        
+        for iv = 1:ntev
+            val[i] = val[i] + kelv.field.tev[iv][i].s
+        end
+        for iv = 1:nlev
+            if i in kelv.shed_ind[nlev]
+                val[i] = val[i] + kelv.field.lev[iv][i].s
+            end
+        end
+    end
+    idx = kelv.field.nsurf
+    for i in kelv.shed_ind[nlev]
+        idx += 1
+        if (kelv.surf[i].a0[1] > 0)
+            lesp_cond = kelv.surf[i].lespcrit[1]
+        else
+            lesp_cond = -kelv.surf[i].lespcrit[1]
+        end
+        val[idx] = kelv.surf[i].a0[1] - lesp_cond
+    end
+    
+    return val
+end
+
+function (kelv::KelvinKuttaMultSurfSep)(v_iter::Array{Float64})
+    
+    val = zeros(2)
+
+    i = kelv.i
+    
+    #Update the TEV and LEV strengths
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    
+    kelv.field.tev[ntev][i].s = v_iter[1]
+    kelv.field.lev[nlev][i].s = v_iter[2]
+    
+    #Update incduced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field, kelv.shed_ind)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf ,[kelv.field.u[1],kelv.field.w[1]])
+    
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+    
+    #Update rest of Fourier terms - for bv calculation
+    #update_a2toan(kelv.surf)
+    
+    val[1] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.)
+
+    for iv = 1:ntev
+        val[1] = val[1] + kelv.field.tev[iv][i].s
+    end
+    for iv = 1:nlev
+        if i in kelv.shed_ind[iv]
+            val[1] = val[1] + kelv.field.lev[iv][i].s
+        end
+    end
+
+    if (kelv.surf[i].a0[1] > 0)
+        lesp_cond = kelv.surf[i].lespcrit[1]
+    else
+        lesp_cond = -kelv.surf[i].lespcrit[1]
+    end
+    val[2] = kelv.surf[i].a0[1] - lesp_cond
+    
+    return val
+end
+
 
 function (kelv::KelvinKutta2DOF)(v_iter::Array{Float64})
     val = zeros(2)

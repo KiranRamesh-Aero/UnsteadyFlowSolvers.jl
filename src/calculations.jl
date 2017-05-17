@@ -215,7 +215,7 @@ end
 # ---------------------------------------------------------------------------------------------
 # Function for updating the induced velocities u, w: eqns (2.12), (2.13) in Ramesh et al.
 function update_indbound(surf::TwoDSurf, curfield::TwoDFlowField)
-    surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev], surf.bnd_x, surf.bnd_z)
+    surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev; curfield.extv], surf.bnd_x, surf.bnd_z)
     return surf
 end
 
@@ -1232,43 +1232,62 @@ end
 # ---------------------------------------------------------------------------------------------
 # Function for calculating the wake rollup
 function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
+
+    nlev = length(curfield.lev)
+    ntev = length(curfield.tev)
+    nextv = length(curfield.extv)
+    
     #Clean induced velocities
-    for i = 1:length(curfield.tev)
+    for i = 1:ntev
         curfield.tev[i].vx = 0
         curfield.tev[i].vz = 0
     end
 
-    for i = 1:length(curfield.lev)
+    for i = 1:nlev
         curfield.lev[i].vx = 0
         curfield.lev[i].vz = 0
     end
 
+    for i = 1:nextv
+        curfield.extv[i].vx = 0
+        curfield.extv[i].vz = 0
+    end
+    
     #Velocities induced by free vortices on each other
-    mutual_ind([curfield.tev; curfield.lev])
+    mutual_ind([curfield.tev; curfield.lev; curfield.extv])
 
     #Add the influence of velocities induced by bound vortices
-    utemp = zeros(length(curfield.tev)+length(curfield.lev))
-    wtemp = zeros(length(curfield.tev)+length(curfield.lev))
-    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev)])
+    utemp = zeros(ntev + nlev + nextv)
+    wtemp = zeros(ntev + nlev + nextv)
+    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev); map(q -> q.x, curfield.extv)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev); map(q -> q.z, curfield.extv) ])
 
-    for i = 1:length(curfield.tev)
+    for i = 1:ntev
         curfield.tev[i].vx += utemp[i]
         curfield.tev[i].vz += wtemp[i]
     end
-    for i = length(curfield.tev)+1:length(utemp)
-        curfield.lev[i-length(curfield.tev)].vx += utemp[i]
-        curfield.lev[i-length(curfield.tev)].vz += wtemp[i]
+    for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vx += utemp[i]
+        curfield.lev[i-ntev].vz += wtemp[i]
     end
-
+    for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vx += utemp[i]
+        curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+    
     #Convect free vortices with their induced velocities
-    for i = 1:length(curfield.tev)
+    for i = 1:ntev
         curfield.tev[i].x += dt*curfield.tev[i].vx
         curfield.tev[i].z += dt*curfield.tev[i].vz
     end
-    for i = 1:length(curfield.lev)
+    for i = 1:nlev
             curfield.lev[i].x += dt*curfield.lev[i].vx
         curfield.lev[i].z += dt*curfield.lev[i].vz
     end
+    for i = 1:nextv
+        curfield.extv[i].x += dt*curfield.extv[i].vx
+        curfield.extv[i].z += dt*curfield.extv[i].vz
+    end
+    
     return curfield
 end
 

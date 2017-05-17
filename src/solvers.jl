@@ -736,7 +736,167 @@ function theodorsen(theo::TheoDefwFlap)
     return wt/(2*pi), Cl_tot, Cmal_tot, Cmbe_tot
 end
 
+function ldvm_varU(surf::TwoDSurf, curfield::TwoDFlowField, recalib::Vector{Float64}, lespcalib::Vector{Float64}, re_ref::Float64, nsteps::Int64 = 500, dtstar::Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 10), kelv_enf = 0., writefile = "Nil")
 
+    lespspl = Spline1D(recalib, lespcalib)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+    
+    #mat = zeros(nsteps,11)
+    mat = mat'
+    
+    dt = dtstar*surf.c/surf.uref
+    
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+    
+    
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        #Add a TEV with dummy strength
+        place_tev(surf,curfield,dt)
+        
+        kelv = KelvinCondition(surf,curfield)
+        #Solve for TEV strength to satisfy Kelvin condition
+        #curfield.tev[length(curfield.tev)].s = secant_method(kelv, 0., -0.01)
+        soln = nlsolve(not_in_place(kelv), [-0.01])
+        curfield.tev[length(curfield.tev)].s = soln.zero[1]
+        
+        #Check for LESP condition
+        #Update values with converged value of shed tev
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+        
+        #Calculate downwash
+        update_downwash(surf, [curfield.u[1],curfield.w[1]])
+        
+        #Calculate first two fourier coefficients
+        update_a0anda1(surf)
+        
+        
+        le_vel_x = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[1]
+        le_vel_z = surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.pvt*surf.c - surf.kinem.hdot*cos(surf.kinem.alpha) + surf.wind[1]
+        vmag = sqrt(le_vel_x*le_vel_x+le_vel_z*le_vel_z)
+        re_le = re_ref*vmag
+        
+        surf.lespcrit[1] = Dierckx.evaluate(lespspl, re_le)
+        
+        lesp = surf.a0[1]
+        
+        #Update adot
+        update_a2a3adot(surf,dt)
+        
+        #2D iteration if LESP_crit is exceeded
+        if (abs(lesp)>surf.lespcrit[1])
+            #Remove the previous tev
+            pop!(curfield.tev)
+            #Add a TEV with dummy strength
+            place_tev(surf,curfield,dt)
+            
+            #Add a LEV with dummy strength
+            place_lev(surf,curfield,dt)
+            
+            kelvkutta = KelvinKutta(surf,curfield)
+            #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
+            
+            soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
+            (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero[1], soln.zero[2]
+            
+            surf.levflag[1] = 1
+        else
+            surf.levflag[1] = 0
+        end
+        
+        
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+        
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+        
+        #Calculate bound vortex strengths
+        update_bv(surf)
+        
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.tev[1].s
+                    for i = 1:length(curfield.tev)-1
+                        curfield.tev[i] = curfield.tev[i+1]
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+                    kelv_enf = kelv_enf + curfield.lev[1].s
+                    for i = 1:length(curfield.lev)-1
+                        curfield.lev[i] = curfield.lev[i+1]
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+        wakeroll(surf, curfield, dt)
+        
+        #cl, cd, cm, cn, cs = calc_forces(surf)
+        
+        if writefile == "Nil"
+            cl, cd, cm = calc_forces(surf)
+        else
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+        end
+        
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, surf.lespcrit[1], re_le])
+        
+        #If required, write an archive file
+        if writefile != "Nil"
+            jldopen(writefile, "r+") do file
+                g = g_create(file, "t$istep")
+                g = write_stamp(surf, curfield, t, kelv_enf, g)
+            end
+        end
+    end
+
+mat = mat'
+mat, surf, curfield, kelv_enf
+
+end
+
+        
 function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0., writefile = "Nil")
 
     if (size(mat,1) > 0)
@@ -2365,9 +2525,9 @@ function QSLLT_lautat(surf :: ThreeDSurfSimple, field :: ThreeDFieldSimple, nste
         kelv = KelvinConditionLLTldvm(surf, field)
 
         #Solve for TEV strength to satisfy Kelvin condition
-
+        
         soln = nlsolve(not_in_place(kelv), [-0.01*ones(surf.nspan); zeros(surf.nspan)])
-
+        
         for i = 1:surf.nspan
             field.f2d[i].tev[length(field.f2d[i].tev)].s = soln.zero[i]
 
@@ -2431,7 +2591,7 @@ function QSLLT_lautat(surf :: ThreeDSurfSimple, field :: ThreeDFieldSimple, nste
             #     end
             # end
             wakeroll(surf.s2d[i], field.f2d[i], dt)
-
+            
             if (surf.s2d[i].levflag[1] == 1)
                 cl[i], cd[i], cm[i] = calc_forces_E(surf.s2d[i], field.f2d[i].lev[length(field.f2d[i].lev)].s, dt)
             else
@@ -2454,6 +2614,197 @@ function QSLLT_lautat(surf :: ThreeDSurfSimple, field :: ThreeDFieldSimple, nste
     end
     mat = mat'
     mat, surf, field
+
+end
+
+function QSLLT_lautat2(surf :: ThreeDSurfSimple, curfield :: ThreeDFieldStrip, nsteps :: Int64, dtstar :: Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 4), kelv_enf = zeros(surf.nspan), writefile = "Nil", writeind :: Vector{Int} = Int[])
+    
+    #Alternate way of solving the newton iteration. For lautat both
+    #types of iteration work, but for ldvm only the type used in this
+    #code will work.
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+
+    mat = mat'
+
+    dt = dtstar*surf.cref/surf.uref
+
+    eps = 1e-6
+    
+    cl = zeros(surf.nspan)
+    cd = zeros(surf.nspan)
+    cm = zeros(surf.nspan)
+    a03dprev = zeros(surf.nspan)
+    
+    shed_ind = Vector{Int}[]
+    
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            write(file, "writeind", writeind)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+    
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf.s2d, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf.s2d, dt)
+
+        #Update IC if required
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+
+        place_tev(surf.s2d, curfield, dt)
+        
+        iter = 0
+        while true
+            iter += 1
+            if iter > 1
+                a03dprev[:] = surf.a03d[:]
+                tev_prev = map(q->q.s, curfield.tev[end])
+            end
+            
+            for i = 1:surf.nspan
+                kelv = KelvinConditionLLTldvmSep(surf, curfield, shed_ind, i, kelv_enf)
+                soln = nlsolve(not_in_place(kelv), [-0.01])
+                curfield.tev[end][i].s = soln.zero[1]
+            end
+
+            calc_a03d(surf)
+            
+            if iter > 1
+                teverr = mean(abs(map(q->q.s, curfield.tev[end]) - tev_prev))
+                a03derr = mean(abs(surf.a03d - a03dprev))
+                
+                if (teverr < eps && a03derr < eps)
+                    break
+                end
+                if (iter > 20)
+                    println("1D convergence failed")
+                    println(teverr, a03derr)
+                    break
+                end
+            end
+        end
+        
+        #Update rest of Fourier terms
+        update_a2toan(surf.s2d)
+        
+        #Update derivatives of Fourier coefficients
+        update_adot(surf.s2d,dt)
+
+        #Update a03ddot
+        for i = 1:surf.nspan
+            surf.a03ddot[i] = (surf.a03d[i] - surf.a03dprev[i])/dt
+        end
+        
+        #Set previous values of aterm to be used for derivatives in next time step
+        for i = 1:surf.nspan
+            surf.s2d[i].a0prev[1] = surf.s2d[i].a0[1]
+            for ia = 1:3
+                surf.s2d[i].aprev[ia] = surf.s2d[i].aterm[ia]
+            end
+            surf.a03dprev[i] = surf.a03d[i]
+        end
+        
+        #For the convenience of not changing 2D codes, a03d is simply
+        #added to a0 as it has the same influence. For proper
+        #accounting however, it is subtracted again so that the terms
+        #are kept separate
+
+        for i = 1:surf.nspan
+            #Update 3D effect on A0
+            surf.s2d[i].a0[1] = surf.s2d[i].a0[1] + surf.a03d[i]
+            surf.s2d[i].a0dot[1] = surf.s2d[i].a0dot[1] + surf.a03ddot[i]
+        end
+                
+        #Calculate bound vortex strengths
+        update_bv(surf.s2d)
+        
+        #Remove vortices that are far away from airfoil
+        if (delvort.flag == 1)
+            if length(curfield.tev) > delvort.limit
+                #check at the first spanwise location and if satisfied delete the whole row
+                if (sqrt((curfield.tev[1][1].x -  surf.s2d[1].bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1][1].z - surf.s2d[1].bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.cref)
+                    for i = 1:surf.nspan
+                        kelv_enf[i] = kelv_enf[i] + curfield.tev[1][i].s
+                        for j = 1:length(curfield.tev) - 1
+                            curfield.tev[j][i] = curfield.tev[j+1][i]
+                        end
+                    end
+                    pop!(curfield.tev)
+                end
+            end
+
+            if length(curfield.lev) > delvort.limit
+                if (sqrt((curfield.lev[1][1].x - surf.s2d[1].bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1][1].z - surf.s2d[1].bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.cref)
+                    for i = 1:surf.nspan
+                        kelv_enf[i] = kelv_enf[i] + curfield.lev[1][i].s
+
+                        for i = 1:length(curfield.lev)-1
+                            curfield.lev[j][i] = curfield.lev[j+1][i]
+                        end
+                    end
+                    pop!(curfield.lev)
+                end
+            end
+        end
+
+        wakeroll(surf.s2d, curfield, dt, shed_ind)
+
+        #bunched a0 with a03d is used here too. Remove after
+        cl, cd, cm = calc_forces(surf.s2d)
+        
+        cl3d = 0
+        cd3d = 0
+        cm3d = 0
+        
+        for i = 1:surf.nspan-1
+            cl3d = cl3d + 0.5*(cl[i] + cl[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])
+            cd3d = cd3d + 0.5*(cd[i] + cd[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])
+            cm3d = cm3d + 0.5*(cm[i] + cm[i+1])*sin(0.5*(surf.psi[i] + surf.psi[i+1]))*(surf.psi[i+1] - surf.psi[i])
+            
+        end
+        
+        mat = hcat(mat, [t, cl3d, cd3d, cm3d])
+        
+        #If required, write an archive file
+        if writefile != "Nil"
+            if istep in writeind
+                jldopen(writefile, "r+") do file
+                    g = g_create(file, "t$istep")
+                    g = write_stamp(surf, curfield, t, kelv_enf, g)
+                end
+            end
+        end
+
+for i = 1:surf.nspan
+    #Update 3D effect on A0
+    surf.s2d[i].a0[1] = surf.s2d[i].a0[1] - surf.a03d[i]
+    surf.s2d[i].a0dot[1] = surf.s2d[i].a0dot[1] - surf.a03ddot[i]
+end
+
+end
+mat = mat'
+mat, surf, curfield, kelv_enf
 
 end
 

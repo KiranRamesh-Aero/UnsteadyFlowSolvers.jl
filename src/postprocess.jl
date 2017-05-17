@@ -50,6 +50,29 @@ function view_vorts(field::Vector{TwoDVort})
     colorbar(sc)
 end
 
+function view_vorts(surf::ThreeDSurfSimple, field::ThreeDFieldStrip)
+    fig = figure()
+    ax = PyPlot.Axes3D(fig)
+    for i = 1:surf.nspan
+        plot(map(q->q.x, surf.s2d[i].bv), ones(surf.ndiv-1)*surf.yle[i], map(q->q.z,surf.s2d[i].bv), color = "black",linewidth=2.0)
+        
+        x = map(p->p.x, map(q->q[:][i], field.tev))
+        z = map(p->p.z, map(q->q[:][i], field.tev))
+        y = ones(length(field.tev))*surf.yle[i]
+        s = map(p->p.s, map(q->q[:][i], field.tev))
+        scatter3D(x, y, z, s=20, c=s, cmap=ColorMap("jet"), edgecolors="none")
+        
+        if length(field.lev) > 0
+            x = map(p->p.x, map(q->q[:][i], field.lev))
+            z = map(p->p.z, map(q->q[:][i], field.lev))
+            y = ones(length(field.lev))*surf.yle[i]
+            s = map(p->p.s, map(q->q[:][i], field.lev))
+            scatter3D(x, y, z, s=20, c=s, cmap=ColorMap("jet"), edgecolors="none")
+        end
+    end
+    PyPlot.show()
+end    
+
 
 # ---------------------------------------------------------------------------------------------
 # Function that calculates the aerodynamic forces
@@ -161,6 +184,61 @@ function calc_forces_more(surf::TwoDSurf)
     return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs, cnc, cnnc, nonl, cn*surf.pvt, cm_p, nonl_m
 end
 
+function calc_forces_more(surf::Vector{TwoDSurf})
+
+    nsurf = length(surf)
+    cl = zeros(nsurf)
+    cd = zeros(nsurf)
+    cm = zeros(nsurf)
+    cnc = zeros(nsurf)
+    cnnc = zeros(nsurf)
+    cn = zeros(nsurf)
+    cs = zeros(nsurf)
+    nonl = zeros(nsurf)
+    cm_n = zeros(nsurf)
+    cm_p = zeros(nsurf)
+    nonl_m = zeros(nsurf)
+    bc = zeros(nsurf)
+    
+    for i = 1:nsurf
+        # First term in eqn (2.30) Ramesh et al. in coefficient form
+        cnc[i] = 2*pi*(surf[i].kinem.u*cos(surf[i].kinem.alpha)/surf[i].uref + surf[i].kinem.hdot*sin(surf[i].kinem.alpha)/surf[i].uref)*(surf[i].a0[1] + surf[i].aterm[1]/2.)
+        
+        # Second term in eqn (2.30) Ramesh et al. in coefficient form
+        cnnc[i] = 2*pi*(3*surf[i].c*surf[i].a0dot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[1]/(4*surf[i].uref) + surf[i].c*surf[i].adot[2]/(8*surf[i].uref))
+        
+        # Suction force given in eqn (2.31) Ramesh et al.
+        cs[i] = 2*pi*surf[i].a0[1]*surf[i].a0[1]
+        
+        #Bound circulation
+        bc[i] = surf[i].uref*surf[i].c*pi*(surf[i].a0[1] + 0.5*surf[i].aterm[1])
+        
+        #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+        nonl[i]=0
+        nonl_m[i]=0
+        for ib = 1:surf[i].ndiv-1
+            nonl[i] = nonl[i] + (surf[i].uind[ib]*cos(surf[i].kinem.alpha) - surf[i].wind[ib]*sin(surf[i].kinem.alpha))*surf[i].bv[ib].s
+            nonl_m[i] = nonl_m[i] + (surf[i].uind[ib]*cos(surf[i].kinem.alpha) - surf[i].wind[ib]*sin(surf[i].kinem.alpha))*surf[i].x[ib]*surf[i].bv[ib].s
+        end
+        nonl[i] = nonl[i]*2./(surf[i].uref*surf[i].uref*surf[i].c)
+        nonl_m[i] = nonl_m[i]*2./(surf[i].uref*surf[i].uref*surf[i].c*surf[i].c)
+        
+        # Normal force coefficient
+        cn[i] = cnc[i] + cnnc[i] + nonl[i]
+        
+        # Lift and drag coefficients
+        cl[i] = cn[i]*cos(surf[i].kinem.alpha) + cs[i]*sin(surf[i].kinem.alpha)
+        cd[i] = cn[i]*sin(surf[i].kinem.alpha) - cs[i]*cos(surf[i].kinem.alpha)
+        
+        #Pitching moment is clockwise or nose up positive
+        cm_n[i] = cn[i]*surf[i].pvt
+        cm_p[i] = 2*pi*((surf[i].kinem.u*cos(surf[i].kinem.alpha)/surf[i].uref + surf[i].kinem.hdot*sin(surf[i].kinem.alpha)/surf[i].uref)*(surf[i].a0[1]/4. + surf[i].aterm[1]/4. - surf[i].aterm[2]/8.) + (surf[i].c/surf[i].uref)*(7.*surf[i].a0dot[1]/16. + 3.*surf[i].adot[1]/16. + surf[i].adot[2]/16. - surf[i].adot[3]/64.))
+        cm[i] = cn[i]*surf[i].pvt -  cm_p[i] - nonl_m[i]
+    end
+    
+    return cl, cd, cm, bc, cn, cs, cnc, cnnc, nonl, cm_n, cm_p, nonl_m
+end
+    
 function calc_forces_E(surf::TwoDSurf, lev :: Float64, dt :: Float64)
 
     # First term in eqn (2.30) Ramesh et al. in coefficient form
@@ -574,6 +652,82 @@ function write_stamp(surf :: TwoDSurf, curfield :: TwoDFlowField, t :: Float64, 
     g["nonl_m"] = nonl_m
 end
 # ---------------------------------------------------------------------------------------------
+function write_stamp(surf :: ThreeDSurfSimple, curfield :: ThreeDFieldStrip, t :: Float64, kelv_enf :: Vector{Float64},  g:: JLD.JldGroup)
+    
+    cl, cd, cm, gamma, cn, cs, cnc, cnnc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf.s2d)
+    
+    tevmat = zeros(length(curfield.tev), surf.nspan, 3)
+    for i = 1:length(curfield.tev)
+        for j = 1:surf.nspan
+            tevmat[i,j,:] = [curfield.tev[i][j].s curfield.tev[i][j].x curfield.tev[i][j].z]
+        end
+    end
+    g["tev"] = tevmat
+    levmat = zeros(length(curfield.lev), surf.nspan, 3)
+    for i = 1:length(curfield.lev)
+        for j = 1:surf.nspan
+            levmat[i,j,:] = [curfield.lev[i][j].s curfield.lev[i][j].x curfield.lev[i][j].z]
+        end
+    end
+    g["lev"] = levmat
+    bvmat = zeros(length(surf.s2d[1].bv), surf.nspan, 3)
+    for i = 1:length(surf.s2d[1].bv)
+        for j = 1:surf.nspan
+            bvmat[i,j,:] = [surf.s2d[j].bv[i].s surf.s2d[j].bv[i].x surf.s2d[j].bv[i].z]
+        end
+    end
+    g["bv"] = bvmat
+    extvmat = zeros(length(curfield.extv), 3)
+    for i = 1:length(curfield.extv)
+        extvmat[i,:] = [curfield.extv[i].s curfield.extv[i].x curfield.extv[i].z]
+    end
+    g["extv"] = extvmat
+
+    #a03d has been addded to a0 so that the calc_forces routine can be used as is
+    a0 = map(q->q.a0[1], surf.s2d) - surf.a03d 
+    a0dot = map(q->q.a0dot[1], surf.s2d) - surf.a03ddot
+    aterm = hcat(map(q->q.aterm[:], surf.s2d)...)
+    levflag = map(q->q.levflag[1], surf.s2d)
+
+    alpha = map(q->q.kinem.alpha, surf.s2d)
+    h = map(q->q.kinem.h, surf.s2d)
+    u = map(q->q.kinem.u, surf.s2d)
+    alphadot = map(q->q.kinem.alphadot, surf.s2d)
+    hdot = map(q->q.kinem.hdot, surf.s2d)
+    udot = map(q->q.kinem.udot, surf.s2d)
+    
+    g["t"] = t
+    
+    g["alpha"] = alpha
+    g["h"] = h
+    g["u"] = u
+    g["alphadot"] = alphadot
+    g["hdot"] = hdot
+    g["udot"] = udot
+    
+    g["a0"] = a0
+    g["a0dot"] = a0dot
+    g["a03d"] = surf.a03d
+    g["a03ddot"] = surf.a03ddot
+    g["aterm"] = aterm
+    g["levflag"] = levflag
+    g["kelv_enf"] = kelv_enf
+    
+    g["cl"] = cl
+    g["cd"] = cd
+    g["cm"] = cm
+    g["bcirc"] = gamma
+    g["cn"] = cn
+    g["cs"] = cs
+    g["cnc"] = cnc
+    g["cnnc"] = cnnc
+    g["nonl_n"] = nonl
+    g["cm_n"] = cm_n
+    g["cm_pvt"] = cm_pvt
+    g["nonl_m"] = nonl_m
+end
+# ---------------------------------------------------------------------------------------------
+
 #Postprocessing for the 3D vortex ring method
 function get_gridprop(surf:: ThreeDSurfVR, prop::String)
     #Obtains the required property in a matrix form
@@ -685,6 +839,24 @@ function plotgrid(surf :: ThreeDSurfVR, field :: ThreeDFlowFieldVR)
     
     PyPlot.show()
     
+end
+
+function forces_harmonic(mat :: Array{Float64,2}, ncyc :: Int, k::Float64)
+    
+    T = pi/k
+    nsteps = length(mat[:,1])
+    range = Int(round((ncyc-1)*nsteps/ncyc))+1:nsteps 
+    tbyT = (mat[range,1]-mat[range[1],1])/T
+
+    ncol = size(mat,2)
+    matnew = Array(Float64,length(tbyT),ncol)
+    
+    matnew[:,1] = tbyT
+    for i = 2:ncol
+        matnew[:,i] = mat[range,i]
+    end
+    
+    return matnew
 end
 
 # ---------------------------------------------------------------------------------------------

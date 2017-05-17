@@ -2728,45 +2728,6 @@ function calc_a03dspl(surf::ThreeDSurfSimple)
     
 end
 
-function calc_a03dspl(surf::ThreeDSurfSimple, shedv :: Array{Int} = Int[], levstr :: Array{Float64} = Float64[])
-
-    nterm = 70
-    bcspl = Spline1D(surf.psi, surf.bc)
-    
-    lhs = zeros(nterm, nterm)
-    rhs = zeros(nterm)
-    
-    a03d = zeros(nterm)
-    psi = zeros(nterm)
-    bcoeff = zeros(nterm)
-    
-    for i = 1:nterm
-        psi[i] = real(i)*(pi/2)/nterm
-        bc = Dierckx.evaluate(bcspl, psi[i])
-        for n = 1:nterm
-            nn = 2*n - 1
-            lhs[i,n] = sin(nn*psi[i])*(sin(psi[i]) + (nn*pi/(2*surf.AR)))
-        end
-        rhs[i] = pi*sin(psi[i])*bc/(2*surf.AR)
-    end
-
-    bcoeff[:] = lhs \ rhs
-   
-    for i = 1:nterm
-        a03d[i] = 0
-        for n = 1:nterm
-            nn = 2*n - 1
-            a03d[i] = a03d[i] - real(nn)*bcoeff[n]*sin(nn*psi[i])/sin(psi[i])
-        end
-    end
-
-    a03dspl = Spline1D(psi, a03d)
-    for i = 1:surf.nspan
-        surf.a03d[i] = evaluate(a03dspl, surf.psi[i])
-    end
-    
-end
-
 
 # ---------------------------------------------------------------------------------------------
 function bendfirstmode(fn :: Float64, fd :: Float64, td :: Float64, c :: Float64, s :: Float64,  y :: Float64)

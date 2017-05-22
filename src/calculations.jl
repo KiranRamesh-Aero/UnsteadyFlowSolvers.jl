@@ -2708,44 +2708,44 @@ function calc_a03d(surf::ThreeDSurfSimple, shedv :: Array{Int} = Int[], levstr :
     end
 end
 
-function calc_a03dspl(surf::ThreeDSurfSimple)
+# function calc_a03dspl(surf::ThreeDSurfSimple)
 
-    nterm = 70
-    bcspl = Spline1D(surf.psi, surf.bc)
+#     nterm = 70
+#     bcspl = Spline1D(surf.psi, surf.bc)
     
-    lhs = zeros(nterm, nterm)
-    rhs = zeros(nterm)
+#     lhs = zeros(nterm, nterm)
+#     rhs = zeros(nterm)
     
-    a03d = zeros(nterm)
-    psi = zeros(nterm)
-    bcoeff = zeros(nterm)
+#     a03d = zeros(nterm)
+#     psi = zeros(nterm)
+#     bcoeff = zeros(nterm)
     
-    for i = 1:nterm
-        psi[i] = real(i)*(pi/2)/nterm
-        bc = Dierckx.evaluate(bcspl, psi[i])
-        for n = 1:nterm
-            nn = 2*n - 1
-            lhs[i,n] = sin(nn*psi[i])*(sin(psi[i]) + (nn*pi/(2*surf.AR)))
-        end
-        rhs[i] = pi*sin(psi[i])*bc/(2*surf.AR)
-    end
+#     for i = 1:nterm
+#         psi[i] = real(i)*(pi/2)/nterm
+#         bc = Dierckx.evaluate(bcspl, psi[i])
+#         for n = 1:nterm
+#             nn = 2*n - 1
+#             lhs[i,n] = sin(nn*psi[i])*(sin(psi[i]) + (nn*pi/(2*surf.AR)))
+#         end
+#         rhs[i] = pi*sin(psi[i])*bc/(2*surf.AR)
+#     end
 
-    bcoeff[:] = lhs \ rhs
+#     bcoeff[:] = lhs \ rhs
    
-    for i = 1:nterm
-        a03d[i] = 0
-        for n = 1:nterm
-            nn = 2*n - 1
-            a03d[i] = a03d[i] - real(nn)*bcoeff[n]*sin(nn*psi[i])/sin(psi[i])
-        end
-    end
+#     for i = 1:nterm
+#         a03d[i] = 0
+#         for n = 1:nterm
+#             nn = 2*n - 1
+#             a03d[i] = a03d[i] - real(nn)*bcoeff[n]*sin(nn*psi[i])/sin(psi[i])
+#         end
+#     end
 
-    a03dspl = Spline1D(psi, a03d)
-    for i = 1:surf.nspan
-        surf.a03d[i] = evaluate(a03dspl, surf.psi[i])
-    end
+#     a03dspl = Spline1D(psi, a03d)
+#     for i = 1:surf.nspan
+#         surf.a03d[i] = evaluate(a03dspl, surf.psi[i])
+#     end
     
-end
+# end
 
 function calc_a03dspl(surf::ThreeDSurfSimple, shedv :: Array{Int} = Int[], levstr :: Array{Float64} = Float64[])
 
@@ -2808,5 +2808,124 @@ function bendfirstmode(fn :: Float64, fd :: Float64, td :: Float64, c :: Float64
 end
 
 # ---------------------------------------------------------------------------------------------
+
+function calc_q1(x1 :: Vector{Float64}, x2 :: Vector{Float64}, x :: Vector{Float64})# !In the form q1(s,e,r)
+    a1 = x1[1] - x[1]
+    a2 = x1[2] - x[2]
+    a3 = x1[3] - x[3]
+    b1 = x2[1] - x[1]
+    b2 = x2[2] - x[2]
+    b3 = x2[3] - x[3]
+    dt = dot([a1; a2; a3], [b1; b2; b3])
+    cr = cross([a1; a2; a3], [b1; b2; b3])
+    t1 = dot(cr,cr)
+    moda = sqrt(a1^2 + a2^2 + a3^2)
+    modb = sqrt(b1^2 + b2^2 + b3^2)
+    t2 = moda + modb
+    t3 = 1. - dt/(moda*modb)
+    vx = cr[1]*t2*t3/t1
+    vy = cr[2]*t2*t3/t1
+    vz = cr[3]*t2*t3/t1
+    return [vx; vy; vz] 
+end 
+
+
+function calc_q2(x1 :: Vector{Float64}, x2 :: Vector{Float64}, x :: Vector{Float64}) #In the form q2(s,t,r,out)
+
+    a1 = x1[1] - x[1]
+    a2 = x1[2] - x[2]
+    a3 = x1[3] - x[3]
+    moda = sqrt(a1^2 + a2^2 + a3^2)
+    cr = cross([a1; a2; a3], x2)
+    dotacrt = dot(cr,cr)
+    dotat = dot([a1; a2; a3], x2)
+
+    vx = cr[1]*(1.-(dotat/moda))/dotacrt
+    vy = cr[2]*(1.-(dotat/moda))/dotacrt
+    vz = cr[3]*(1.-(dotat/moda))/dotacrt
+    return [vx; vy; vz] 
+end 
+
+
+# ---------------------------------------------------------------------------------------------
+
+function update_IC(surf :: ThreeDSurfWeiss, hs_prev :: Vector{Float64}, he_prev :: Vector{Float64})
+    for i = 1:surf.nlat
+        if i == 1
+            h_s = surf.s2d[i].kinem.h - 0.5*(surf.s2d[i+1].kinem.h - surf.s2d[i].kinem.h)
+        else
+            h_s = surf.s2d[i].kinem.h - 0.5*(surf.s2d[i].kinem.h - surf.s2d[i-1].kinem.h)
+        end
+        if i == nlat
+            h_e = surf.s2d[i].kinem.h + 0.5*(surf.s2d[i].kinem.h - surf.s2d[i-1].kinem.h)
+        else
+            h_e = surf.s2d[i].kinem.h + 0.5*(surf.s2d[i+1].kinem.h - surf.s2d[i].kinem.h)
+        end
+        
+        hdiff_s = hs_prev[i] - h_s
+        hdiff_e = he_prev[i] - h_e
+        
+        surf.s1[i,3] -= hdiff_s
+        surf.e1[i,3] -= hdiff_e
+    end
+
+    for ilat = 1:nlat
+        surf.m[ilat,3] = 0.5*(surf.s1[ilat,3] + surf.e1[ilat,3])
+        surf.s[ilat,3] = surf.s1[ilat,3]
+        surf.e[ilat,3] = surf.e1[ilat,3]
+        surf.cx[ilat,3] = surf.m[ilat,3]
+        surf.c0[ilat,3] = surf.cx[ilat,3]
+        surf.s0[ilat,3] = surf.s[ilat,3] 
+        surf.e0[ilat,3] = surf.e[ilat,3]
+        tan1 = surf.e[ilat,1] - surf.s[ilat,1]
+        tan2 = surf.e[ilat,2] - surf.s[ilat,2]  
+        tan3 = surf.e[ilat,3] - surf.s[ilat,3]
+        tanmod=sqrt(tan1*tan1+tan2*tan2+tan3*tan3)
+        tan1 = tan1/tanmod
+        tan2 = tan2/tanmod
+        tan3 = tan3/tanmod
+        surf.norm[ilat,:] = cross([tan1; tan2;tan3],[1.; 0.; 0.])
+        surf.dih[ilat] = atan((surf.s[ilat,3] - surf.e[ilat,3])/(surf.e[ilat,2] - surf.s[ilat,2]))
+        surf.ds[ilat] = sqrt((surf.e[ilat,2] - surf.s[ilat,2])*(surf.e[ilat,2] - surf.s[ilat,2]) + (surf.e[ilat,3] - surf.s[ilat,3])*(surf.e[ilat,3] - surf.s[ilat,3]))
+    end
+    
+    a = zeros(3)
+    b = zeros(3)
+    
+    for i=1:surf.nlat
+        for j=1:surf.nlat 
+            q1terms = calc_q2(surf.s0[j,:],[-1.; 0.; 0.], surf.c0[i,:])
+            q2terms = calc_q2(surf.e0[j,:],[-1.; 0.; 0.], surf.c0[i,:])
+            q1t = dot(q1terms, surf.norm[i,:])
+            q2t = dot(q2terms, surf.norm[i,:])
+            surf.ICt[i,j] = (1/(4*pi))*(2*q2t - 2*q1t) 
+            
+            a[1] = surf.s[j,1] - surf.cx[i,1]
+            a[2] = surf.s[j,2] - surf.cx[i,2]
+            a[3] = surf.s[j,3] - surf.cx[i,3]
+            b[1] = surf.e[j,1] - surf.cx[i,1]
+            b[2] = surf.e[j,2] - surf.cx[i,2]
+            b[3] = surf.e[j,3] - surf.cx[i,3]
+            
+            cr = cross(a,b)
+            check = dot(cr, cr)
+            
+            if (check < errtiny) then
+                    q1terms[:] = 0.
+            else
+                q1terms = calc_q1(surf.s[j,:],surf.e[j,:],surf.cx[i,:])
+            end
+            
+            q2terms = calc_q2(surf.s[j,:], [-1.; 0.; 0.], surf.cx[i,:])
+            q3terms = calc_q2(surf.e[j,:], [-1.; 0.; 0.], surf.cx[i,:])
+            
+            q1t =  dot(q1terms, surf.norm[i,:])
+            q2t =  dot(q2terms, surf.norm[i,:])
+            q3t = dot(q3terms, surf.norm[i,:])
+            surf.IC[i,j] = (1/(4*pi))*(q1t - q2t + q3t)
+        end
+    end
+end
+
 
 # ---------------------------------------------------------------------------------------------

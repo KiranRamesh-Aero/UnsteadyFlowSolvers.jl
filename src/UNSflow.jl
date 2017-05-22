@@ -29,7 +29,7 @@ QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
 lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp,
 vortxl, voring, voring_I, get_gridprop, calc_forces_E, mutual_ind_llt,
 forces_harmonic, QSLLT_lautat2 , ldvm_varU, calc_a03d, bendfirstmode,
-calc_a03dspl
+calc_a03dspl, ldvm_klb, QSWeiss_lautat
 
 
 
@@ -45,7 +45,7 @@ ThreeDSurfVRingGrid, ThreeDSurfVRingPanel, ThreeDSurfVR,
 ThreeDFlowFieldVR, ThreeDWakeVRingGrid, TwoDFlowFieldMultSurf,
 KelvinConditionMultSurf, KelvinKuttaMultSurf, KelvinKuttaMultSurfSep,
 KelvinConditionMultSurfSep, ThreeDFieldStrip,
-KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef
+KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss
 
 
 include("types.jl")

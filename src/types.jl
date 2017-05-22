@@ -1,6 +1,7 @@
 #Constants
 
 const accl_g = 9.80665
+const errtiny = 1e-20
 
 # ---------------------------------------------------------------------------------------------
 # Theodorsen solver input
@@ -1093,17 +1094,39 @@ end
 
 #----------------------------------------------------------------------------------------------
 # Definition of a 3D surface
-# immutable patch
-#     x :: Float64
-#     y :: Float64
-#     z :: Float64
-#     pvt :: Float64
-#     coord_file :: String
-#     c :: Float64
-#     twist :: Float64
-#     lc :: Float64
-#     nspan :: Int8
-# end
+immutable patch
+    x :: Float64
+    y :: Float64
+    z :: Float64
+    pvt :: Float64
+    coord_file :: String
+    c :: Float64
+    twist :: Float64
+    lc :: Float64
+    nspan :: Int8
+end
+
+immutable patchweiss
+    #x, y, z location of quarter chord
+    x1 :: Float64
+    y1 :: Float64
+    z1 :: Float64
+    pvt1 :: Float64
+    coord_file1 :: String
+    c1 :: Float64
+    twist1 :: Float64
+    lc1 :: Float64
+    x2 :: Float64
+    y2 :: Float64
+    z2 :: Float64
+    pvt2 :: Float64
+    coord_file2 :: String
+    c2 :: Float64
+    twist2 :: Float64
+    lc2 :: Float64
+    nlat :: Int8
+end
+
 
 # immutable ThreeDSurfGen
 #     cref :: Float64
@@ -1381,6 +1404,193 @@ end
 # new(cref, bref, sref, uref, patchdata, ndiv, nspan, naterm, nbterm, kindef, c, pvt, cam, cam_slope, theta, psi, x, xle, yle, zle, kinem, bnd_x, bnd_z, uind, vind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv,lespcrit,levflag)
 # end
 
+immutable ThreeDSurfWeiss
+    cref :: Float64
+    bref :: Float64
+    sref :: Float64
+    uref :: Float64
+    patchdata :: Vector{patchweiss}
+    ndiv :: Int8
+    nlat :: Int8
+    naterm :: Int8
+    kindef :: KinemDef3D
+    s2d :: Vector{TwoDSurf}
+    IC :: Array{Float64,2}
+    ICt :: Array{Float64,2}
+    chord :: Array{Float64}
+    twist :: Array{Float64}
+    gamma :: Array{Float64}
+    a03d :: Array{Float64}
+    a13d :: Array{Float64}
+    a03dprev :: Array{Float64}
+    a03ddot :: Array{Float64}
+    s1 :: Array{Float64,2} #Start of quarter chord line
+    e1 :: Array{Float64,2} #End of quarter chord line
+    s :: Array{Float64,2} #Amended start of quarter chord line
+    e :: Array{Float64,2} #Amended end of quarter chord line
+    m :: Array{Float64,2} #mid of quarter chord line
+    cx :: Array{Float64,2} #Control point
+    c0 :: Array{Float64,2} #Similar quantities for trefftz plane
+    s0 :: Array{Float64,2} #Similar quantities for trefftz plane
+    e0 :: Array{Float64,2} #Similar quantities for trefftz plane 
+    norm :: Array{Float64,2} #Normal
+    dih :: Array{Float64}
+    ds :: Array{Float64}
+
+    #s1 is the vector defining the starting quarter chord point of each lattice(with sweep) 
+    #e1 is the vector defining the ending quarter chord point of each lattice(with sweep)   
+    #chord,a0l and twist are calculated at the mid points of each lattice
+    
+    #This definition is to be used for the QS Weissinger method
+    
+    function ThreeDSurfWeiss(AR, patchdata, kindef, cref=1., uref=1., ndiv=70, naterm=35)
+        
+        bref = AR*cref
+        sref = bref*cref
+        
+        nlat = 0
+        for i = 1:length(patchdata)
+            nlat += patchdata[i].nlat
+        end
+
+        chord = zeros(nlat)
+        twist = zeros(nlat)
+        s1 = zeros(nlat,3)
+        e1 = zeros(nlat,3)
+        IC = zeros(nlat,nlat)
+        ICt = zeros(nlat,nlat)
+        gamma = zeros(nlat)
+        s2d = TwoDSurf[]
+        a03d = zeros(nlat)
+        a13d = zeros(nlat)
+        a03dprev = zeros(nlat)
+        a03ddot = zeros(nlat)
+        
+        nlat = 0
+        for i = 1:length(patchdata)
+            div=(patchdata[i].y2 - patchdata[i].y1)/patchdata[i].nlat
+            for ilat = 1:patchdata[i].nlat
+                nlat += 1 
+                
+                chord[nlat] =  interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].c1, patchdata[i].c2, patchdata[i].y1+(ilat-0.5)*div)
+                lespc = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].lc1, patchdata[i].lc2, patchdata[i].y1+(ilat-0.5)*div)
+                twist[nlat] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].twist1, patchdata[i].twist2, patchdata[i].y1 + (ilat-0.5)*div)
+                pvt = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].pvt1, patchdata[i].pvt2, patchdata[i].y1+(ilat-0.5)*div)
+                s1[nlat,1] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].x1, patchdata[i].x2, patchdata[i].y1+(ilat-1.)*div)
+                s1[nlat,2] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].y1, patchdata[i].y2, patchdata[i].y1+(ilat-1.)*div)
+                s1[nlat,3] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].z1, patchdata[i].z2, patchdata[i].y1+(ilat-1.)*div)
+                e1[nlat,1] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].x1, patchdata[i].x2, patchdata[i].y1+ilat*div)
+                e1[nlat,2] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].y1, patchdata[i].y2, patchdata[i].y1+ilat*div)
+                e1[nlat,3] = interp(patchdata[i].y1, patchdata[i].y2, patchdata[i].z1, patchdata[i].z2, patchdata[i].y1+ilat*div)
+
+                if typeof(kindef.h) == BendingDef
+                    ypos = 0.5*(s1[nlat,2] + e1[nlat,2])
+                    h_amp = evaluate(kindef.h.spl, abs(ypos))*kindef.h.scale
+                    h2d = CosDef(0., h_amp, kindef.h.k, kindef.h.phi)
+                    kinem2d = KinemDef(kindef.alpha, h2d, kindef.u)
+                else
+                    kinem2d = KinemDef(kindef.alpha, kindef.h, kindef.u)
+                end
+                push!(s2d, TwoDSurf(patchdata[i].coord_file1, pvt, kinem2d, [lespc], c = cref, uref = uref, ndiv = ndiv, naterm = naterm))
+            end
+        end
+
+        #Some temp arrays
+        m = zeros(nlat,3)
+        s = zeros(nlat,3)
+        e = zeros(nlat,3)
+        cx = zeros(nlat,3)
+        c0 = zeros(nlat,3)
+        s0 = zeros(nlat,3)
+        e0 = zeros(nlat,3)
+        norm = zeros(nlat,3)
+        dih = zeros(nlat)
+        ds = zeros(nlat)
+        
+        #Definition of geometry
+        for ilat = 1:nlat
+            m[ilat,1] = 0.5*(s1[ilat,1] + e1[ilat,1])
+            m[ilat,2] = 0.5*(s1[ilat,2] + e1[ilat,2])
+            m[ilat,3] = 0.5*(s1[ilat,3] + e1[ilat,3])
+            s[ilat,1] = m[ilat,1]
+            s[ilat,2] = s1[ilat,2]
+            s[ilat,3] = s1[ilat,3]
+            e[ilat,1] = m[ilat,1]
+            e[ilat,2] = e1[ilat,2]
+            e[ilat,3] = e1[ilat,3]
+            cx[ilat,1] = m[ilat,1] - chord[ilat]/2.
+            cx[ilat,2] = m[ilat,2]
+            cx[ilat,3] = m[ilat,3]
+            c0[ilat,1] = 0.
+            c0[ilat,2] = cx[ilat,2]
+            c0[ilat,3] = cx[ilat,3]
+            s0[ilat,1] = 0.
+            s0[ilat,2] = s[ilat,2] 
+            s0[ilat,3] = s[ilat,3] 
+            e0[ilat,1] = 0.
+            e0[ilat,2] = e[ilat,2]
+            e0[ilat,3] = e[ilat,3]
+            tan1 = e[ilat,1] - s[ilat,1]
+            tan2 = e[ilat,2] - s[ilat,2]  
+            tan3 = e[ilat,3] - s[ilat,3]
+            tanmod=sqrt(tan1*tan1+tan2*tan2+tan3*tan3)
+            tan1 = tan1/tanmod
+            tan2 = tan2/tanmod
+            tan3 = tan3/tanmod
+            norm[ilat,:] = cross([tan1; tan2;tan3],[1.; 0.; 0.])
+            dih[ilat] = atan((s[ilat,3] - e[ilat,3])/(e[ilat,2] - s[ilat,2]))
+            ds[ilat] = sqrt((e[ilat,2] - s[ilat,2])*(e[ilat,2] - s[ilat,2]) + (e[ilat,3] - s[ilat,3])*(e[ilat,3] - s[ilat,3]))
+        end
+        #Note on the vectors above.
+        #s and e are the vectors defining the starting and ending quarter
+        #chord point of each lattice(without sweep)   
+        #m is the mid point of s1 and e1
+        #cx is the control point
+        #norm is the normal vector for each lattice
+        #dih is the dihedral angle
+
+        #Some tem vectors
+        a = zeros(3)
+        b = zeros(3)
+        
+        for i=1:nlat
+            for j=1:nlat 
+                q1terms = calc_q2(s0[j,:],[-1.; 0.; 0.], c0[i,:])
+                q2terms = calc_q2(e0[j,:],[-1.; 0.; 0.], c0[i,:])
+                q1t = dot(q1terms, norm[i,:])
+                q2t = dot(q2terms, norm[i,:])
+                ICt[i,j] = (1/(4*pi))*(2*q2t - 2*q1t) 
+                
+                a[1] = s[j,1] - cx[i,1]
+                a[2] = s[j,2] - cx[i,2]
+                a[3] = s[j,3] - cx[i,3]
+                b[1] = e[j,1] - cx[i,1]
+                b[2] = e[j,2] - cx[i,2]
+                b[3] = e[j,3] - cx[i,3]
+                
+                cr = cross(a,b)
+                check = dot(cr, cr)
+                
+                if (check < errtiny) then
+                    q1terms[:] = 0.
+                else
+                    q1terms = calc_q1(s[j,:],e[j,:],cx[i,:])
+                end
+                
+                q2terms = calc_q2(s[j,:], [-1.; 0.; 0.], cx[i,:])
+                q3terms = calc_q2(e[j,:], [-1.; 0.; 0.], cx[i,:])
+                
+                q1t =  dot(q1terms, norm[i,:])
+                q2t =  dot(q2terms, norm[i,:])
+                q3t = dot(q3terms, norm[i,:])
+                IC[i,j] = (1/(4*pi))*(q1t - q2t + q3t)
+            end
+        end
+        
+        
+new(cref, bref, sref, uref, patchdata, ndiv, nlat, naterm, kindef, s2d, IC, ICt, chord, twist, gamma, a03d, a13d, a03dprev, a03ddot, s1, e1, s, e, m, cx, c0, s0, e0, norm, dih, ds)
+end
+end
 
 
 immutable ThreeDSurfSimple
@@ -1573,6 +1783,15 @@ immutable KelvinConditionLLTldvmSep
     i :: Int
     kelv_enf :: Vector{Float64}
 end
+
+immutable KelvinConditionWeiss
+    surf :: ThreeDSurfWeiss
+    field :: ThreeDFieldStrip
+    shed_ind :: Vector{Vector{Int}}
+    i :: Int
+    kelv_enf :: Vector{Float64}
+end
+
 
 function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
@@ -1867,6 +2086,42 @@ function (kelv::KelvinConditionLLTldvmSep)(tev_iter::Array{Float64})
 
     val = val + kelv.kelv_enf[i]
         
+    return val
+end
+
+function (kelv::KelvinConditionWeiss)(tev_iter::Array{Float64})
+    i = kelv.i
+    
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    
+    kelv.field.tev[ntev][i].s = tev_iter[1]
+    
+    #Update induced velocities on airfoil
+    update_indbound(kelv.surf.s2d, kelv.field, kelv.shed_ind)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf.s2d, [kelv.field.u[1],kelv.field.w[1]])
+    
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf.s2d)
+    
+    kelv.surf.gamma[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1] + kelv.surf.a03d[i] + 0.5*kelv.surf.a13d[i])
+    
+    #calc_a03d(kelv.surf)
+    
+    val = kelv.surf.gamma[i] 
+    
+    for iv = 1:ntev
+        val = val + kelv.field.tev[iv][i].s
+    end
+    
+    for iv = 1:nlev
+        val = val + kelv.field.lev[iv][i].s
+    end
+
+    val = val + kelv.kelv_enf[i]
+    
     return val
 end
 

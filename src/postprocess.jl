@@ -73,6 +73,28 @@ function view_vorts(surf::ThreeDSurfSimple, field::ThreeDFieldStrip)
     PyPlot.show()
 end    
 
+function view_vorts(surf::ThreeDSurfWeiss, field::ThreeDFieldStrip)
+    fig = figure()
+    ax = PyPlot.Axes3D(fig)
+    for i = 1:surf.nlat
+        plot(map(q->q.x, surf.s2d[i].bv), ones(surf.ndiv-1)*surf.yle[i], map(q->q.z,surf.s2d[i].bv), color = "black",linewidth=2.0)
+        
+        x = map(p->p.x, map(q->q[:][i], field.tev))
+        z = map(p->p.z, map(q->q[:][i], field.tev))
+        y = ones(length(field.tev))*surf.yle[i]
+        s = map(p->p.s, map(q->q[:][i], field.tev))
+        scatter3D(x, y, z, s=20, c=s, cmap=ColorMap("jet"), edgecolors="none")
+        
+        if length(field.lev) > 0
+            x = map(p->p.x, map(q->q[:][i], field.lev))
+            z = map(p->p.z, map(q->q[:][i], field.lev))
+            y = ones(length(field.lev))*surf.yle[i]
+            s = map(p->p.s, map(q->q[:][i], field.lev))
+            scatter3D(x, y, z, s=20, c=s, cmap=ColorMap("jet"), edgecolors="none")
+        end
+    end
+    PyPlot.show()
+end    
 
 # ---------------------------------------------------------------------------------------------
 # Function that calculates the aerodynamic forces
@@ -146,6 +168,100 @@ function calc_forces(surf::Vector{TwoDSurf})
         #Pitching moment is clockwise or nose up positive
         cm[i] = cn*surf[i].pvt - 2*pi*((surf[i].kinem.u*cos(surf[i].kinem.alpha)/surf[i].uref + surf[i].kinem.hdot*sin(surf[i].kinem.alpha)/surf[i].uref)*(surf[i].a0[1]/4. + surf[i].aterm[1]/4. - surf[i].aterm[2]/8.) + (surf[i].c/surf[i].uref)*(7.*surf[i].a0dot[1]/16. + 3.*surf[i].adot[1]/16. + surf[i].adot[2]/16. - surf[i].adot[3]/64.)) - nonl_m
     end
+    return cl, cd, cm
+end
+
+function calc_forces(surf::TwoDSurf, fsep :: Float64)
+
+    #Constants for moment calculation
+    k1 = -0.135
+    k2 = 0.04
+    
+    # First term in eqn (2.30) Ramesh et al. in coefficient form
+    cnc = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
+
+    # Second term in eqn (2.30) Ramesh et al. in coefficient form
+    cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
+
+    # Suction force given in eqn (2.31) Ramesh et al. and accounting for separation
+    cs = sqrt(fsep)*2*pi*surf.a0[1]*surf.a0[1]
+    
+    
+    #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+    nonl=0
+    nonl_m=0
+    for ib = 1:surf.ndiv-1
+        nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
+        nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
+    end
+    nonl = nonl*2./(surf.uref*surf.uref*surf.c)
+    nonl_m = nonl_m*2./(surf.uref*surf.uref*surf.c*surf.c)
+
+    #Account for separation
+    cnsep = (cnc+nonl)*((1 + sqrt(fsep))/2.)^2
+    
+    # Normal force coefficient
+    cn = cnsep + cnnc
+    
+    # Lift and drag coefficients
+    cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
+    cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
+
+    #Pitching moment is clockwise or nose up positive
+    cm1 = (surf.pvt + k1*(1 - fsep) + k2*sin(pi*(fsep)^2))*cnsep + surf.pvt*cnnc
+    cm2 = -((1 + sqrt(fsep))^2)*2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+    cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
+    cm4 = -((1 + sqrt(fsep))^2)*nonl_m 
+
+                                      
+    cm = cm1 + cm2 + cm3 + cm4 
+    return cl, cd, cm
+end
+
+function calc_forces(surf::TwoDSurf_2DOF, fsep :: Float64)
+
+    #Constants for moment calculation
+    k1 = -0.135
+    k2 = 0.04
+    
+    # First term in eqn (2.30) Ramesh et al. in coefficient form
+    cnc = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
+
+    # Second term in eqn (2.30) Ramesh et al. in coefficient form
+    cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
+
+    # Suction force given in eqn (2.31) Ramesh et al. and accounting for separation
+    cs = sqrt(fsep)*2*pi*surf.a0[1]*surf.a0[1]
+    
+    
+    #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+    nonl=0
+    nonl_m=0
+    for ib = 1:surf.ndiv-1
+        nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
+        nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
+    end
+    nonl = nonl*2./(surf.uref*surf.uref*surf.c)
+    nonl_m = nonl_m*2./(surf.uref*surf.uref*surf.c*surf.c)
+
+    #Account for separation
+    cnsep = (cnc+nonl)*((1 + sqrt(fsep))/2.)^2
+    
+    # Normal force coefficient
+    cn = cnsep + cnnc
+    
+    # Lift and drag coefficients
+    cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
+    cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
+
+    #Pitching moment is clockwise or nose up positive
+    cm1 = (surf.pvt + k1*(1 - fsep) + k2*sin(pi*(fsep)^2))*cnsep + surf.pvt*cnnc
+    cm2 = -((1 + sqrt(fsep))^2)*2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+    cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
+    cm4 = -((1 + sqrt(fsep))^2)*nonl_m 
+
+                                      
+    cm = cm1 + cm2 + cm3 + cm4 
     return cl, cd, cm
 end
 
@@ -598,8 +714,6 @@ function anim_flow(outfolder, freq)
     run(`open $outfolder/anim.mpg`)
 end
 # ---------------------------------------------------------------------------------------------
-
-
 
 function write_stamp(surf :: TwoDSurf, curfield :: TwoDFlowField, t :: Float64, kelv_enf :: Float64, g:: JLD.JldGroup)
 

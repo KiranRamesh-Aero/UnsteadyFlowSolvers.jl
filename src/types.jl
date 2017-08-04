@@ -256,6 +256,41 @@ end
 function (kin::CosDef)(t)
   (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
 end
+
+#Definition for Vertical axis wind turbines
+immutable VAWTalphaDef <: MotionDef
+    lambda :: Float64
+    R :: Float64
+    phi :: Float64
+end
+
+function (kin::VAWTalphaDef)(t)
+    theta = kin.lambda*t/kin.R + kin.phi
+    atan2(sin(theta), (cos(theta) + kin.lambda))
+end
+         
+immutable VAWThDef <: MotionDef
+    lambda :: Float64
+    R :: Float64
+    phi :: Float64
+end
+
+function (kin::VAWThDef)(t)
+    theta = kin.lambda*t/kin.R + kin.phi
+    kin.R*cos(theta)
+end
+
+immutable VAWTuDef <: MotionDef
+    lambda :: Float64
+    R :: Float64
+    phi :: Float64
+end
+
+function (kin::VAWTuDef)(t)
+    theta = kin.lambda*t/kin.R + kin.phi
+    1 + kin.lambda*cos(theta)
+end
+
 # ---------------------------------------------------------------------------------------------
 
 # Added by Laura Merchant 2016
@@ -1613,7 +1648,8 @@ immutable ThreeDSurfSimple
     bcoeff :: Vector{Float64}
     a03dprev :: Vector{Float64}
     a03ddot :: Vector{Float64}
-                             
+    levstr :: Vector{Float64}
+    
     function ThreeDSurfSimple(AR, kindef, coord_file, pvt, lespcrit = [10.;]; nspan = 10, cref = 1., uref=1., ndiv=70, naterm=35)
 
         bref = AR*cref
@@ -1639,7 +1675,8 @@ immutable ThreeDSurfSimple
         else
             for i = 1:nspan
                 kinem2d = KinemDef(kindef.alpha, kindef.h, kindef.u)
-                push!(s2d, TwoDSurf(coord_file, pvt,  kinem2d, lespcrit, c=cref, uref=uref, ndiv=ndiv, naterm=naterm))
+                lespc = lespcrit[1]
+                push!(s2d, TwoDSurf(coord_file, pvt,  kinem2d, [lespc;], c=cref, uref=uref, ndiv=ndiv, naterm=naterm))
             end
         end
         
@@ -1649,8 +1686,9 @@ immutable ThreeDSurfSimple
         bc = zeros(nspan)
         nshed = [0.;]
         bcoeff = zeros(nspan)
-        
-new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d, a03d, bc, nshed, bcoeff, a03dprev, a03ddot)
+        levstr = zeros(nspan)
+
+        new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d, a03d, bc, nshed, bcoeff, a03dprev, a03ddot, levstr)
 end
 end
 
@@ -1777,6 +1815,14 @@ immutable KelvinConditionLLTldvm
 end
 
 immutable KelvinConditionLLTldvmSep
+    surf :: ThreeDSurfSimple
+    field :: ThreeDFieldStrip
+    shed_ind :: Vector{Vector{Int}}
+    i :: Int
+    kelv_enf :: Vector{Float64}
+end
+
+immutable KelvinConditionLLTldvmSepDup
     surf :: ThreeDSurfSimple
     field :: ThreeDFieldStrip
     shed_ind :: Vector{Vector{Int}}
@@ -2022,14 +2068,9 @@ function (kelv::KelvinConditionLLTldvm)(tev_iter::Array{Float64})
         update_a0anda1(kelv.surf.s2d[i])
         
         kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
-        
-        kelv.surf.a03d[i] = 0
-        
-        for n = 1:kelv.surf.nspan
-            nn = 2*n - 1
-            kelv.surf.a03d[i] = kelv.surf.a03d[i] - real(nn)*tev_iter[n+kelv.surf.nspan]*sin(nn*kelv.surf.psi[i])/sin(kelv.surf.psi[i])
-        end
-        
+
+        calc_a03dwlev(kelv.surf)
+
         val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
 
         for iv = 1:ntev
@@ -2072,7 +2113,45 @@ function (kelv::KelvinConditionLLTldvmSep)(tev_iter::Array{Float64})
 
     kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
 
-    calc_a03d(kelv.surf)
+    calc_a03dwlev(kelv.surf)
+    
+    val = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
+    
+    for iv = 1:ntev
+        val = val + kelv.field.tev[iv][i].s
+    end
+    
+    for iv = 1:nlev
+        val = val + kelv.field.lev[iv][i].s
+    end
+
+    val = val + kelv.kelv_enf[i]
+        
+    return val
+end
+
+function (kelv::KelvinConditionLLTldvmSepDup)(tev_iter::Array{Float64})
+    #Same as above but with no a03d calcualtion - for use in LEV loop
+
+    i = kelv.i
+    
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    
+    kelv.field.tev[ntev][i].s = tev_iter[1]
+    
+    #Update induced velocities on airfoil
+    update_indbound(kelv.surf.s2d, kelv.field, kelv.shed_ind)
+    
+    #Calculate downwash
+    update_downwash(kelv.surf.s2d, [kelv.field.u[1],kelv.field.w[1]])
+    
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf.s2d)
+
+    kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
+
+    #calc_a03d(kelv.surf)
     
     val = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
     
@@ -2134,6 +2213,12 @@ end
 immutable KelvinKutta
     surf :: TwoDSurf
     field :: TwoDFlowField
+end
+
+immutable KelvinKuttaQS
+    surf :: TwoDSurf
+    field :: TwoDFlowField
+    a03d :: Float64
 end
 
 immutable KelvinKuttaMultSurfSep
@@ -2213,6 +2298,44 @@ function (kelv::KelvinKutta)(v_iter::Array{Float64})
         lesp_cond = -kelv.surf.lespcrit[1]
     end
     val[2] = kelv.surf.a0[1]-lesp_cond
+
+    #Add kelv_enforced if necessary - merging will be better
+    return val
+end
+
+function (kelv::KelvinKuttaQS)(v_iter::Array{Float64})
+    val = zeros(2)
+
+    #Update the TEV and LEV strengths
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    kelv.field.tev[ntev].s = v_iter[1]
+    kelv.field.lev[nlev].s = v_iter[2]
+
+    #Update incduced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field)
+
+    #Calculate downwash
+    update_downwash(kelv.surf ,[kelv.field.u[1],kelv.field.w[1]])
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    val[1] = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.a03d + kelv.surf.aterm[1]/2.)
+
+    for iv = 1:ntev
+        val[1] = val[1] + kelv.field.tev[iv].s
+    end
+    for iv = 1:nlev
+        val[1] = val[1] + kelv.field.lev[iv].s
+    end
+
+    if (kelv.surf.a0[1] + kelv.a03d > 0)
+        lesp_cond = kelv.surf.lespcrit[1]
+    else
+        lesp_cond = -kelv.surf.lespcrit[1]
+    end
+    val[2] = kelv.surf.a0[1] + kelv.a03d -lesp_cond
 
     #Add kelv_enforced if necessary - merging will be better
     return val
@@ -2343,7 +2466,7 @@ function (kelv::KelvinKuttaLLTldvmSep)(v_iter::Array{Float64})
     update_a0anda1(kelv.surf.s2d)
     
     kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
-    
+
     val[1] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
     
     for iv = 1:ntev

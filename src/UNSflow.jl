@@ -28,9 +28,8 @@ ldvm_more, ldvm_E_more, calc_forces_more, calc_forces_E_more, interp,
 QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
 lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp,
 vortxl, voring, voring_I, get_gridprop, calc_forces_E, mutual_ind_llt,
-forces_harmonic, QSLLT_lautat2 , ldvm_varU, calc_a03d, bendfirstmode,
-calc_a03dspl, ldvm_klb, QSWeiss_lautat
-
+forces_harmonic, QSLLT_lautat, QSLLT_lautat2 , ldvm_varU, calc_a03d, bendfirstmode,
+calc_a03dspl, ldvm_klb, QSWeiss_lautat, calc_fouriergam, calc_a03dwlev, ldvm_matrix
 
 
 export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree,
@@ -45,7 +44,7 @@ ThreeDSurfVRingGrid, ThreeDSurfVRingPanel, ThreeDSurfVR,
 ThreeDFlowFieldVR, ThreeDWakeVRingGrid, TwoDFlowFieldMultSurf,
 KelvinConditionMultSurf, KelvinKuttaMultSurf, KelvinKuttaMultSurfSep,
 KelvinConditionMultSurfSep, ThreeDFieldStrip,
-KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss
+KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss, KelvinConditionLLTldvmSepDup, KelvinKuttaQS, VAWTalphaDef, VAWThDef, VAWTuDef
 
 
 include("types.jl")

@@ -580,6 +580,9 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.alpha) == CosDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == VAWTalphaDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     end
     # ---------------------------------------------------------------------------------------------
 
@@ -607,8 +610,11 @@ function update_kinem(surf::TwoDSurf, t)
       surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == CosDef)
       surf.kinem.h = surf.kindef.h(t)*surf.c
-      surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
-    end
+      surf.kinem.hdot =  ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == VAWThDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        end
     # ---------------------------------------------------------------------------------------------
 
     # Forward velocity
@@ -622,7 +628,33 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.u) == ConstDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = 0.
+    elseif (typeof(surf.kindef.h) == VAWThDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        end
+    # ---------------------------------------------------------------------------------------------
+
+    # Forward velocity
+    if (typeof(surf.kindef.u) == EldUpDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == ConstDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = 0.
+    elseif (typeof(surf.kindef.u) == SinDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == CosDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == LinearDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == VAWTuDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     end
@@ -654,6 +686,7 @@ function update_kinem(surf::Vector{TwoDSurf}, t)
         elseif (typeof(surf[i].kindef.alpha) == CosDef)
             surf[i].kinem.alpha = surf[i].kindef.alpha(t)
             surf[i].kinem.alphadot = ForwardDiff.derivative(surf[i].kindef.alpha,t)*surf[i].uref/surf[i].c
+            
         end
         # ---------------------------------------------------------------------------------------------
         
@@ -2708,6 +2741,31 @@ function calc_a03d(surf::ThreeDSurfSimple, shedv :: Array{Int} = Int[], levstr :
     end
 end
 
+function calc_a03dwlev(surf::ThreeDSurfSimple)
+    
+    lhs = zeros(surf.nspan, surf.nspan)
+    rhs = zeros(surf.nspan)
+    
+    for i = 1:surf.nspan
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            lhs[i,n] = sin(nn*surf.psi[i])*(sin(surf.psi[i]) + (nn*pi/(2*surf.AR)))
+        end
+        rhs[i] = pi*sin(surf.psi[i])*(surf.bc[i] + surf.levstr[i]/pi)/(2*surf.AR)
+    end
+    
+    surf.bcoeff[:] = lhs \ rhs
+    
+    for i = 1:surf.nspan
+        surf.a03d[i] = 0
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            surf.a03d[i] = surf.a03d[i] - real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/sin(surf.psi[i])
+        end
+    end
+end
+
+
 # function calc_a03dspl(surf::ThreeDSurfSimple)
 
 #     nterm = 70
@@ -2929,3 +2987,14 @@ end
 
 
 # ---------------------------------------------------------------------------------------------
+
+function calc_fouriergam(surf::ThreeDSurfSimple)
+    gam = zeros(surf.nspan)
+    for i = 1:surf.nspan
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            gam[i] = gam[i] + 2*surf.AR*surf.bcoeff[n]*sin(nn*surf.psi[i])
+        end
+    end
+    gam
+end

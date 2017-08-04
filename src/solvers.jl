@@ -1045,6 +1045,210 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat, surf, curfield, kelv_enf
 end
 
+function ldvm_matrix(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 8), kelv_enf = 0., writefile = "Nil", vcore = 0.02*surf.c)
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+    
+    #mat = zeros(nsteps,11)
+    mat = mat'
+    
+    dt = dtstar*surf.c/surf.uref
+    
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+
+    T1 = zeros(surf.ndiv)
+    T2 = zeros(surf.ndiv)
+    T3 = zeros(surf.ndiv)
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        #Set up the matrix problem to find tev str
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+        #Calculate downwash
+        update_downwash(surf, [curfield.u[1],curfield.w[1]])
+        
+        #The integrals I1 and J1 are based on this downwash which doesnt
+        #include vortives shed at current step (equal to term T1)
+        T1[:] = surf.downwash[:]
+        I1 = surf.c*trapz(T1.*(cos(surf.theta) - 1), surf.theta) #units of circulation
+        J1 = -trapz(T1,surf.theta)/(surf.uref*pi) #dimensionless
+        
+        # T2 depends on recenetly shed TEV
+        ntev = length(curfield.tev)
+    
+        if ntev == 0
+            xloc_tev = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
+            zloc_tev = surf.bnd_z[surf.ndiv]
+        else
+            xloc_tev = surf.bnd_x[surf.ndiv]+(1./3.)*(curfield.tev[ntev].x - surf.bnd_x[surf.ndiv])
+            zloc_tev = surf.bnd_z[surf.ndiv]+(1./3.)*(curfield.tev[ntev].z - surf.bnd_z[surf.ndiv])
+        end
+        
+        for ib = 1:surf.ndiv
+            xdist = surf.bnd_x[ib] - xloc_tev
+            zdist = surf.bnd_z[ib] - zloc_tev
+            distsq = xdist*xdist + zdist*zdist
+            T2[ib] = (surf.cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
+        end
+
+        sig_prev = sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev))
+        
+        I2 = trapz(T2.*(cos(surf.theta) - 1.), surf.theta)
+        J2 = -trapz(T2, surf.theta)/(pi*surf.uref)
+        
+        tevstr = -(I1 + sig_prev)/(1 + I2)
+        
+        #Calc first 3 fourier coefficients and derivatives
+        surf.a0[1] = J1 + J2*tevstr
+        for ia = 1:3
+            surf.aterm[ia] = 2.*(trapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*trapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+        end
+        
+        #Calculate adot
+        surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+        for ia = 1:3
+            surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+        end
+        
+        #Check if LEV shedding is true
+        if abs(surf.a0[1]) > surf.lespcrit[1]
+            if (surf.a0[1] >= 0.)
+                lesp_cond = surf.lespcrit[1]
+            else
+                lesp_cond = -surf.lespcrit[1]
+            end
+            
+            # T3 depends on recenetly shed LEV
+            nlev = length(curfield.lev)
+            if surf.levflag[1] == 0
+                le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
+                le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
+                xloc_lev = surf.bnd_x[1] + 0.5*le_vel_x*dt
+                zloc_lev = surf.bnd_z[1] + 0.5*le_vel_z*dt
+            else
+                xloc_lev = surf.bnd_x[1] + (1./3.)*(curfield.lev[nlev].x - surf.bnd_x[1])
+                zloc_lev = surf.bnd_z[1]+(1./3.)*(curfield.lev[nlev].z - surf.bnd_z[1])
+            end
+            
+            for ib = 1:surf.ndiv
+                xdist = surf.bnd_x[ib] - xloc_lev
+                zdist = surf.bnd_z[ib] - zloc_lev
+                distsq = xdist*xdist + zdist*zdist
+                T3[ib] = (surf.cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
+            end
+            I3 = trapz(T3.*(cos(surf.theta) - 1.), surf.theta)
+            J3 = -trapz(T3, surf.theta)/(pi*surf.uref)
+            
+            det = J3*(I2 + 1) - J2*(I3 + 1)
+            
+            tevstr = (-J3*(I1 + sig_prev) + (I3 + 1)*(J1 - lesp_cond))/det
+            levstr = (J2*(I1 + sig_prev) - (I2 + 1)*(J1 - lesp_cond))/det
+            
+            #Recalculate required fourier terms
+            surf.a0[1] = J1 + J2*tevstr + J3*levstr
+            for ia = 1:3
+                surf.aterm[ia] = 2.*(trapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*trapz(T2.*cos(ia*surf.theta), surf.theta) + levstr*trapz(T3.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            end
+            
+            push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+            push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
+            
+            surf.levflag[1] = 1
+        else
+            
+            push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+            surf.levflag[1] = 0
+        end
+        
+        #Calculate rest of fourier terms
+        for ia = 4:surf.naterm
+            surf.aterm[ia] = 2.*(trapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*trapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+        end
+        
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+for ia = 1:3
+    surf.aprev[ia] = surf.aterm[ia]
+end
+
+#Calculate bound vortex strengths
+update_bv(surf)
+
+#Remove vortices that are far away from airfoil
+if (delvort.flag == 1)
+    if length(curfield.tev) > delvort.limit
+        if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+            kelv_enf = kelv_enf + curfield.tev[1].s
+            for i = 1:length(curfield.tev)-1
+                curfield.tev[i] = curfield.tev[i+1]
+            end
+            pop!(curfield.tev)
+        end
+        end
+    if length(curfield.lev) > delvort.limit
+        if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
+            kelv_enf = kelv_enf + curfield.lev[1].s
+            for i = 1:length(curfield.lev)-1
+                curfield.lev[i] = curfield.lev[i+1]
+            end
+            pop!(curfield.lev)
+        end
+    end
+end
+wakeroll(surf, curfield, dt)
+
+if writefile == "Nil"
+    cl, cd, cm = calc_forces(surf)
+else
+    cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+end
+
+mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+
+#If required, write an archive file
+if writefile != "Nil"
+    jldopen(writefile, "r+") do file
+        g = g_create(file, "t$istep")
+        g = write_stamp(surf, curfield, t, kelv_enf, g)
+    end
+end
+end
+
+mat = mat'
+mat, surf, curfield, kelv_enf
+
+end
+
 function ldvm_klb(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015; delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 10), kelv_enf = 0., writefile = "Nil", tf = 3.0, alpha1 = 7*pi/180, S1 = 3.0*pi/180, S2 = 2.3*pi/180)
     
     if (size(mat,1) > 0)

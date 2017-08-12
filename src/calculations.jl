@@ -580,6 +580,9 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.alpha) == CosDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+	elseif (typeof(surf.kindef.alpha) == LinearDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     end
     # ---------------------------------------------------------------------------------------------
 
@@ -1924,6 +1927,89 @@ end
 # ---------------------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------------------------
+#Calculates first approximation of surface speed for NACA 00XX airfoil at fsep location (defined as a fraction of c)
+function surfspeed(tau::Float64, fsep::Float64, surf::TwoDSurf)
+
+	#Coefficients for NACA airfoil
+	b1 = 1.48450
+	b2 = -0.63
+	b4 = -1.758
+	b6 = 1.4215
+	b8 = -0.5075
+	#derivative of thickness function
+	dT = tau.*(b1./(2.*sqrt(fsep)).+b2.+2.*b4.*fsep.+3.*b6.*fsep.^2.+4.*b8.*fsep.^3)
+
+	#Delete this after singularities @ LE and TE are removed
+	if(fsep <0.02)
+	fsep == 0.02
+	elseif(fsep > 0.98)
+	fsep = 0.98
+	end
+	
+	#First-order speed due to thickness
+	q1t = tau./pi.*(1./tau.*dT.*log(fsep./(1.-fsep))+b1./sqrt(fsep).*log((1.+sqrt(fsep))./sqrt(fsep)).-2.*b4.-3./2.*b6.-4./3.*b8.-(3.*b6.+2.*b8).*fsep.-4.*b8.*fsep.^2)
+		
+		#Riegel's rule
+		ro = (1.1019*tau^2*surf.c)/2
+		cos_eta = sqrt(fsep./(fsep.+ro./2))
+		q1t=q1t.*cos_eta
+		
+	#First-order speed due to camber
+	sumAn = 0.
+	fsep_theta = acos(1-2*fsep)
+	for ia = 1:surf.naterm
+        sumAn = sumAn + surf.aterm[ia]*sin(ia*fsep_theta)*sin(fsep_theta/2)
+    end
+	q1c = sqrt(2.)./sqrt(1-cos(fsep_theta)+ro)*(surf.a0[1]*cos(fsep_theta/2)+sumAn)
+	
+	#Total speed
+	u_sh = surf.kinem.u*(1+q1t+q1c)
+	
+	u_sh, q1t, q1c
+end
+
+# Places a vortex at separation point location
+function place_spv(surf::TwoDSurf,field::TwoDFlowField,dt, fsep::Float64, tau::Float64)
+	nlev = length(field.lev)
+	
+	#Find idx corresponding to fsep location
+		#x is defined from 0 to c
+		#fsep is defined as a fraction of c
+	tmp = abs(surf.x.-fsep.*surf.c) #subtract and find the smallest value
+	idx = 1
+	for a = 1 : length(surf.x)-1
+		if(tmp[idx+1]<tmp[idx])
+			idx+=1
+		end
+	end
+		#This is more neat solution, but it crashes at some conditions for some reason.
+			#E.g. for alpha = 18.0 deg
+			#NACA0012 sepdef = SeparationParams(16.2,1.52,3.21,"Sheng")
+		#val = minimum(tmp)
+		#idx = find(tmp -> tmp==val, tmp) #find idx of the smallest value of tmp
+		#idx = idx[1] #in case there are multiple minimum values	
+
+#VELOCITY, both formulas should give similar results for steady state
+	#le_vel_x = surfspeed(tau, fsep, surf)*cos(surf.kindef.alpha.amp) #contribution from hdot and alphadot needs to be added
+	#le_vel_z = surfspeed(tau, fsep, surf)*sin(surf.kindef.alpha.amp) #contribution from hdot and alphadot needs to be added
+	le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*abs(fsep-surf.pvt)*surf.c + surf.uind[idx]
+    le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*abs(fsep-surf.pvt)*surf.c- surf.kinem.hdot + surf.wind[idx]
+
+#POSITION
+    if (surf.levflag[1] == 0)
+        xloc = surf.bnd_x[idx] + 0.5*le_vel_x*dt
+        zloc = surf.bnd_z[idx] + 0.5*le_vel_z*dt
+   else
+       xloc = surf.bnd_x[idx]+(1./3.)*(field.lev[nlev].x - surf.bnd_x[idx]) 
+       zloc = surf.bnd_z[idx]+(1./3.)*(field.lev[nlev].z - surf.bnd_z[idx])
+    end
+
+    push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+    return field
+end
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
 # Function determining the effects of interacting vorticies - velocities induced on each other - classical n-body problem
 function mutual_ind(vorts::Vector{TwoDVort})
     for i = 1:length(vorts)
@@ -2928,4 +3014,218 @@ function update_IC(surf :: ThreeDSurfWeiss, hs_prev :: Vector{Float64}, he_prev 
 end
 
 
-# ---------------------------------------------------------------------------------------------
+	"""	
+	```julia-repl
+	Calculate separation point position f basing on static CN(alpha) data.
+	To study this function step by step, refer to the notebook "1.1. Steady state separation point model". 
+	
+	#Arguments
+	```
+	- 'alpha::Vector{Float64}': vector of angles of attack
+	- 'CN::Vector{Float64}': vector of normal force coefficients CN corresponding to alpha
+	```
+ 	
+	#Keyword arguments
+	```
+	- 'lin::Float64': max. alpha at which CN is still linear, in degrees (default lin = 7)
+	```
+	"""
+function fFromCN(alpha::Vector{Float64}, CN::Vector{Float64}; lin::Float64 = 7.)
+
+	#trim domain to linear part
+    idx_linear = 1
+    while(alpha[idx_linear]<lin)
+        idx_linear+=1
+    end
+    
+    #find b,a for y = bx + a
+    a,b = linreg(alpha[1:idx_linear], CN[1:idx_linear])
+    alpha0 = -a/b
+
+	#Calculate max. slope from static data (amax) to guarantee that f will not exceed 1
+    amax = 0
+    for idx = 1 : idx_linear
+        if(CN[idx]/(alpha[idx]-alpha0) > amax)
+        amax = CN[idx]/(alpha[idx]-alpha0)
+        end
+    end
+
+	#Calculate f 	
+	f = zeros(length(alpha))
+
+	for idx = 1 : length(alpha)
+		f[idx] = (2*sqrt(CN[idx]/(amax*(alpha[idx]-alpha0)))-1)^2
+	end 
+
+	f
+end
+
+
+
+	"""	
+	```julia-repl
+	Model separation point position f. To study this function step by step, refer to the notebook "1.1 Steady state separation point model". 
+	
+	#Arguments
+	```
+	- 'alpha::Vector{Float64}': vector of angles of attack
+	- 'f::Vector{Float64}': vector of separation point f positions corresponding to alpha
+	- 'model::String': Sheng or Original models available.
+	```
+	"""
+function findStaticCoeff(alpha::Vector{Float64}, f::Vector{Float64}, model::String)
+
+	if(model == "Sheng")
+		fsep =  0.6
+		temp = abs(f.-fsep)
+		idxf = findfirst(temp,minimum(temp))
+
+		alpha1 = alpha[idxf]
+		
+		#STEP 3: OPTIMIZE 
+		pcws1(x, s1) = 1.0.-0.4.*exp((abs(x).-alpha1)./s1)
+		pcws2(x, s2) = 0.02.+0.58.*exp((alpha1.-abs(x))./s2)
+		s1_0 = [3.5]
+		s2_0 = [3.5]
+
+		alpha_pcws1 = alpha[1:idxf]
+		alpha_pcws2 = alpha[idxf:end]
+
+		f_pcws1 = f[1:idxf]
+		f_pcws2 = f[idxf:end]
+
+		fit1 = curve_fit(pcws1, alpha_pcws1, f_pcws1, s1_0)
+		fit2 = curve_fit(pcws2, alpha_pcws2, f_pcws2, s2_0)
+		s1 = fit1.param[1]
+		s2 = fit2.param[1]
+		f=vcat(pcws1(alpha_pcws1,fit1.param), pcws2(alpha_pcws2,fit1.param)[2:end])
+		
+	elseif(model =="Original")
+		fsep =  0.7
+		temp = abs(f.-fsep)
+		idxf = findfirst(temp,minimum(temp))
+
+		alpha1 = alpha[idxf]
+
+		#STEP 3: OPTIMIZE 
+		pcws3(x, s1) = 1.0.-0.3.*exp((abs(x).-alpha1)./s1)
+		pcws4(x, s2) = 0.04.+0.66.*exp((alpha1.-abs(x))./s2)	
+		s1_0 = [3.5]
+		s2_0 = [3.5]
+
+		
+		alpha_pcws3 = alpha[1:idxf]
+		alpha_pcws4 = alpha[idxf:end]
+
+		f_pcws3 = f[1:idxf]
+		f_pcws4 = f[idxf:end]
+
+		fit3 = curve_fit(pcws3, alpha_pcws3, f_pcws3, s1_0)
+		fit4 = curve_fit(pcws4, alpha_pcws4, f_pcws4, s2_0)
+		s1 = fit3.param[1]
+		s2 = fit4.param[1]
+		f=vcat(pcws3(alpha_pcws3,fit3.param), pcws4(alpha_pcws4,fit4.param)[2:end])
+	else
+		println("Wrong f model specified. Choose Sheng or Original.")
+	end
+		
+	alpha1, s1, s2, f
+end	
+
+"""	
+	```julia-repl
+	Calculate f(a) characteristic for a set of static constants.
+	
+	Output: f(a)
+	
+	#Arguments
+	
+	```
+	
+	- 'alpha::Vector{Float64}': vector of angles of attack in deg
+	- 'alpha1::Float64': alpha in deg for which f = 0.6 (Sheng) or f = 0.7 (Original), can be approximated as stall angle
+	- 's1::Float64': static constant in deg for piecewise model, attached regime
+	- 's2::Float64': static constant in deg for piecewise model, separated regime	
+	- 'model::String': Two models are available: "Sheng" and "Original"
+	
+		
+	```
+	
+	#Keyword argument
+	
+	```
+	
+	- 'par': Default is 0.1. Modify to larger values if no result is given by function.
+
+	"""
+function fFromConst(alpha::Vector{Float64}, alpha1::Float64, s1::Float64, s2::Float64, model::String; par=0.1)
+	
+	if(model == "Sheng")
+		c1 = 1.0
+		c2 = 0.4
+		c3 = 0.02
+		c4 = 0.58
+	elseif(model=="Original")
+		c1 = 1.0
+		c2 = 0.3
+		c3 = 0.04
+		c4 = 0.66
+	else
+		println("Wrong f model specified. Choose Sheng or Original.")
+	end
+		
+		pcws_1(x, s1, alpha1) = c1.-c2.*exp((abs(x).-alpha1)./s1)
+		pcws_2(x, s2, alpha1) = c3.+c4.*exp((alpha1.-abs(x))./s2)	
+	
+		idxf = 1
+		while(abs(alpha[idxf]-alpha1)>par)
+			idxf+=1
+		end
+		
+		f = vcat(pcws_1(alpha[1:idxf],s1,alpha1), pcws_2(alpha[idxf+1:end],s2,alpha1))
+end
+
+	"""	
+	```julia-repl
+	Obtain static constants for moment coefficient calculation, basing on CM(a), CN(a) and f(a). 
+	
+	Output: k0, k1, k2, m
+	
+	#Arguments
+	
+	```
+	
+	- 'CM::Vector{Float64}': vector of moment coefficients CM for a set of angles of attack
+	- 'CN::Vector{Float64}': vector of normal force coefficients CN for the same set of angles of attack
+	- 'f::Vector{Float64}': vector of separation point position f as a fraction of c, corresponding to the above
+	
+	```
+	
+	#Keyword argument
+	
+	```
+	
+	- 'par': Upper limit of f that is used in calculations. Default is 0.9, may be modified for a better fit.
+	
+	```
+ 	
+	For more information refer to "2.1 Static constants for CM" notebook.
+	```
+	"""
+function cmstatic(CM::Vector{Float64}, CN::Vector{Float64}, f::Vector{Float64}; par = 0.9)
+
+fun(f, p) = p[1] + p[2]*(1.-f)+p[3]*sin(pi.*f.^p[4]) #1 - k0, 2 - k1, 3 - k2, 4 - m
+init = [0., -0.135, 0.04, 2.] #initial values from [1] Z. Liu, J. C. S. Lai, J. Young, and F.-B. Tian, 
+                            #“Discrete Vortex Method with Flow Separation Corrections for Flapping-Foil Power Generators,” 
+                            #AIAA Journal, vol. 55, no. 2, pp. 410–418, Feb. 2017.
+idx = 1
+while(f[idx]>par)
+    idx+=1
+end
+							
+fit = curve_fit(fun, f[idx:end], CM[idx:end]./CN[idx:end], init)
+
+fit.param
+end
+
+# -------------------------------------------------------------------------------------------

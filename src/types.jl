@@ -82,10 +82,13 @@ type KinemPar2DOF
     hddot_pr :: Float64
     hddot_pr2 :: Float64
     hddot_pr3 :: Float64
-
+	
     function KinemPar2DOF(alpha, h, alphadot, hdot, u)
         new(alpha, h, alphadot, hdot, u, 0., 0., 0., alpha, h, alphadot, alphadot, alphadot, hdot, hdot, hdot, 0., 0., 0., 0., 0., 0.)
     end
+#    function KinemPar2DOF(alpha, h, alphadot, hdot, u, udot,  par1, par2, par3, par4, par5, par6, par7, par8, par9, par10, par11, par12, par13, par14, par15, par16)
+#        new(alpha, h, alphadot, hdot, u, 0., 0., 0., alpha, h, alphadot, alphadot, alphadot, hdot, hdot, hdot, 0., 0., 0., 0., 0., 0.)
+#    end
 end
 
 type KinemPar2DFree
@@ -984,7 +987,8 @@ immutable TwoDSurf_2DOF
     levflag :: Vector{Int8}
 
     function TwoDSurf_2DOF(c, uref, coord_file, pvt, ndiv, naterm, strpar, kinem ,lespcrit=zeros(1))
-        theta = zeros(ndiv)
+
+		theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
         cam_slope = zeros(ndiv)
@@ -992,19 +996,25 @@ immutable TwoDSurf_2DOF
         bnd_z = zeros(ndiv)
 
         dtheta = pi/(ndiv-1)
+		
+		# transformation variable theta
         for ib = 1:ndiv
             theta[ib] = real(ib-1.)*dtheta
             x[ib] = c/2.*(1-cos(theta[ib]))
         end
+		
+		#import camber data
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
 
-
+?
         for i = 1:ndiv
             bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha))
             bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha))
         end
+		
+		
         uind = zeros(ndiv)
         wind = zeros(ndiv)
         downwash = zeros(ndiv)
@@ -1015,6 +1025,8 @@ immutable TwoDSurf_2DOF
         a0prev = zeros(1)
         aprev = zeros(3)
         bv = TwoDVort[]
+		
+		#ask what is that part?
         for i = 1:ndiv-1
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
@@ -1734,6 +1746,28 @@ end
 # END EldUpIntDef
 # ---------------------------------------------------------------------------------------------
 
+ type SeparationParams
+	 alpha1 :: Float64 	#static constant for f model
+	 s1 :: Float64		#static constant for f model
+	 s2 :: Float64		#static constant for f model
+	 model :: String	#f model, Sheng or Original
+	 aoa :: String		#f model, based on angle of attack or effective angle of attack (Effective or AoA)
+	 k0 :: Float64		#static constant for cm model
+	 k1 :: Float64		#static constant for cm model
+	 k2 :: Float64		#static constant for cm model
+	 m :: Float64		#static constant for cm model
+	 cm_model :: String	#cm model, Dymore or Liu
+	 cs_model :: String	#cs model, piecewise, continuous, Sheng_piecewise or Sheng_continuous
+	 tf :: Float64		#time constant for transient model
+	 tau :: Float64		#thickness of an aerofoil, e.g. 0.12 for 0012 NACA aerofoil
+	 fsep_forced :: Float64	#nondefault value forces SPV vortices to be shed from a set point
+	 alternative_transient :: Bool	#alternative transient formula, doesn't work
+	 
+	
+	function SeparationParams(alpha1::Float64,s1::Float64,s2::Float64, model::String; aoa::String="Effective", k0::Float64 = 0.0, k1::Float64 = -0.135, k2::Float64 = 0.04, m::Float64 = 2.0, cm_model::String = "Dymore", cs_model::String = "piecewise", tf::Float64=3.0, tau::Float64=0.12, fsep_forced::Float64 =-1.0, alternative_transient::Bool = false)  
+	new(alpha1,s1,s2,model,aoa,k0,k1,k2,m,cm_model, cs_model,tf,tau,fsep_forced, alternative_transient)
+	end
+end
 
 # ---------------------------------------------------------------------------------------------
 # BEGIN KelvinCondition
@@ -1792,6 +1826,19 @@ immutable KelvinConditionWeiss
     kelv_enf :: Vector{Float64}
 end
 
+type KelvinConditionSPV
+    surf :: TwoDSurf
+    field :: TwoDFlowField
+	dt :: Float64
+	sepdef :: SeparationParams	
+	f0sep_pr :: Float64
+	dfn_pr :: Float64
+	f0sep :: Float64
+	dfn :: Float64
+	fsep :: Float64
+	istep :: Float64
+	
+end
 
 function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     #Update the TEV strength
@@ -1823,6 +1870,71 @@ function (kelv::KelvinCondition)(tev_iter::Array{Float64})
 
     return val
 end
+
+
+function (kelv::KelvinConditionSPV)(v_iter::Array{Float64})
+      #Update the TEV strength
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+    kelv.field.tev[ntev].s = v_iter[1]
+	
+	if(kelv.sepdef.fsep_forced == -1.0)
+		if(kelv.sepdef.model == "Sheng")
+
+			if (abs(kelv.surf.a0[1]*180/pi) < kelv.sepdef.alpha1)
+				kelv.f0sep = 1 - 0.4*exp((abs(kelv.surf.a0[1]*180/pi) - kelv.sepdef.alpha1)/kelv.sepdef.s1)
+			else
+				kelv.f0sep = 0.02 + 0.58*exp((kelv.sepdef.alpha1 - abs(kelv.surf.a0[1]*180/pi))/kelv.sepdef.s2)
+			end
+				
+		elseif(kelv.sepdef.model == "Original")
+					
+			if (abs(kelv.surf.a0[1]*180/pi) < kelv.sepdef.alpha1)
+				kelv.f0sep = 1 - 0.3*exp((abs(kelv.surf.a0[1]*180/pi) - kelv.sepdef.alpha1)/kelv.sepdef.s1)
+			else
+				kelv.f0sep = 0.04 + 0.66*exp((kelv.sepdef.alpha1 - abs(kelv.surf.a0[1]*180/pi))/kelv.sepdef.s2)
+			end
+
+		else
+			println("Wrong model. Choose Sheng or Original as model Keyword in SeparationParams.")
+		end
+		
+		kelv.dfn = kelv.dfn_pr*exp(-2*kelv.dt/kelv.sepdef.tf)+(kelv.f0sep - kelv.f0sep_pr)*exp(-kelv.dt/kelv.sepdef.tf)
+		kelv.fsep = kelv.f0sep - kelv.dfn
+		
+		if(kelv.istep == 1)
+			kelv.fsep = kelv.f0sep
+			kelv.dfn = 0.
+		end
+	end
+	
+	u_sh, q1t, q1c = surfspeed(kelv.sepdef.tau, kelv.fsep, kelv.surf)
+	kelv.field.lev[nlev].s = u_sh^2*kelv.dt
+
+    #Update incduced velocities on airfoil
+    update_indbound(kelv.surf, kelv.field)
+
+    #Calculate downwash
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    val = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.)
+
+    for iv = 1:ntev
+        val = val + kelv.field.tev[iv].s
+    end
+    for iv = 1:nlev
+        val = val + kelv.field.lev[iv].s
+    end
+
+
+    #Add kelv_enforced if necessary - merging will be better
+    return val
+end
+
+
 
 function (kelv::KelvinConditionMultSurf)(tev_iter::Array{Float64})
 
@@ -2862,3 +2974,35 @@ immutable ThreeDFlowFieldVR
     end
 end
 # ---------------------------------------------------------------------------------------------
+
+type Xfoil
+#Static data from xfoil
+	alpha :: Vector{Float64}
+	CL :: Vector{Float64}
+	CD :: Vector{Float64}
+	CM :: Vector{Float64}
+	CN :: Vector{Float64}
+	foil_no :: String
+
+	function Xfoil(xfoil_file::String)
+		data = readdlm(xfoil_file; skipstart = 12) 
+		alpha = data[:,1]
+		CL = data[:,2]
+		CD = data[:,3]
+		CM = data[:,5]
+
+		#Calculate normal force coefficient CN basing on CL and CD
+		CN = zeros(length(alpha))
+    	for idx = 1 : length(alpha)
+			CN[idx] = CL[idx]*cos(deg2rad(alpha[idx]))+CD[idx]*sin(deg2rad(alpha[idx]))
+		end
+		
+		##Extract airfoil's name
+		nline = open(readlines, xfoil_file)[4]
+		id = search(nline,":")[1]
+
+		foil_no = strip(string(nline[id+1:end-4]))
+		
+		new(alpha, CL, CD, CM, CN, foil_no)
+	end
+end

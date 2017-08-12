@@ -7,7 +7,7 @@ using ForwardDiff
 export derivative
 
 using PyPlot
-export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers, axis, savefig
+export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers, axis, savefig, linreg, annotate
 
 using NLsolve
 export nlsolve, not_in_place
@@ -17,6 +17,12 @@ export jldopen
 
 using HDF5
 export g_create
+
+using LsqFit
+export curve_fit
+
+using Interpolations
+export interpolate
 
 export camber_calc, update_boundpos, update_kinem, update_indbound,
 update_downwash, update_a0anda1, place_tev, place_lev, update_a2toan,
@@ -29,7 +35,8 @@ QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
 lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp,
 vortxl, voring, voring_I, get_gridprop, calc_forces_E, mutual_ind_llt,
 forces_harmonic, QSLLT_lautat2 , ldvm_varU, calc_a03d, bendfirstmode,
-calc_a03dspl, ldvm_klb, QSWeiss_lautat
+calc_a03dspl, ldvm_klb, QSWeiss_lautat, fFromCN, findStaticCoeff,
+cmstatic, place_spv, surfspeed, fFromConst, ldvm_klb_tr, ldvm_spv, rms
 
 
 
@@ -45,8 +52,8 @@ ThreeDSurfVRingGrid, ThreeDSurfVRingPanel, ThreeDSurfVR,
 ThreeDFlowFieldVR, ThreeDWakeVRingGrid, TwoDFlowFieldMultSurf,
 KelvinConditionMultSurf, KelvinKuttaMultSurf, KelvinKuttaMultSurfSep,
 KelvinConditionMultSurfSep, ThreeDFieldStrip,
-KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss
-
+KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef, BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss,
+Xfoil, SeparationParams, KelvinConditionSPV
 
 include("types.jl")
 include("calculations.jl")

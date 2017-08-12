@@ -128,7 +128,9 @@ function calc_forces(surf::TwoDSurf)
 
     #Pitching moment is clockwise or nose up positive
     cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
-    return cl, cd, cm
+  #  return cl, cd, cm
+	return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs, cnc, cnnc, nonl, cn*surf.pvt, nonl_m
+   
 end
 
 function calc_forces(surf::Vector{TwoDSurf})
@@ -171,30 +173,72 @@ function calc_forces(surf::Vector{TwoDSurf})
     return cl, cd, cm
 end
 
-function calc_forces(surf::TwoDSurf, fsep :: Float64)
+function calc_forces(surf::TwoDSurf, fsep :: Float64, sepdef::SeparationParams)
 
-    #Constants for moment calculation
-    k1 = -0.135
-    k2 = 0.04
-    
+
     # First term in eqn (2.30) Ramesh et al. in coefficient form
     cnc = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
-
+ 
     # Second term in eqn (2.30) Ramesh et al. in coefficient form
     cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
 
     # Suction force given in eqn (2.31) Ramesh et al. and accounting for separation
-    cs = sqrt(fsep)*2*pi*surf.a0[1]*surf.a0[1]
-    
-    
+	
+	#Cs model 
+	if(sepdef.model == "Sheng")
+		fcrit = 0.6
+	else	
+		fcrit = 0.7
+	end
+	
+	if(sepdef.cs_model == "Sheng_continuous")
+		eta = 1.0
+		E_0 = 0.2
+	
+		cs = eta*2*pi*surf.a0[1]*surf.a0[1]*(sqrt(fsep)-E_0)	
+	
+	elseif(sepdef.cs_model == "Sheng_piecewise")
+	
+		eta = 1.0
+		E_0 = 0.2
+	
+		if(fsep<fcrit)
+			cs = eta*2*pi*surf.a0[1]*surf.a0[1]*((fsep)^(3/2)-E_0)
+		else
+			cs = eta*2*pi*surf.a0[1]*surf.a0[1]*(sqrt(fsep)-E_0)	
+		end
+	
+	elseif(sepdef.cs_model == "piecewise")
+	
+		eta = 1.0
+		E_0 = 0.0
+		
+		if(fsep<fcrit)
+			cs = eta*2*pi*surf.a0[1]*surf.a0[1]*((fsep)^(3/2)-E_0)
+		else
+			cs = eta*2*pi*surf.a0[1]*surf.a0[1]*(sqrt(fsep)-E_0)	
+		end
+	
+	
+	elseif(sepdef.cs_model == "continuous")
+	
+		eta = 1.0
+		E_0 = 0.0
+	
+		cs = eta*2*pi*surf.a0[1]*surf.a0[1]*(sqrt(fsep)-E_0)	
+	else
+	println("Wrong Cs model specified. Choose Sheng_continuous, Sheng_piecewise, piecewise or continuous")
+	end
+
     #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
     nonl=0
     nonl_m=0
     for ib = 1:surf.ndiv-1
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
-    end
-    nonl = nonl*2./(surf.uref*surf.uref*surf.c)
+	end
+
+	nonl = nonl*2./(surf.uref*surf.uref*surf.c)
     nonl_m = nonl_m*2./(surf.uref*surf.uref*surf.c*surf.c)
 
     #Account for separation
@@ -206,16 +250,36 @@ function calc_forces(surf::TwoDSurf, fsep :: Float64)
     # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
-
-    #Pitching moment is clockwise or nose up positive
-    cm1 = (surf.pvt + k1*(1 - fsep) + k2*sin(pi*(fsep)^2))*cnsep + surf.pvt*cnnc
-    cm2 = -((1 + sqrt(fsep))^2)*2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
-    cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
-    cm4 = -((1 + sqrt(fsep))^2)*nonl_m 
-
-                                      
+ 
+ cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+ + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
+    
+	
+	if(sepdef.cm_model == "Dymore")
+				#Pitching moment is clockwise or nose up positive
+		cm1 = (sepdef.k0+surf.pvt + surf.c*sepdef.k1*(1 - fsep) + sepdef.k2*surf.c*sin(pi*(fsep)^sepdef.m))*cnsep + surf.pvt*cnnc 
+	  #  cm2 = -((1 + sqrt(fsep))^2)*2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+		cm2 = -2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+		#cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
+		cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
+		#cm4 = -((1 + sqrt(fsep))^2)*nonl_m
+		cm4 = -nonl_m
+	elseif (sepdef.cm_model == "Liu")
+		#Pitching moment is clockwise or nose up positive
+		cm1 = (sepdef.k0+surf.pvt + surf.c*sepdef.k1*(1 - fsep) + sepdef.k2*surf.c*sin(pi*(fsep)^sepdef.m))*cnsep + surf.pvt*cnnc  
+		cm2 = -((1 + sqrt(fsep))^2)*2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.)
+		cm3 = -2*pi*surf.c/surf.uref*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)
+		cm4 = -((1 + sqrt(fsep))^2)*nonl_m
+	else
+		println("Wrong model specified.")
+	end
+	                                      
     cm = cm1 + cm2 + cm3 + cm4 
-    return cl, cd, cm
+
+  #  return cl, cd, cm
+   # return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs, cnc, cnnc, nonl, cn*surf.pvt, cm_p, nonl_m
+   return cl, cd, cm, surf.a0[1] + 0.5*surf.aterm[1], cn, cs, cnc, cnnc, nonl, cn*surf.pvt, nonl_m, cm1, cm2, cm3, cm4
+
 end
 
 function calc_forces(surf::TwoDSurf_2DOF, fsep :: Float64)
@@ -974,3 +1038,23 @@ function forces_harmonic(mat :: Array{Float64,2}, ncyc :: Int, k::Float64)
 end
 
 # ---------------------------------------------------------------------------------------------
+
+#function rms(x_1::Vector{Float64}, y_1::Vector{Float64}, x_2::Vector{Float64}, y_2::Vector{Float64}; par::Float64=100)
+function rms(x_1::Vector{Float64}, y_1::Vector{Float64},x_2::Vector{Float64},y_2::Vector{Float64}; par=100)
+	knots_1 = (x_1,) #syntax required by interpolate function
+	knots_2 = (x_2,)
+	itp_1 = interpolate(knots_1, y_1, Gridded(Linear())) 
+	itp_2 = interpolate(knots_2, y_2, Gridded(Linear()))
+
+	x_max_rms = min(x_1[end],x_2[end])
+	x_min_rms = max(x_1[1],x_2[1])
+	x_rms = linspace(x_min_rms, x_max_rms, par)
+	diff = itp_2[x_rms].-itp_1[x_rms]
+
+	s = 0.0
+	for a in diff
+		s +=a*a
+	end
+
+	return sqrt(s/length(diff))
+end

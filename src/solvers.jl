@@ -619,6 +619,325 @@ function lautat_wakeroll_more(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::I
 
 end
 
+function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 13), kelv_enf = 0., writefile = "Nil")
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+    
+    mat = mat'
+    
+    dt = dtstar*surf.c/surf.uref
+    
+    vcore = 0.02*surf.c
+    
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+
+    wa_x = zeros(surf.ndiv)
+    int_wax_prev = zeros(surf.ndiv)
+    
+    
+    for istep = 1:nsteps
+        
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+        
+        #Set up the matrix problem
+        
+        #Calculate the missing column in LHS that depends on last shed vortex location
+        
+        ntev = length(curfield.tev)
+        
+        if ntev == 0
+            xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+            zloc_tev = surf.bnd_z_chord[surf.ndiv]
+        else
+            xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+            zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+        end
+        
+        dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+        
+        u_u_dummy, w_u_dummy = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+        u_l_dummy, w_l_dummy = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+        
+        for i = 2:surf.ndiv-1
+            dphidz_u = w_u_dummy[i]*cos(surf.kinem.alpha) + u_u_dummy[i]*sin(surf.kinem.alpha)
+            dphidz_l = w_l_dummy[i]*cos(surf.kinem.alpha) + u_l_dummy[i]*sin(surf.kinem.alpha)
+            
+            dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
+            dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
+            
+            surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u - dphidx_l)
+            
+            surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
+        end
+        
+        
+        #Construct RHS vector
+        for i = 2:surf.ndiv-1
+            
+            #RHS for lifting equation
+            dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
+            dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
+            
+            dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+            dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+            
+            
+            surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u + dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) + surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) - surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+            
+            surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i] + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l)) + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+        end
+    
+        #RHS for Kelvin condition (negative strength of all previously shed vortices)
+        surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+        
+        #Now solve the matrix problem
+        soln = surf.LHS \ surf.RHS
+        
+        #Assign the solution
+        surf.a0[1] = soln[1]
+        for i = 1:surf.naterm
+            surf.aterm[i] = soln[i+1]
+            surf.bterm[i] = soln[i+surf.naterm+1]
+        end
+        
+        tevstr = soln[2*surf.naterm+2]
+        
+        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+        
+        
+        #Calculate adot
+        surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+        for ia = 1:3
+            surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+        end
+        
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+        
+        #Update induced velocities to include effect of last shed vortex
+        update_indbound(surf, curfield)
+    
+        #Calculate bound vortex strengths
+        update_bv_src(surf)
+        
+        #Wake rollup
+        #wakeroll(surf, curfield, dt)
+        
+        #Force calculation
+        cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd = calc_forces(surf, int_wax_prev, dt)
+        
+        #Precalculation for apparent mass at next time step
+        for i = 1:surf.ndiv
+            wa_x[i] = 0.5*(surf.uind_u[i] - surf.uind_l[i])
+        end
+
+for i = 1:surf.ndiv
+    int_wax_prev[i] = trapz(wa_x[1:i], surf.x[1:i])
+end
+
+mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd])
+
+end
+
+mat = mat'
+
+mat, surf, curfield, kelv_enf
+
+end    
+
+function lautat_wakeroll(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(Float64, 0, 13), kelv_enf = 0., writefile = "Nil")
+
+    if (size(mat,1) > 0)
+        t = mat[end,1]
+    else
+        t = 0.
+    end
+    
+    mat = mat'
+    
+    dt = dtstar*surf.c/surf.uref
+    
+    vcore = 0.02*surf.c
+    
+    #If required, write an archive file
+    if writefile != "Nil"
+        jldopen(writefile, "w") do file
+            write(file, "dt",  dt)
+            write(file, "dtstar",  dt)
+            write(file, "Insurf",  surf)
+            write(file, "Infield", curfield)
+            write(file, "delvort", delvort)
+            write(file, "nsteps", nsteps)
+            cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+            g = g_create(file, "Init")
+            g = write_stamp(surf, curfield, t, kelv_enf, g)
+        end
+    end
+
+    wa_x = zeros(surf.ndiv)
+    int_wax_prev = zeros(surf.ndiv)
+    
+    
+    for istep = 1:nsteps
+        
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+        
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+        
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+        
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+        
+        #Set up the matrix problem
+        
+        #Calculate the missing column in LHS that depends on last shed vortex location
+        
+        ntev = length(curfield.tev)
+        
+        if ntev == 0
+            xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+            zloc_tev = surf.bnd_z_chord[surf.ndiv]
+        else
+            xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+            zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+        end
+        
+        dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+        
+        u_u_dummy, w_u_dummy = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+        u_l_dummy, w_l_dummy = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+        
+        for i = 2:surf.ndiv-1
+            dphidz_u = w_u_dummy[i]*cos(surf.kinem.alpha) + u_u_dummy[i]*sin(surf.kinem.alpha)
+            dphidz_l = w_l_dummy[i]*cos(surf.kinem.alpha) + u_l_dummy[i]*sin(surf.kinem.alpha)
+            
+            dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
+            dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
+            
+            surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u - dphidx_l)
+            
+            surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
+        end
+        
+        
+        #Construct RHS vector
+        for i = 2:surf.ndiv-1
+            
+            #RHS for lifting equation
+            dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
+            dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
+            
+            dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+            dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+            
+            
+            surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u + dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) + surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) - surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+            
+            surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i] + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l)) + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+        end
+    
+        #RHS for Kelvin condition (negative strength of all previously shed vortices)
+        surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+        
+        #Now solve the matrix problem
+        soln = surf.LHS \ surf.RHS
+        
+        #Assign the solution
+        surf.a0[1] = soln[1]
+        for i = 1:surf.naterm
+            surf.aterm[i] = soln[i+1]
+            surf.bterm[i] = soln[i+surf.naterm+1]
+        end
+        
+        tevstr = soln[2*surf.naterm+2]
+        
+        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+        
+        
+        #Calculate adot
+        surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+        for ia = 1:3
+            surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+        end
+        
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+        
+        #Update induced velocities to include effect of last shed vortex
+        update_indbound(surf, curfield)
+    
+        #Calculate bound vortex strengths
+        update_bv_src(surf)
+        
+        #Wake rollup
+        wakeroll(surf, curfield, dt)
+        
+        #Force calculation
+        cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd = calc_forces(surf, int_wax_prev, dt)
+        
+        #Precalculation for apparent mass at next time step
+        for i = 1:surf.ndiv
+            wa_x[i] = 0.5*(surf.uind_u[i] - surf.uind_l[i])
+        end
+
+for i = 1:surf.ndiv
+    int_wax_prev[i] = trapz(wa_x[1:i], surf.x[1:i])
+end
+
+mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd])
+
+end
+
+mat = mat'
+
+mat, surf, curfield, kelv_enf
+
+end    
+
+
 
 function theodorsen(theo::TheoDef)
     # Inputs:
@@ -999,27 +1318,10 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         #Calculate bound vortex strengths
         update_bv(surf)
 
-        #Remove vortices that are far away from airfoil
-        if (delvort.flag == 1)
-            if length(curfield.tev) > delvort.limit
-                if (sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
-                    kelv_enf = kelv_enf + curfield.tev[1].s
-                    for i = 1:length(curfield.tev)-1
-                        curfield.tev[i] = curfield.tev[i+1]
-                    end
-                    pop!(curfield.tev)
-                end
-            end
-            if length(curfield.lev) > delvort.limit
-                if (sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2) > delvort.dist*surf.c)
-                    kelv_enf = kelv_enf + curfield.lev[1].s
-                    for i = 1:length(curfield.lev)-1
-                        curfield.lev[i] = curfield.lev[i+1]
-                    end
-                    pop!(curfield.lev)
-                end
-            end
+        if delvort.flag != 0 
+            control_vort_count(delvort, surf, curfield)
         end
+        
         wakeroll(surf, curfield, dt)
 
         #cl, cd, cm, cn, cs = calc_forces(surf)

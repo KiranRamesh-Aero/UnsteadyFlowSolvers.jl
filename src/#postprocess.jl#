@@ -1,4 +1,4 @@
- ---------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------
 # Function for viewing the 2D vorticity field around the airfoil
 function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
     scatter(map(q->q.x, field.tev),map(q->q.z,field.tev),s=20,c=map(q->q.s,field.tev),edgecolors="none")
@@ -7,11 +7,20 @@ function view_vorts(surf::TwoDSurf, field::TwoDFlowField)
 end
 
 function view_vorts(surf::Vector{TwoDSurf}, field::TwoDFlowFieldMultSurf)
-    scatter([map(q->q.x, field.tev[i]) for i = 1:length(field.tev)] , [map(q->q.z,field.tev[i]) for i = 1:length(field.tev)], s=20, c=[map(q->q.s,field.tev[i]) for i = 1:length(field.tev)], edgecolors="none")
-    scatter([map(q->q.x, field.lev[i]) for i = 1:length(field.lev)] , [map(q->q.z,field.lev[i]) for i = 1:length(field.lev)], s=20, c=[map(q->q.s,field.lev[i]) for i = 1:length(field.lev)], edgecolors="none")
-    for i = 1:field.nsurf
-        plot(map(q->q.x, surf[i].bv), map(q->q.z,surf[i].bv), color = "black", linewidth=2.0)
-    end
+
+    scatter([map(q->q.x, field.tev[i]) for i = 1:length(field.tev)] ,
+    [map(q->q.z,field.tev[i]) for i = 1:length(field.tev)], s=20,
+    c=[map(q->q.s,field.tev[i]) for i = 1:length(field.tev)],
+    edgecolors="none")
+
+    scatter([map(q->q.x, field.lev[i]) for i = 1:length(field.lev)] ,
+    [map(q->q.z,field.lev[i]) for i = 1:length(field.lev)], s=20,
+    c=[map(q->q.s,field.lev[i]) for i = 1:length(field.lev)],
+    edgecolors="none")
+
+    for i = 1:field.nsurf plot(map(q->q.x, surf[i].bv),
+        map(q->q.z,surf[i].bv), color = "black", linewidth=2.0) end
+    
     PyPlot.show()
 end
 
@@ -171,11 +180,11 @@ function calc_forces(surf::Vector{TwoDSurf})
     return cl, cd, cm
 end
 
-function calc_forces(surf::TwoDSurf, fsep :: Float64)
+function calc_forces(surf::TwoDSurf, fsep :: Float64; k1 :: Float64 = -0.135, k2 :: Float64 = 0.04)
 
     #Constants for moment calculation
-    k1 = -0.135
-    k2 = 0.04
+    #k1 = -0.135
+    #k2 = 0.04
     
     # First term in eqn (2.30) Ramesh et al. in coefficient form
     cnc = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)

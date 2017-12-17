@@ -1,5 +1,3 @@
-#Function for estimating a problem's time step
-
 #Simple linear interpolation function
 """
     interp(x1, x2, y1, y2, x)
@@ -9,11 +7,19 @@ find the value of `y` at `x`.
 
 """
 function interp(x1 ::Float64, x2 :: Float64, y1 :: Float64, y2 :: Float64, x::Float64)
+
     y = y1 + (y2 - y1)*(x - x1)/(x2 - x1)
     return y
 end
 
-    
+#Function for estimating a problem's time step    
+"""
+    find_tstep([kin1 kin2 ...]
+
+kin* are a list of either Sin or Cos kinematic definitions
+A suitable time-step is calculated based on the value of amp*k
+Time step for amp*k = 0.2 is 0.015
+"""    
 function find_tstep(kin:: Array{CosDef})
     dtstar = 15
     for i = 1:length(kin)

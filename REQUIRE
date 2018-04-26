@@ -1,6 +1,5 @@
-julia 0.5
+julia 0.6
 Dierckx
 ForwardDiff
-PyPlot
 NLsolve
-IJulia
+

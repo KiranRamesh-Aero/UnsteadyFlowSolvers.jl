@@ -1,60 +1,118 @@
+__precompile__(true)
+
 module UNSflow
 
-using Dierckx
-export Spline1D, derivative, evaluate
+using Dierckx: Spline1D, derivative, evaluate
 
 using ForwardDiff
-export derivative
 
-using PyPlot
-export plot, scatter, figure, xlabel, ylabel, xlim, ylim, xticks, yticks, subplot, axes, legend, markers, axis, savefig
+using NLsolve: nlsolve, not_in_place
 
-using NLsolve
-export nlsolve, not_in_place
+export
+    # kinematics types and funtions
+    MotionDef,
+    KinemPar,
+    KinemDef,
+    EldUpDef,
+    EldUptstartDef,
+    ConstDef,
+    EldRampReturnDef,
+    EldUpIntDef,
+    EldUpInttstartDef,
+    SinDef,
+    CosDef,
 
-using JLD
-export jldopen
+    # 2D low-order solver types
+    TwoDSurf,
+    TwoDVort,
+    TwoDFlowField,
+    KelvinCondition,
+    KelvinKutta,
 
-using HDF5
-export g_create
+    # vortex count control utility
+    delVortDef,
+    delNone,
+    delSpalart,
 
-export camber_calc, update_boundpos, update_kinem, update_indbound,
-update_downwash, update_a0anda1, place_tev, place_lev, update_a2toan,
-mutual_ind, trapz, update_a2a3adot, update_bv, ind_vel, view_vorts,
-wakeroll, lautat, lautat_wakeroll, ldvm, calc_forces, design_solve,
-lesp_design_max, transfer_cm, theodorsen, anim_flow,
-drone_trajectory_problem, simple_LLT, find_tstep, ldvm_E, update_adot,
-ldvm_more, ldvm_E_more, calc_forces_more, calc_forces_E_more, interp,
-QScorrect_lautat, QScorrect_ldvm, QSLLT_lautat, QSLLT_ldvm,
-lautat_wakeroll_more, LLT_ldvm, update_externalvel, write_stamp,
-vortxl, voring, voring_I, get_gridprop, calc_forces_E, mutual_ind_llt,
-forces_harmonic, QSLLT_lautat, QSLLT_lautat2 , ldvm_varU, calc_a03d,
-bendfirstmode, calc_a03dspl, ldvm_klb, QSWeiss_lautat,
-calc_fouriergam, calc_a03dwlev, ldvm_matrix, wake_ind_split,
-control_vort_count, ind_vel_src, update_bv_src
+    # 3D low-order solver types
+    ThreeDSurfSimple,
+    KinemDef3D,
+    ThreeDFieldSimple,
+    
+    # utility functions
+    simpleTrapz,
+    camber_calc,
+    find_tstep,
+    simpleInterp,
+    
+    # 2D low-order solver function
+    update_boundpos,
+    update_kinem,
+    update_indbound,
+    update_downwash,
+    update_a0anda1,
+    place_tev,
+    place_lev,
+    update_a2toan,
+    mutual_ind,
+    update_a2a3adot,
+    update_bv,
+    ind_vel,
+    wakeroll,
+    update_adot,
+    update_externalvel,
+    controlVortCount,
+
+    #2D low-order solver methods
+    lautat,
+    lautatRoll,
+    ldvm,
+    
+    # Postprocessing functions
+    calc_forces,
+    writeStamp
 
 
-export KinemPar, KinemParwFlap, KinemPar2DOF, KinemPar2DFree,
-MotionDef, KinemDef, KinemDefwFlap, EldUpDef, EldUptstartDef,
-ConstDef, TwoDOFPar, TwoDFreePar, TwoDSurf, TwoDSurfLV, TwoDSurfwFlap,
-TwoDSurf_2DOF, TwoDFreeSurf, TwoDVort, TwoDFlowField, KelvinCondition,
-KelvinKutta, EldRampReturnDef, EldUpIntDef, EldUpInttstartDef, SinDef,
-CosDef, TheoDef, TheoDefwFlap, TwoDFlowData, DelVortDef,
-ThreeDSurfSimple, KinemDef3D, ThreeDVort, TwoDLVPanel,
-ThreeDFieldSimple, KelvinConditionLLTldvm, KelvinKuttaLLTldvm,
-ThreeDSurfVRingGrid, ThreeDSurfVRingPanel, ThreeDSurfVR,
-ThreeDFlowFieldVR, ThreeDWakeVRingGrid, TwoDFlowFieldMultSurf,
-KelvinConditionMultSurf, KelvinKuttaMultSurf, KelvinKuttaMultSurfSep,
-KelvinConditionMultSurfSep, ThreeDFieldStrip,
-KelvinConditionLLTldvmSep, KelvinKuttaLLTldvmSep, LinearDef,
-BendingDef, patch, patchweiss, ThreeDSurfWeiss, KelvinConditionWeiss,
-KelvinConditionLLTldvmSepDup, KelvinKuttaQS, VAWTalphaDef, VAWThDef,
-VAWTuDef, TwoDSource, TwoDSurfThick
 
+### source files
 
-include("types.jl")
-include("calculations.jl")
-include("solvers.jl")
-include("postprocess.jl")
+# kinematic types
+include("kinem.jl")
+
+# utility functions
+include("utils.jl")
+
+# vortex count control utility
+include("delVort.jl")
+
+# low-order 2D solvers
+include("lowOrder2D/typedefs.jl")            # type definitions                
+include("lowOrder2D/calcs.jl")               # calculation functions 
+include("lowOrder2D/solvers.jl")             # solver methods
+include("lowOrder2D/postprocess.jl")         # postprocessing functions
+
+# low-order 3D solvers
+include("lowOrder3D/typedefs.jl")            # type definitions
+
+end
+
+module UNSplots
+
+using PyCall
+pygui(:tk)
+
+using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
+xticks, yticks, subplot, legend, axis, savefig, close
+
+export
+    # 2D plotting functions 
+    viewVort2D,
+    viewVortConnect2D,
+
+    # 2D plot output functions
+    makeVortPlots2D
+
+# 2D plotting functions
+include("plots/plots2D.jl")
 
 end

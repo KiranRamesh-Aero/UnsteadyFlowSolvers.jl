@@ -13,7 +13,7 @@ best-of-breed open source C and Fortran libraries for various
 computing algorithms. 
 
 ### Installing Julia and UNSflow
-[Download](http://julialang.org/downloads/) Julia vesion 0.5
+[Download](http://julialang.org/downloads/) the latest stable version of Julia.
 
 Run the application, and at the prompt type, `Pkg.clone("https://github.com/KiranUofG/UNSflow")`
 

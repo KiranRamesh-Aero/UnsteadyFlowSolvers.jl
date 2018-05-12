@@ -18,7 +18,7 @@ using UNSflow
 
 Motion kinematics for the airfoil are to be defined in term of pitch
 (rotation), plunge/heave (vertical translation) and surge (horizontal
-translation). The documentation for type MotionDef will show all available
+translation). The documentation for type `MotionDef` will show all available
 kinematic definitons.
 
 ```
@@ -51,7 +51,7 @@ curfield = TwoDFlowField()
 ```
 
 The simulation time step for typical kinematics can be calculated
-using the find_tstep(kin::MotionDef) function. The total run time is
+using the `find_tstep(kin::MotionDef)` function. The total run time is
 defined using the number of time steps. 
 
 ```
@@ -60,8 +60,8 @@ t_tot = 10.
 nsteps =Int(round(t_tot/dtstar))+1
 ```
 
-writeflag=1 is used to write the simulation details (vortex strengths
-and locations) at a frequency defined using writeInterval. startflag=1
+`writeflag=1` is used to write the simulation details (vortex strengths
+and locations) at a frequency defined using `writeInterval`. startflag=1
 can be used to restart and continue a simulation which is not used here.
 
 ```

@@ -3,6 +3,7 @@
 
 Clears all timestamp directories in the current folder 
 """
+
 function cleanWrite()
     dirvec = readdir()
     dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
@@ -39,6 +40,7 @@ For Eldredge ramp kinematics, time step for K = 0.2 is 0.015
 For Constant kinematics, time step is 0.015
 
 """    
+
 function find_tstep(kin:: CosDef)
     dtstar = 15.
     dt_tmp = 0.015*0.2/(kin.k*kin.amp)

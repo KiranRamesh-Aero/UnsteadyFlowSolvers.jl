@@ -14,7 +14,7 @@ pygui(:tk)
 using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
 xticks, yticks, subplot, legend, axis, savefig, close
 
-using LatexStrings: @L_str
+using LaTeXStrings: @L_str
 
 export
     # kinematics types and funtions
@@ -52,6 +52,7 @@ export
     camber_calc,
     find_tstep,
     simpleInterp,
+    cleanWrite,
 
     # 2D low-order solver function
     update_boundpos,

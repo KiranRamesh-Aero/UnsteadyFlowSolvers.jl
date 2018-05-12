@@ -109,4 +109,14 @@ cleanWrite()
 The time variation plots (of pitch angle and force coefficients) from
 this simulation are shown below.
 
+<img src="forcePlots/pitch.png" width="400"><img src="forcePlots/cl.png" width="400">
+<img src="forcePlots/cd.png" width="400"><img src="forcePlots/cm.png" width="400">
+
 Vortex map plots from this simulation are shown below.
+
+<img src="vortPlots/1.005.png" width="200"><img src="vortPlots/1.995.png" width="200"><img src="vortPlots/3.0.png" width="200"><img src="vortPlots/4.005.png" width="200">
+
+<img src="vortPlots/4.995.png" width="200"><img src="vortPlots/6.0.png" width="200"><img src="vortPlots/7.005.png" width="200"><img src="vortPlots/7.995.png" width="200">
+
+<img src="vortPlots/9.0.png" width="200"><img src="vortPlots/10.005.png" width="200">
+

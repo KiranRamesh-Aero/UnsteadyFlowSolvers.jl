@@ -26,7 +26,7 @@ kinematic definitons.
 ```
 
 Here, we define a constant pitch angle of 5 deg, no plunge, and a
-constant freestream velocity. 
+constant freestream velocity.
 
 ```
 alphadef = ConstDef(5.*pi/180)
@@ -52,7 +52,7 @@ curfield = TwoDFlowField()
 
 The simulation time step for typical kinematics can be calculated
 using the `find_tstep(kin::MotionDef)` function. The total run time is
-defined using the number of time steps. 
+defined using the number of time steps.
 
 ```
 dtstar = find_tstep(alphadef)
@@ -64,7 +64,7 @@ nsteps =Int(round(t_tot/dtstar))+1
 strengths and locations) at a frequency defined using
 `writeInterval`. `startflag=1` can be used to restart and continue a
 simulation which is not used here. Vortex count control can be
-implemented but is not used here, so `delNone()` is provided. 
+implemented but is not used here, so `delNone()` is provided.
 
 ```
 startflag = 0
@@ -106,6 +106,7 @@ makeVortPlots2D()
 cleanWrite()
 ```
 
-The time variation plots from this simulation are shown below. 
+The time variation plots (of pitch angle and force coefficients) from
+this simulation are shown below.
 
-Vortex map plots from this simulation are shown below. 
+Vortex map plots from this simulation are shown below.

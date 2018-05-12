@@ -1,7 +1,7 @@
 """
     cleanWrite()
 
-Clears all timestamp directories in the current folder 
+Clears all timestamp directories in the current folder
 """
 function cleanWrite()
     dirvec = readdir()
@@ -38,7 +38,7 @@ For Eldredge ramp kinematics, time step for K = 0.2 is 0.015
 
 For Constant kinematics, time step is 0.015
 
-"""    
+"""
 function find_tstep(kin:: CosDef)
     dtstar = 15.
     dt_tmp = 0.015*0.2/(kin.k*kin.amp)
@@ -57,7 +57,7 @@ function find_tstep(kin:: EldUpDef)
     dtstar = 1.
     dtstar = minimum([0.015*0.2/kin.K 0.015])
     return dtstar
-end                        
+end
 
 function find_tstep(kin:: EldUptstartDef)
     dtstar = 1.
@@ -128,6 +128,6 @@ function camber_calc(x::Vector,airfoil::String)
     cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1];
     cam[1] = 0;
     cam_spl = Spline1D(x,cam);
-    cam_slope[1:ndiv] = Dierckx.derivative(cam_spl,x);
+    cam_slope[1:ndiv] = derivative(cam_spl,x);
     return cam, cam_slope
 end

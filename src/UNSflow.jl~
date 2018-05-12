@@ -14,8 +14,6 @@ pygui(:tk)
 using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
 xticks, yticks, subplot, legend, axis, savefig, close
 
-using LatexStrings: @L_str
-
 export
     # kinematics types and funtions
     MotionDef,
@@ -46,13 +44,13 @@ export
     ThreeDSurfSimple,
     KinemDef3D,
     ThreeDFieldSimple,
-
+    
     # utility functions
     simpleTrapz,
     camber_calc,
     find_tstep,
     simpleInterp,
-
+    
     # 2D low-order solver function
     update_boundpos,
     update_kinem,
@@ -75,17 +73,16 @@ export
     lautat,
     lautatRoll,
     ldvm,
-
+    
     # Postprocessing functions
     calc_forces,
     writeStamp,
-
-    # 2D plotting functions
+    
+    # 2D plotting functions    		
     viewVort2D,
     viewVortConnect2D,
 
-    # 2D plot output functions
-    makeForcePlots,
+    # 2D plot output functions                                                
     makeVortPlots2D
 
 
@@ -101,13 +98,15 @@ include("utils.jl")
 include("delVort.jl")
 
 # low-order 2D solvers
-include("lowOrder2D/typedefs.jl")            # type definitions
-include("lowOrder2D/calcs.jl")               # calculation functions
+include("lowOrder2D/typedefs.jl")            # type definitions                
+include("lowOrder2D/calcs.jl")               # calculation functions 
 include("lowOrder2D/solvers.jl")             # solver methods
 include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
 # low-order 3D solvers
 include("lowOrder3D/typedefs.jl")            # type definitions
+
+end
 
 # 2D plotting functions
 include("plots/plots2D.jl")

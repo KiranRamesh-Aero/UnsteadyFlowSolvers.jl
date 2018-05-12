@@ -36,4 +36,6 @@ mat, surf, curfield = lautatRoll(surf, curfield, nsteps, dtstar,startflag, write
 
 makeVortPlots2D()
 
-#makeForcePlots2D()
+makeForcePlots()
+
+cleanWrite()

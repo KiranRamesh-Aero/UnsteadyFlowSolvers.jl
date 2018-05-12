@@ -60,43 +60,52 @@ t_tot = 10.
 nsteps =Int(round(t_tot/dtstar))+1
 ```
 
-`writeflag=1` is used to write the simulation details (vortex strengths
-and locations) at a frequency defined using `writeInterval`. startflag=1
-can be used to restart and continue a simulation which is not used here.
+`writeflag=1` is used to write the simulation details (vortex
+strengths and locations) at a frequency defined using
+`writeInterval`. `startflag=1` can be used to restart and continue a
+simulation which is not used here. Vortex count control can be
+implemented but is not used here, so `delNone()` is provided. 
 
 ```
 startflag = 0
 writeflag = 1
 writeInterval = t_tot/10.
 delvort = delNone()
-
 ```
 
-```
-?lautat
-```
+Finally, the input parameters are provided to the unsteady solver
+function `lautatRoll`. This solver provides an unsteady, time-accurate
+potential flow solution is found using the Large-Angle Unsteady Thin
+Airfoil Theory, with free wake rollup implemented. The theory is
+described in Ramesh, K. et al., "An unsteady airfoil theory applied to
+pitching motions validated against experiment and computation",
+Theor. Comput. Fluid Dyn. (2013) 27:
+843. [Weblink](https://doi.org/10.1007/s00162-012-0292-8)
 
-to see all solver options.
-
-Documentation for all custom types seen in simRun.jl can be accessed
-the same way.
-
-```
-include("simRun.jl")
-```
-
-to define the simulation paramters and run.
-
-```
-include("postRun.jl")
-```
-
-to create vorticity maps from output timestamp directories. writeflag
-must be set to 1 in simRun.jl for this. PyPlot libraries will need to
-be configured correctly on your system. 
+`lautatRoll` returns a matrix containing time variation of simulation
+variables, and the final surface and flowfield data structures at the
+end of the simulation. The time variation of simulation variables is
+also written as a file to the current directory, *resultsSummary*.
 
 ```
+mat, surf, curfield = lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+```
+
+`makeForcePlots2D()` can be used to create plots of the time variation
+of force coefficients during the simulation; they are written to a
+directory *forcePlots*. `makeVortPlots2D()` can be used to create
+vorticity maps from output timestamp directories (written to
+*vortPlots*). This can be used only if `writeflag=1` was used and data
+directories exist in the current directory. PyPlot libraries will need
+to be configured correctly on your system. `cleanWrite()` clear all
+timestamp directories from the current directory.
+
+```
+makeForcePlots2D()
+makeVortPlots2D()
 cleanWrite()
 ```
 
-to clear all timestamp directories
+The time variation plots from this simulation are shown below. 
+
+Vortex map plots from this simulation are shown below. 

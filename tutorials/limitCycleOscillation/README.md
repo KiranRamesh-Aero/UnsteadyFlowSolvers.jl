@@ -1,5 +1,9 @@
-This tutorial simulates using potential flow theory an airfoil in
-constant freestream at a constant angle of attack and undergoing sinusoidal plunge.
+This tutorial simulates an aeroelastic system - an airfoil constrained by rotational 
+and translational springs, and subject to constant freestream. The aerodynamic solution 
+is obtained with unsteady potential flow theory augmented with leading-edge vortex shedding. 
+The theory is described in Ramesh, K. et al., "Limit-cycle oscillations in unsteady flows 
+dominated by intermittent leading-edge vortex shedding", J. Fluids and Structures
+(2015) 55: 84-105. [Weblink](https://doi.org/10.1016/j.jfluidstructs.2015.02.005)
 
 Refer to the *steadyAirfoil* for general guideline in setting up the kinematics, 
 surface and solver definitons. 
@@ -11,73 +15,76 @@ current directory,
 include("simRun.jl")
 ```
 
-Here, we define a constant pitch angle of 4 deg, sinusoidal plunge, and a
-constant freestream velocity. The `SinDef(mean, amp, k, phi)` takes arguments mean 
-value of plunge displacement, amplitude of oscillation, reduced frequency and phase 
-angle in radians. The reduced frequency is defined as $k=\omega*c/(2*u)$ where $\omega$ 
-is frequency in rad/s, $c$ is chord length and $u$ is freestream velocity.
+The initial conditions for airfoil position and velocity, and the freestream velocity are
+provided to define the kinematics. 
 
 ```
 push!(LOAD_PATH,"../../src/")
 using UNSflow
 
-alphadef = ConstDef(4.*pi/180)
-hdef = SinDef(0., 0.05, 3.93, 0.)
-udef = ConstDef(1.)
-full_kinem = KinemDef(alphadef, hdef, udef)
+alpha_init = 10*pi/180
+alphadot_init = 0.
+h_init = 0.
+hdot_init = 0.
+u = 0.467
+udot = 0
+kinem = KinemPar2DOF(alpha_init, h_init, alphadot_init, hdot_init, u)
 ```
 
-An SD7003 airfoil is defined with the coordinate file provided in working directory. 
+Structural parameters for the aeroelastic system are provided. 
 
 ```
-pvt = 0.25
-geometry = "sd7003.dat"
-surf = TwoDSurf(geometry, pvt, full_kinem)
+x_alpha = 0.05
+r_alpha = 0.5
+kappa = 0.05
+w_alpha = 1.
+w_h = 1.
+w_alphadot = 0.
+w_hdot = 0.
+cubic_h_1 = 1.
+cubic_h_3 = 0.
+cubic_alpha_1 = 1.
+cubic_alpha_3 = 0.
+strpar = TwoDOFPar(x_alpha, r_alpha, kappa, w_alpha, w_h, w_alphadot, w_hdot, cubic_h_1, cubic_h_3, cubic_alpha_1, cubic_alpha_3)
+```
+
+A flat plate airfoil is defined. 
+
+```
+pvt = 0.35
+geometry = "FlatPlate"
+lespcrit = [0.11;]
+c = 1.0
+surf = TwoDSurf2DOF(c, u, geometry, pvt, strpar, kinem, lespcrit)
 curfield = TwoDFlowField()
 ```
 
-The `find_tstep` function is used with `hdef` as the input since the 
-oscillation determines the time step of the problem. The total run time
-is calculated as 5 cycles of oscillation. 
+The aim is to run for long time until a steady condition is reached. So `nsteps` 
+is set to a large value. 
 
 ```
-dtstar = find_tstep(hdef)
-t_tot = 5.*pi/hdef.k
-nsteps =Int(round(t_tot/dtstar))+1
+dtstar = 0.015
+nsteps = 50000
 ```
 
-`writeInterval` is set so that 20 time instants are written 
-for creating the vorticity plots. 
+`writeflag` is set off. Vortex count control through merging is implemented using 
+Spalart's algortihm.  
 
 ```
 startflag = 0
-writeflag = 1
-writeInterval = t_tot/20.
-delvort = delNone()
+writeflag = 0
+delvort = delSpalart(500, 12, 1e-5)
 
-mat, surf, curfield = lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = ldvm(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
 makeForcePlots2D()
-makeVortPlots2D()
-cleanWrite()
 ```
 
-The time variation plots (of pitch angle and force coefficients) from
-this simulation are shown below.
+The time variation plots of pitch angle and plunge displacement for the self-sustained 
+oscillation of the airfoil are shown below. 
 
-<img src="forcePlots/plunge.png" width="400"><img src="forcePlots/cl.png" width="400">
-<img src="forcePlots/cd.png" width="400"><img src="forcePlots/cm.png" width="400">
+<img src="forcePlots/pitch.png" width="400"><img src="forcePlots/plunge.png" width="400">
 
-Vortex map plots from this simulation are shown below.
 
-<img src="vortPlots/0.198473.png" width="200"><img src="vortPlots/0.396947.png" width="200"><img src="vortPlots/0.59542.png" width="200"><img src="vortPlots/0.793893.png" width="200">
-
-<img src="vortPlots/0.992366.png" width="200"><img src="vortPlots/1.206107.png" width="200"><img src="vortPlots/1.40458.png" width="200"><img src="vortPlots/1.603053.png" width="200">
-
-<img src="vortPlots/1.801527.png" width="200"><img src="vortPlots/2.0.png" width="200"><img src="vortPlots/2.198473.png" width="200"><img src="vortPlots/2.396947.png" width="200">
-
-<img src="vortPlots/2.59542.png" width="200"><img src="vortPlots/2.793893.png" width="200"><img src="vortPlots/2.992366.png" width="200"><img src="vortPlots/3.19084.png" width="200">
-
-<img src="vortPlots/3.40458.png" width="200"><img src="vortPlots/3.603053.png" width="200"><img src="vortPlots/3.801527.png" width="200"><img src="vortPlots/4.0.png" width="200">
 
 

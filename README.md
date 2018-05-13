@@ -19,7 +19,8 @@ Run the application, and at the prompt type, `Pkg.clone("https://github.com/Kira
 This will install UNSflow and the packages it depends on.
 
 ### Getting started
-Refer to the tutorials provided. 
+The tutorials provide some sample simulations that can be performed with the code. To run 
+your own case, copy a tutorial directory and modify the input file "simRun.jl" as necessary.  
 
 
 

@@ -1,4 +1,17 @@
-function blLagrangian(m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, write_x=0, write_u=0, write_xy=0, write_norm=0, write_vort=0, write_shear=0)
+function blLagrangian(tTot = 1.0, m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, writflag = 1, writeInterval = 0.5)
+
+    # if writeflag is on, determine the timesteps to write at
+    if writeflag == 1
+        writeArray = Int64[]
+        for i = 1:maxwrite
+            tcur = writeInterval*real(i)
+            if t > tTot
+                break
+            else
+                push!(writeArray, Int(round(tcur/dtstar)))
+            end
+        end
+    end
 
     #Define domain in eta and eps
     del_eps = pi/m
@@ -6,15 +19,8 @@ function blLagrangian(m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, write_x=0
     eps = linspace(0., pi, m+1)
     eta = linspace(0, 1., n+1)
 
-    x = zeros(m+1, n+1)
-    u = zeros(m+1, n+1)
-    util = zeros(m+1, n+1)
-    x_prev = zeros(m+1, n+1)
-    u_prev = zeros(m+1, n+1)
-    u_previter = zeros(m+1, n+1)
-    newt = zeros(m+1, n+1)
-    z = zeros(n+1)
-    gam = zeros(n+1)
+    x = u = util = x_prev = u_prev = u_previter = newt = zeros(m+1, n+1)
+    z = gam = zeros(n+1)
 
     #Assign initial conditions
     del_t = 0.001
@@ -35,12 +41,7 @@ function blLagrangian(m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, write_x=0
 
     tim = 0.
 
-    p = zeros(m+1, n+1)
-    q = zeros(m+1, n+1)
-    r = zeros(m+1, n+1)
-    s = zeros(m+1, n+1)
-    t = zeros(m+1, n+1)
-    d = zeros(m+1, n+1)
+    p = q = r = s = t = d = zeros(m+1, n+1)
 
     #Start time loop
     for tt = 1:100#3200
@@ -94,5 +95,37 @@ function blLagrangian(m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, write_x=0
             iter_res =  maximum(newt)
         end
 
+        #Write flow details if required
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(tim,nround))"
+
+                norm = vort = y = zeros(m,n)
+                tau = zeros(m)
+
+                y = calc_y(x, eps, eta, del_eps, del_eta, del_t, m, n)
+                tau = calc_shear(u, del_eta, m)
+                norm, minnorm = calc_minnorm(c, del_eps, del_eta, m, n)
+                println(tim, minnorm)
+                vort = calc_vort(x, u, del_eps, del_eta, m, n)
+
+                writeStampBl(dirname, x, u, y, tau, norm, vort)
+            else
+                _,minnorm = calc_minnorm(c, del_eps, del_eta, m, n)
+                println(tim, minnorm)
+            end
+        end
+
+        #Check for separation (both gradients equal zero)
+        for i = 2:m
+            for j = 2:n
+                del_x_eps=0.5*(x[i+1,j] - x[i-1,j])/del_eps
+                del_x_eta=0.5*(x[i,j+1] - x[i,j-1])/del_eta
+                if del_x_eps<tol && del_x_eta<tol
+                    println("singularity (separation) detected. time = $tim, i=$i, j=$j, eps=$(eps[i]), eta=$(eta[j]), x=$(x[i,j])")
+                    break
+                end
+            end
+        end
     end
 end

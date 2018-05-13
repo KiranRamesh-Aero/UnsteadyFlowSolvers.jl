@@ -1,0 +1,65 @@
+function thomas_alg(a, b, c, d, n)
+
+    a = zeros(n)
+    b = zeros(n)
+    c = zeros(n)
+    d = zeros(n)
+    x = zeros(n)
+    cc = zeros(n)
+    bb = zeros(n)
+    dd = zeros(n)
+
+    #Forward sweep                                                                                                                                              
+    bb[1] = b[1]
+    dd[1] = d[1]
+    cc[1:n] = c[1:n]
+
+    for i = 2:n
+    bb[i] = b[i] - cc(i-1)*a[i]/bb(i-1)
+    end
+
+    for i = 2:n
+        dd[i] = d[i] - dd(i-1)*a[i]/bb(i-1)
+    end
+
+    x[n] = dd[n]/bb[n]
+    for i = n-1:-1:1
+    x[i] = (dd[i]-cc[i]*x(i+1))/bb[i]
+    end
+    return x
+end
+
+function tridiag(a,b,c,r,n)
+    nmax = 500
+
+    u = zeros(n)
+
+    #Solves for a vector u(1:n) of length n the tridiagonal linear set given by equation (2.4.1) in numerical recipes.                                          
+    #a(1:n), b(1:n), c(1:n), and r(1:n) are input vectors and are not modified.                                                                                 
+    #Parameter: NMAX is the maximum expected value of n.                                                                                                        
+
+    gam = zeros(nmax)
+
+    if b[1] == 0.
+        println("rewrite equations")
+        #If this happens then you should rewrite your equations as a set of order N, with u2 trivially eliminated.                                              
+    end
+    bet = b[1]
+    u[1] = r[1]/bet
+    #Decomposition and forward substitution.                                                                                                                    
+    for j = 2:n
+        gam[j] = c[j-1]/bet
+        bet = b[j] - a[j]*gam[j]
+        if bet == 0.
+            println("tridag failed'")
+        end
+        u[j] = (r[j] - a[j]*u[j-1])/bet
+    end
+#Backsubstitution                                                                                                                                           
+    for j = n-1:-1:1
+        u[j] = u[j] - gam[j+1]*u[j+1]
+    end
+    return u
+
+end
+

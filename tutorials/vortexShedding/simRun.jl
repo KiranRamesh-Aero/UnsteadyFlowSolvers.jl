@@ -9,7 +9,7 @@ udef = ConstDef(1.)
 
 full_kinem = KinemDef(alphadef, hdef, udef)
 
-pvt = 0.25
+pvt = 0.0
 
 geometry = "FlatPlate"
 

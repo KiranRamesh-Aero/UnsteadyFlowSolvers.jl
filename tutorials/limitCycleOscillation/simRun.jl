@@ -38,15 +38,11 @@ nsteps = 50000
 
 startflag = 0
 
-writeflag = 1
-
-writeInterval = nsteps*dtstar/20.
+writeflag = 0
 
 delvort = delSpalart(500, 12, 1e-5)
 
 mat, surf, curfield = ldvm(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
-
-makeVortPlots2D()
 
 makeForcePlots()
 

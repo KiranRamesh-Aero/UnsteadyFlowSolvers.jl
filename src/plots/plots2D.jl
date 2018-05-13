@@ -81,7 +81,7 @@ function makeForcePlots()
     xmin = t[1]
     xmax = t[end]
     zmin = minimum(alpha) - 0.1*abs(minimum(alpha))
-    zmax = maximum(alpha) + 0.1*abs(minimum(alpha))
+    zmax = maximum(alpha) + 0.1*abs(maximum(alpha))
     axis([xmin, xmax, zmin, zmax])
     xlabel(L"$t^*$")
     ylabel(L"$\alpha$ (deg)")
@@ -92,7 +92,7 @@ function makeForcePlots()
     xmin = t[1]
     xmax = t[end]
     zmin = minimum(h) - 0.1*abs(minimum(h))
-    zmax = maximum(h) + 0.1*abs(minimum(h))
+    zmax = maximum(h) + 0.1*abs(maximum(h))
     axis([xmin, xmax, zmin, zmax])
     xlabel(L"$t^*$")
     ylabel(L"$h/c$")
@@ -104,7 +104,7 @@ function makeForcePlots()
     xmin = t[1]
     xmax = t[end]
     zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
-    zmax = maximum(cl[range]) + 0.1*abs(minimum(cl[range]))
+    zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
     axis([xmin, xmax, zmin, zmax])
     xlabel(L"$t^*$")
     ylabel(L"$C_l$")
@@ -116,7 +116,7 @@ function makeForcePlots()
     xmin = t[1]
     xmax = t[end]
     zmin = minimum(cd[range]) - 0.1*abs(minimum(cd[range]))
-    zmax = maximum(cd[range]) + 0.1*abs(minimum(cd[range]))
+    zmax = maximum(cd[range]) + 0.1*abs(maximum(cd[range]))
     axis([xmin, xmax, zmin, zmax])
     xlabel(L"$t^*$")
     ylabel(L"$C_d$")
@@ -128,7 +128,7 @@ function makeForcePlots()
     xmin = t[1]
     xmax = t[end]
     zmin = minimum(cm[range]) - 0.1*abs(minimum(cm[range]))
-    zmax = maximum(cm[range]) + 0.1*abs(minimum(cm[range]))
+    zmax = maximum(cm[range]) + 0.1*abs(maximum(cm[range]))
     axis([xmin, xmax, zmin, zmax])
     xlabel(L"$t^*$")
     ylabel(L"$C_m$")

@@ -1,3 +1,0 @@
-function blLagrangian(m=200, n=60, tol=1e-6, write_freq=20, dels=1e-3, write_x=0, write_u=0, write_xy=0, write_norm=0, write_vort=0, write_shear=0)
-
-

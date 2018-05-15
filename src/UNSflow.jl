@@ -32,6 +32,7 @@ export
 
     # 2D low-order solver types
     TwoDSurf,
+    TwoDSurfThick,
     TwoDOFPar,
     KinemPar2DOF,
     TwoDSurf2DOF,
@@ -77,6 +78,7 @@ export
     update_externalvel,
     controlVortCount,
     update_kinem,
+    calc_initkinem,
 
     #2D low-order solver methods
     lautat,

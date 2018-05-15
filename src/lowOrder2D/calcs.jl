@@ -45,6 +45,16 @@ function update_indbound(surf::TwoDSurf, curfield::TwoDFlowField)
     return surf
 end
 
+function update_indbound(surf::TwoDSurfThick, curfield::TwoDFlowField)
+    surf.uind_u[1:surf.ndiv], surf.wind_u[1:surf.ndiv] = ind_vel([curfield.tev;
+    curfield.lev; curfield.extv], surf.bnd_x_u, surf.bnd_z_u)
+
+    surf.uind_l[1:surf.ndiv], surf.wind_l[1:surf.ndiv] = ind_vel([curfield.tev;
+    curfield.lev; curfield.extv], surf.bnd_x_l, surf.bnd_z_l)
+
+    return surf
+end
+
 function update_indbound(surf::TwoDSurf2DOF, curfield::TwoDFlowField)
     surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev; curfield.extv], surf.bnd_x, surf.bnd_z)
     return surf
@@ -150,8 +160,8 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == EldUpIntDef)
-            surf.kinem.h = surf.kindef.h(t)*surf.c
-            surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == EldUpInttstartDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
@@ -162,15 +172,15 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = 0.
     elseif (typeof(surf.kindef.h) == SinDef)
-      surf.kinem.h = surf.kindef.h(t)*surf.c
-      surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == CosDef)
-      surf.kinem.h = surf.kindef.h(t)*surf.c
-      surf.kinem.hdot =  ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot =  ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == VAWThDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
-        end
+    end
     # ---------------------------------------------------------------------------------------------
 
     # Forward velocity
@@ -187,7 +197,110 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.h) == VAWThDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
-        end
+    end
+    # ---------------------------------------------------------------------------------------------
+
+    # Forward velocity
+    if (typeof(surf.kindef.u) == EldUpDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == ConstDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = 0.
+    elseif (typeof(surf.kindef.u) == SinDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == CosDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == LinearDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == VAWTuDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    end
+    # ---------------------------------------------------------------------------------------------
+    return surf
+end
+
+function update_kinem(surf::TwoDSurfThick, t)
+
+    # Pitch kinematics
+    if (typeof(surf.kindef.alpha) == EldUpDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldUptstartDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldRampReturnDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == ConstDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = 0.
+    elseif (typeof(surf.kindef.alpha) == SinDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == CosDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == VAWTalphaDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    end
+    # ---------------------------------------------------------------------------------------------
+
+    # Plunge kinematics
+    if (typeof(surf.kindef.h) == EldUpDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldUptstartDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldUpIntDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldUpInttstartDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldRampReturnDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == ConstDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = 0.
+    elseif (typeof(surf.kindef.h) == SinDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == CosDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot =  ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == VAWThDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    end
+    # ---------------------------------------------------------------------------------------------
+
+    # Forward velocity
+    if (typeof(surf.kindef.u) == EldUpDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == ConstDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = 0.
+    elseif (typeof(surf.kindef.h) == VAWThDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    end
     # ---------------------------------------------------------------------------------------------
 
     # Forward velocity
@@ -310,7 +423,7 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
         curfield.tev[i].z += dt*curfield.tev[i].vz
     end
     for i = 1:nlev
-            curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].x += dt*curfield.lev[i].vx
         curfield.lev[i].z += dt*curfield.lev[i].vz
     end
     for i = 1:nextv
@@ -370,7 +483,7 @@ function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
         curfield.tev[i].z += dt*curfield.tev[i].vz
     end
     for i = 1:nlev
-            curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].x += dt*curfield.lev[i].vx
         curfield.lev[i].z += dt*curfield.lev[i].vz
     end
     for i = 1:nextv
@@ -387,7 +500,7 @@ function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     if ntev == 0
         xloc = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
         zloc = surf.bnd_z[surf.ndiv]
-        else
+    else
         xloc = surf.bnd_x[surf.ndiv]+(1./3.)*(field.tev[ntev].x - surf.bnd_x[surf.ndiv])
 
         zloc = surf.bnd_z[surf.ndiv]+(1./3.)*(field.tev[ntev].z - surf.bnd_z[surf.ndiv])
@@ -401,7 +514,7 @@ function place_tev(surf::TwoDSurf2DOF,field::TwoDFlowField,dt)
     if ntev == 0
         xloc = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
         zloc = surf.bnd_z[surf.ndiv]
-        else
+    else
         xloc = surf.bnd_x[surf.ndiv]+(1./3.)*(field.tev[ntev].x - surf.bnd_x[surf.ndiv])
 
         zloc = surf.bnd_z[surf.ndiv]+(1./3.)*(field.tev[ntev].z - surf.bnd_z[surf.ndiv])
@@ -458,6 +571,33 @@ function update_boundpos(surf::TwoDSurf, dt::Float64)
     return surf
 end
 
+function update_boundpos(surf::TwoDSurfThick, dt::Float64)
+    for i = 1:surf.ndiv
+        surf.bnd_x_u[i] = surf.bnd_x_u[i] + dt*((surf.pvt*surf.c - surf.x[i])*
+        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i]
+        + surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+
+        surf.bnd_z_u[i] = surf.bnd_z_u[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c
+        - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] +
+        surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
+
+        surf.bnd_x_l[i] = surf.bnd_x_l[i] + dt*((surf.pvt*surf.c - surf.x[i])*
+        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i]
+        - surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+
+        surf.bnd_z_l[i] = surf.bnd_z_l[i] + dt*(surf.kinem.hdot + (surf.pvt*
+        surf.c - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i]
+        - surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
+
+        surf.bnd_x_chord[i] = surf.bnd_x_chord[i] + dt*((surf.pvt*surf.c - surf.x[i])*
+        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u)
+        surf.bnd_z_chord[i] = surf.bnd_z_chord[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c
+        - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+    end
+
+    return surf
+end
+
 function update_boundpos(surf::TwoDSurf2DOF, dt::Float64)
     for i = 1:surf.ndiv
         surf.bnd_x[i] = surf.bnd_x[i] + dt*((surf.pvt*surf.c - surf.x[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + surf.cam[i]*cos(surf.kinem.alpha)*surf.kinem.alphadot)
@@ -507,213 +647,326 @@ function mutual_ind(vorts::Vector{TwoDVort})
 end
 
 """
-    controlVortCount(delvort, surf, curfield)
+controlVortCount(delvort, surf, curfield)
 
 Performs merging or deletion operation on free vortices in order to
 control computational cost according to algorithm specified.
 
 Algorithms for parameter delvort
 
- - delNone
+    - delNone
 
     Does nothing, no vortex count control.
 
- - delSpalart(limit=500, dist=10, tol=1e-6)
+    - delSpalart(limit=500, dist=10, tol=1e-6)
 
     Merges vortices according to algorithm given in Spalart,
     P. R. (1988). Vortex methods for separated flows.
 
-     - limit: min number of vortices present for merging to occur
+    - limit: min number of vortices present for merging to occur
 
-     - dist: small values encourage mergin near airfoil, large values in
-         wake (see paper)
+    - dist: small values encourage mergin near airfoil, large values in
+    wake (see paper)
 
-     - tol: tolerance for merging, merging is less likely to occur for low
-        values (see paper)
+    - tol: tolerance for merging, merging is less likely to occur for low
+    values (see paper)
 
-There is no universal set of parameters that work for all problem. If
-using vortex control, test and calibrate choice of parameters
+    There is no universal set of parameters that work for all problem. If
+        using vortex control, test and calibrate choice of parameters
 
-"""
-function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: TwoDFlowField)
+        """
+        function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: TwoDFlowField)
 
-    if typeof(delvort) == delNone
+            if typeof(delvort) == delNone
 
-    elseif typeof(delvort) == delSpalart
-        D0 = delvort.dist*surf.c
-        V0 = delvort.tol
-        if length(curfield.tev) > delvort.limit
-            #Check possibility of merging the last vortex with the closest 20 vortices
-            gamma_j = curfield.tev[1].s
-            d_j = sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-            z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
+            elseif typeof(delvort) == delSpalart
+                D0 = delvort.dist*surf.c
+                V0 = delvort.tol
+                if length(curfield.tev) > delvort.limit
+                    #Check possibility of merging the last vortex with the closest 20 vortices
+                    gamma_j = curfield.tev[1].s
+                    d_j = sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                    z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
 
 
-            for i = 2:20
-                gamma_k = curfield.tev[i].s
-                d_k = sqrt((curfield.tev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
+                    for i = 2:20
+                        gamma_k = curfield.tev[i].s
+                        d_k = sqrt((curfield.tev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                        z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
 
-                fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
+                        fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
 
-                if fact < V0
-                    #Merge the 2 vortices into the one at k
-                    curfield.tev[i].x = (abs(gamma_j)*curfield.tev[1].x + abs(gamma_k)*curfield.tev[i].x)/(abs(gamma_j + gamma_k))
-                    curfield.tev[i].z = (abs(gamma_j)*curfield.tev[1].z + abs(gamma_k)*curfield.tev[i].z)/(abs(gamma_j + gamma_k))
-                    curfield.tev[i].s += curfield.tev[1].s
+                        if fact < V0
+                            #Merge the 2 vortices into the one at k
+                            curfield.tev[i].x = (abs(gamma_j)*curfield.tev[1].x + abs(gamma_k)*curfield.tev[i].x)/(abs(gamma_j + gamma_k))
+                            curfield.tev[i].z = (abs(gamma_j)*curfield.tev[1].z + abs(gamma_k)*curfield.tev[i].z)/(abs(gamma_j + gamma_k))
+                            curfield.tev[i].s += curfield.tev[1].s
 
-                    for j = 1:length(curfield.tev)-1
-                        curfield.tev[j] = curfield.tev[j+1]
+                            for j = 1:length(curfield.tev)-1
+                                curfield.tev[j] = curfield.tev[j+1]
+                            end
+
+                            pop!(curfield.tev)
+
+                            break
+                        end
                     end
 
-                    pop!(curfield.tev)
+                    if length(curfield.lev) > delvort.limit
+                        #Check possibility of merging the last vortex with the closest 20 vortices
 
-                    break
-                end
-            end
+                        gamma_j = curfield.lev[1].s
+                        d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                        z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
 
-            if length(curfield.lev) > delvort.limit
-                #Check possibility of merging the last vortex with the closest 20 vortices
+                        for i = 2:20
+                            gamma_k = curfield.lev[i].s
+                            d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                            z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
 
-                gamma_j = curfield.lev[1].s
-                d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
+                            fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
 
-                for i = 2:20
-                    gamma_k = curfield.lev[i].s
-                    d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                    z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
+                            if fact < V0
+                                #Merge the 2 vortices into the one at k
+                                curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j + gamma_k))
+                                curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j + gamma_k))
+                                curfield.lev[i].s += curfield.lev[1].s
 
-                    fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
+                                for j = 1:length(curfield.lev)-1
+                                    curfield.lev[j] = curfield.lev[j+1]
+                                end
 
-                    if fact < V0
-                        #Merge the 2 vortices into the one at k
-                         curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j + gamma_k))
-                        curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j + gamma_k))
-                        curfield.lev[i].s += curfield.lev[1].s
+                                pop!(curfield.lev)
 
-                        for j = 1:length(curfield.lev)-1
-                            curfield.lev[j] = curfield.lev[j+1]
+                                break
+                            end
                         end
-
-                        pop!(curfield.lev)
-
-                        break
                     end
                 end
             end
         end
-    end
-end
 
-function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf2DOF, curfield :: TwoDFlowField)
+        function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf2DOF, curfield :: TwoDFlowField)
 
-    if typeof(delvort) == delNone
+            if typeof(delvort) == delNone
 
-    elseif typeof(delvort) == delSpalart
-        D0 = delvort.dist*surf.c
-        V0 = delvort.tol
-        if length(curfield.tev) > delvort.limit
-            #Check possibility of merging the last vortex with the closest 20 vortices
-            gamma_j = curfield.tev[1].s
-            d_j = sqrt((curfield.tev[1].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z - surf.bnd_z[div(surf.ndiv,2)])^2)
-            z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
+            elseif typeof(delvort) == delSpalart
+                D0 = delvort.dist*surf.c
+                V0 = delvort.tol
+                if length(curfield.tev) > delvort.limit
+                    #Check possibility of merging the last vortex with the closest 20 vortices
+                    gamma_j = curfield.tev[1].s
+                    d_j = sqrt((curfield.tev[1].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z - surf.bnd_z[div(surf.ndiv,2)])^2)
+                    z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
 
-            for i = 2:20
-                gamma_k = curfield.tev[i].s
-                d_k = sqrt((curfield.tev[i].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z - surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
+                    for i = 2:20
+                        gamma_k = curfield.tev[i].s
+                        d_k = sqrt((curfield.tev[i].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z - surf.bnd_z[div(surf.ndiv,2)])^2)
+                        z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
 
-                fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
+                        fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
 
-                if fact < V0
-                    #Merge the 2 vortices into the one at k
-                    curfield.tev[i].x = (abs(gamma_j)*curfield.tev[1].x + abs(gamma_k)*curfield.tev[i].x)/(abs(gamma_j) + abs(gamma_k))
-                    curfield.tev[i].z = (abs(gamma_j)*curfield.tev[1].z + abs(gamma_k)*curfield.tev[i].z)/(abs(gamma_j) + abs(gamma_k))
-                    curfield.tev[i].s += curfield.tev[1].s
+                        if fact < V0
+                            #Merge the 2 vortices into the one at k
+                            curfield.tev[i].x = (abs(gamma_j)*curfield.tev[1].x + abs(gamma_k)*curfield.tev[i].x)/(abs(gamma_j) + abs(gamma_k))
+                            curfield.tev[i].z = (abs(gamma_j)*curfield.tev[1].z + abs(gamma_k)*curfield.tev[i].z)/(abs(gamma_j) + abs(gamma_k))
+                            curfield.tev[i].s += curfield.tev[1].s
 
-                    for j = 1:length(curfield.tev)-1
-                        curfield.tev[j] = curfield.tev[j+1]
+                            for j = 1:length(curfield.tev)-1
+                                curfield.tev[j] = curfield.tev[j+1]
+                            end
+
+                            pop!(curfield.tev)
+
+                            break
+                        end
                     end
 
-                    pop!(curfield.tev)
+                    if length(curfield.lev) > delvort.limit
+                        #Check possibility of merging the last vortex with the closest 20 vortices
 
-                    break
-                end
-            end
+                        gamma_j = curfield.lev[1].s
+                        d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                        z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
 
-            if length(curfield.lev) > delvort.limit
-                #Check possibility of merging the last vortex with the closest 20 vortices
+                        for i = 2:20
+                            gamma_k = curfield.lev[i].s
+                            d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                            z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
 
-                gamma_j = curfield.lev[1].s
-                d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
+                            fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
 
-                for i = 2:20
-                    gamma_k = curfield.lev[i].s
-                    d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                    z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
+                            if fact < V0
+                                #Merge the 2 vortices into the one at k
+                                curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j) + abs(gamma_k))
+                                curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j) + abs(gamma_k))
+                                curfield.lev[i].s += curfield.lev[1].s
 
-                    fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
+                                for j = 1:length(curfield.lev)-1
+                                    curfield.lev[j] = curfield.lev[j+1]
+                                end
 
-                    if fact < V0
-                        #Merge the 2 vortices into the one at k
-                         curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j) + abs(gamma_k))
-                        curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j) + abs(gamma_k))
-                        curfield.lev[i].s += curfield.lev[1].s
+                                pop!(curfield.lev)
 
-                        for j = 1:length(curfield.lev)-1
-                            curfield.lev[j] = curfield.lev[j+1]
+                                break
+                            end
                         end
-
-                        pop!(curfield.lev)
-
-                        break
                     end
                 end
             end
         end
-    end
-end
 
-function update_kinem(surf::TwoDSurf2DOF, dt, cl, cm)
-    #Update previous terms
-    surf.kinem.alpha_pr = surf.kinem.alpha
-    surf.kinem.h_pr = surf.kinem.h
+        function update_kinem(surf::TwoDSurf2DOF, dt, cl, cm)
+            #Update previous terms
+            surf.kinem.alpha_pr = surf.kinem.alpha
+            surf.kinem.h_pr = surf.kinem.h
 
-    surf.kinem.alphadot_pr3 = surf.kinem.alphadot_pr2
-    surf.kinem.alphadot_pr2 = surf.kinem.alphadot_pr
-    surf.kinem.alphadot_pr = surf.kinem.alphadot
+            surf.kinem.alphadot_pr3 = surf.kinem.alphadot_pr2
+            surf.kinem.alphadot_pr2 = surf.kinem.alphadot_pr
+            surf.kinem.alphadot_pr = surf.kinem.alphadot
 
-    surf.kinem.hdot_pr3 = surf.kinem.hdot_pr2
-    surf.kinem.hdot_pr2 = surf.kinem.hdot_pr
-    surf.kinem.hdot_pr = surf.kinem.hdot
+            surf.kinem.hdot_pr3 = surf.kinem.hdot_pr2
+            surf.kinem.hdot_pr2 = surf.kinem.hdot_pr
+            surf.kinem.hdot_pr = surf.kinem.hdot
 
-    surf.kinem.alphaddot_pr3 = surf.kinem.alphaddot_pr2
-    surf.kinem.alphaddot_pr2 = surf.kinem.alphaddot_pr
+            surf.kinem.alphaddot_pr3 = surf.kinem.alphaddot_pr2
+            surf.kinem.alphaddot_pr2 = surf.kinem.alphaddot_pr
 
-    surf.kinem.hddot_pr3 = surf.kinem.hddot_pr2
-    surf.kinem.hddot_pr2 = surf.kinem.hddot_pr
+            surf.kinem.hddot_pr3 = surf.kinem.hddot_pr2
+            surf.kinem.hddot_pr2 = surf.kinem.hddot_pr
 
-    # Calculate hddot and alphaddot from forces based on 2DOF structural system
-    m11 = 2./surf.c
-    m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
-    m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
-    m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
+            # Calculate hddot and alphaddot from forces based on 2DOF structural system
+            m11 = 2./surf.c
+            m12 = -surf.strpar.x_alpha*cos(surf.kinem.alpha)
+            m21 = -2.*surf.strpar.x_alpha*cos(surf.kinem.alpha)/surf.c
+            m22 = surf.strpar.r_alpha*surf.strpar.r_alpha
 
-    R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
+            R1 = 4*surf.strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*surf.strpar.w_h*surf.strpar.w_h*(surf.strpar.cubic_h_1*surf.kinem.h + surf.strpar.cubic_h_3*surf.kinem.h^3)/surf.c - surf.strpar.x_alpha*sin(surf.kinem.alpha)*surf.kinem.alphadot*surf.kinem.alphadot
 
-    R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
+            R2 = 8*surf.strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - surf.strpar.w_alpha*surf.strpar.w_alpha*surf.strpar.r_alpha*surf.strpar.r_alpha*(surf.strpar.cubic_alpha_1*surf.kinem.alpha + surf.strpar.cubic_alpha_3*surf.kinem.alpha^3)
 
-    surf.kinem.hddot_pr = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
-    surf.kinem.alphaddot_pr = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
+            surf.kinem.hddot_pr = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
+            surf.kinem.alphaddot_pr = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
 
-    #Kinematics are updated according to the 2DOF response
-    surf.kinem.alphadot = surf.kinem.alphadot_pr + (dt/12.)*(23*surf.kinem.alphaddot_pr - 16*surf.kinem.alphaddot_pr2 + 5*surf.kinem.alphaddot_pr3)
-    surf.kinem.hdot = surf.kinem.hdot_pr + (dt/12)*(23*surf.kinem.hddot_pr-16*surf.kinem.hddot_pr2 + 5*surf.kinem.hddot_pr3)
+            #Kinematics are updated according to the 2DOF response
+            surf.kinem.alphadot = surf.kinem.alphadot_pr + (dt/12.)*(23*surf.kinem.alphaddot_pr - 16*surf.kinem.alphaddot_pr2 + 5*surf.kinem.alphaddot_pr3)
+            surf.kinem.hdot = surf.kinem.hdot_pr + (dt/12)*(23*surf.kinem.hddot_pr-16*surf.kinem.hddot_pr2 + 5*surf.kinem.hddot_pr3)
 
-    surf.kinem.alpha = surf.kinem.alpha_pr + (dt/12)*(23*surf.kinem.alphadot_pr-16*surf.kinem.alphadot_pr2 + 5*surf.kinem.alphadot_pr3)
-    surf.kinem.h = surf.kinem.h_pr + (dt/12)*(23*surf.kinem.hdot_pr - 16*surf.kinem.hdot_pr2 + 5*surf.kinem.hdot_pr3)
+            surf.kinem.alpha = surf.kinem.alpha_pr + (dt/12)*(23*surf.kinem.alphadot_pr-16*surf.kinem.alphadot_pr2 + 5*surf.kinem.alphadot_pr3)
+            surf.kinem.h = surf.kinem.h_pr + (dt/12)*(23*surf.kinem.hdot_pr - 16*surf.kinem.hdot_pr2 + 5*surf.kinem.hdot_pr3)
 
-    return surf
-end
+            return surf
+        end
+
+        #Set initial kinematics
+        function set_initkinem(kindef::KinemDef, c::Float64, uref::Float64)
+            kinem = KinemPar(0., 0., 0., 0., 0., 0.)
+
+            if (typeof(kindef.alpha) == EldUpDef)
+                kinem.alpha = kindef.alpha(0.)
+                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+            elseif (typeof(kindef.alpha) == EldRampReturnDef)
+                kinem.alpha = kindef.alpha(0.)
+                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+            elseif (typeof(kindef.alpha) == ConstDef)
+                kinem.alpha = kindef.alpha(0.)
+                kinem.alphadot = 0.
+            elseif (typeof(kindef.alpha) == SinDef)
+                kinem.alpha = kindef.alpha(0.)
+                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+            elseif (typeof(kindef.alpha) == CosDef)
+                kinem.alpha = kindef.alpha(0.)
+                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+            end
+            if (typeof(kindef.h) == EldUpDef)
+                kinem.h = kindef.h(0.)*c
+                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+            elseif (typeof(kindef.h) == EldUpIntDef)
+                kinem.h = kindef.h(0.)*c
+                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+            elseif (typeof(kindef.h) == EldRampReturnDef)
+                kinem.h= kindef.h(0.)*c
+                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+            elseif (typeof(kindef.h) == ConstDef)
+                kinem.h = kindef.h(0.)*c
+                kinem.hdot = 0.
+            elseif (typeof(kindef.h) == SinDef)
+                kinem.h = kindef.h(0.)*c
+                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+            elseif (typeof(kindef.h) == CosDef)
+                kinem.h = kindef.h(0.)*c
+                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+            end
+
+            if (typeof(kindef.u) == EldUpDef)
+                kinem.u = kindef.u(0.)*uref
+                kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+            elseif (typeof(kindef.u) == EldRampReturnDef)
+                kinem.u, kinem.udot = kindef.u(0.)
+                kinem.u = kinem.u*uref
+                kinem.udot = kinem.udot*uref*uref/c
+            elseif (typeof(kindef.u) == ConstDef)
+                kinem.u = kindef.u(0.)*uref
+                kinem.udot = 0.
+            end
+
+            return kinem
+        end
+
+        function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+            #Calculate the missing column in LHS that depends on last shed vortex location
+
+            ntev = length(curfield.tev)
+
+            if ntev == 0
+                xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+                zloc_tev = surf.bnd_z_chord[surf.ndiv]
+            else
+                xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+                zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+            end
+
+            dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+
+            u_u_dummy, w_u_dummy = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+            u_l_dummy, w_l_dummy = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
+            for i = 2:surf.ndiv-1
+                dphidz_u = w_u_dummy[i]*cos(surf.kinem.alpha) + u_u_dummy[i]*sin(surf.kinem.alpha)
+                dphidz_l = w_l_dummy[i]*cos(surf.kinem.alpha) + u_l_dummy[i]*sin(surf.kinem.alpha)
+
+                dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
+                dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
+
+                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u -\
+                dphidx_l)
+
+                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) - 0.5*surf.thick_slope[i]*(\
+                dphidx_u + dphidx_l)
+            end
+
+            function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+                for i = 2:surf.ndiv-1
+                    #RHS for lifting equation
+                    dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
+                    dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
+
+                    dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+                    dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+
+                    surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i]
+                    - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
+                    dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
+                    surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) +
+                    surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) -
+                    surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+
+                    surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i]
+                    + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l))
+                    + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha)
+                    + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+                end
+
+                #RHS for Kelvin condition (negative strength of all previously shed vortices)
+                surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+            end

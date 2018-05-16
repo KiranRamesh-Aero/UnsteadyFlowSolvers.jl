@@ -78,7 +78,6 @@ export
     update_externalvel,
     controlVortCount,
     update_kinem,
-    calc_initkinem,
 
     #2D low-order solver methods
     lautat,

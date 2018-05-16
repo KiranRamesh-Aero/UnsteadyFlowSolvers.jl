@@ -17,6 +17,13 @@ type TwoDVort
     vz :: Float64
 end
 
+#Source distribution to model nonlifting/thickness solution
+type TwoDSource
+    x :: Float64
+    z :: Float64
+    s :: Float64
+end
+
 immutable TwoDFlowField
     velX :: MotionDef
     velZ :: MotionDef
@@ -87,7 +94,56 @@ immutable TwoDSurf
         #    cam_slope[i] = Dierckx.derivative(camspl, theta[i])
         #end
 
-        kinem = set_initkinem(kindef, c, uref)
+        kinem = KinemPar(0., 0., 0., 0., 0., 0.)
+
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            kinem.h= kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+        if (typeof(kindef.u) == EldUpDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+        elseif (typeof(kindef.u) == EldRampReturnDef)
+            kinem.u, kinem.udot = kindef.u(0.)
+            kinem.u = kinem.u*uref
+            kinem.udot = kinem.udot*uref*uref/c
+        elseif (typeof(kindef.u) == ConstDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = 0.
+        end
+
 
         for i = 1:ndiv
             bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha)) + initpos[1]
@@ -220,7 +276,56 @@ immutable TwoDSurfThick
         else
             cam, cam_slope = camber_calc(x, coord_file)
         end
-        kinem = calc_initkinem(kindef, c, uref)
+
+        kinem = KinemPar(0., 0., 0., 0., 0., 0.)
+
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            kinem.h= kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+        if (typeof(kindef.u) == EldUpDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+        elseif (typeof(kindef.u) == EldRampReturnDef)
+            kinem.u, kinem.udot = kindef.u(0.)
+            kinem.u = kinem.u*uref
+            kinem.udot = kinem.udot*uref*uref/c
+        elseif (typeof(kindef.u) == ConstDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = 0.
+        end
 
         for i = 1:ndiv
             #Upper and lower are used to find the induced velocities

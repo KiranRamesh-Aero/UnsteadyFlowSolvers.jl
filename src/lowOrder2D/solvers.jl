@@ -130,12 +130,13 @@ Simulates potential flow for an airfoil undergoing unsteady motion
 
     end
 
-    function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500; dtstar::Float64 = 0.015, delvort = DelVortDef(0, 0, 0.), mat = Array(F\
-        loat64, 0, 13), kelv_enf = 0., writefile = "Nil")
+    function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
+        dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000.,
+        delvort = delNone(); maxwrite = 100, nround=6)
 
         # If a restart directory is provided, read in the simulation data
         if startflag == 0
-            mat = Array{Float64}(0, 8)
+            mat = Array{Float64}(0, 13)
             t = 0.
         elseif startflag == 1
             dirvec = readdir()
@@ -187,7 +188,7 @@ Simulates potential flow for an airfoil undergoing unsteady motion
             update_indbound(surf, curfield)
 
             #Set up the matrix problem
-            update_thickLHS(surf, curfield)
+            surf, xloc_tev, zloc_tev = update_thickLHS(surf, curfield, dt, vcore)
 
             #Construct RHS vector
             update_thickRHS(surf, curfield)
@@ -234,7 +235,7 @@ Simulates potential flow for an airfoil undergoing unsteady motion
             end
 
             for i = 1:surf.ndiv
-                int_wax_prev[i] = trapz(wa_x[1:i], surf.x[1:i])
+                int_wax_prev[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
             end
 
             mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],

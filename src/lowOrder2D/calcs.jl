@@ -858,62 +858,7 @@ Algorithms for parameter delvort
             return surf
         end
 
-        #Set initial kinematics
-        function set_initkinem(kindef::KinemDef, c::Float64, uref::Float64)
-            kinem = KinemPar(0., 0., 0., 0., 0., 0.)
-
-            if (typeof(kindef.alpha) == EldUpDef)
-                kinem.alpha = kindef.alpha(0.)
-                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
-            elseif (typeof(kindef.alpha) == EldRampReturnDef)
-                kinem.alpha = kindef.alpha(0.)
-                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
-            elseif (typeof(kindef.alpha) == ConstDef)
-                kinem.alpha = kindef.alpha(0.)
-                kinem.alphadot = 0.
-            elseif (typeof(kindef.alpha) == SinDef)
-                kinem.alpha = kindef.alpha(0.)
-                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
-            elseif (typeof(kindef.alpha) == CosDef)
-                kinem.alpha = kindef.alpha(0.)
-                kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
-            end
-            if (typeof(kindef.h) == EldUpDef)
-                kinem.h = kindef.h(0.)*c
-                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldUpIntDef)
-                kinem.h = kindef.h(0.)*c
-                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == EldRampReturnDef)
-                kinem.h= kindef.h(0.)*c
-                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == ConstDef)
-                kinem.h = kindef.h(0.)*c
-                kinem.hdot = 0.
-            elseif (typeof(kindef.h) == SinDef)
-                kinem.h = kindef.h(0.)*c
-                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            elseif (typeof(kindef.h) == CosDef)
-                kinem.h = kindef.h(0.)*c
-                kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-            end
-
-            if (typeof(kindef.u) == EldUpDef)
-                kinem.u = kindef.u(0.)*uref
-                kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
-            elseif (typeof(kindef.u) == EldRampReturnDef)
-                kinem.u, kinem.udot = kindef.u(0.)
-                kinem.u = kinem.u*uref
-                kinem.udot = kinem.udot*uref*uref/c
-            elseif (typeof(kindef.u) == ConstDef)
-                kinem.u = kindef.u(0.)*uref
-                kinem.udot = 0.
-            end
-
-            return kinem
-        end
-
-        function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+        function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
             #Calculate the missing column in LHS that depends on last shed vortex location
 
             ntev = length(curfield.tev)
@@ -938,35 +883,66 @@ Algorithms for parameter delvort
                 dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
                 dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
 
-                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) - 0.5*surf.thick_slope[i]*(dphidx_u -\
-                dphidx_l)
+                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l)
+                - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l)
+                - 0.5*surf.thick_slope[i]*(dphidx_u  - dphidx_l)
 
-                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) - 0.5*surf.thick_slope[i]*(\
-                dphidx_u + dphidx_l)
+                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l)
+                - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l)
+                - 0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
+
             end
 
-            function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
-                for i = 2:surf.ndiv-1
-                    #RHS for lifting equation
-                    dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
-                    dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
+            return surf, xloc_tev, zloc_tev
+        end
 
-                    dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
-                    dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
 
-                    surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i]
-                    - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
-                    dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
-                    surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) +
-                    surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) -
-                    surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+        function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+            for i = 2:surf.ndiv-1
+                #RHS for lifting equation
+                dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
+                dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
 
-                    surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i]
-                    + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l))
-                    + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha)
-                    + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+                dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+                dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+
+                surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i]
+                - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
+                dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
+                surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) +
+                surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) -
+                surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+
+                surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i]
+                + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l))
+                + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha)
+                + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+            end
+
+            #RHS for Kelvin condition (negative strength of all previously shed vortices)
+            surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+        end
+
+        #Update position and strengths of bound vortices and sources
+        function update_bv_src(surf::TwoDSurfThick)
+            gamma = zeros(surf.ndiv)
+            src = zeros(surf.ndiv)
+            for ib = 1:surf.ndiv
+                gamma[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))
+                for ia = 1:surf.naterm
+                    gamma[ib] += surf.aterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
+                    src[ib] += surf.bterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
                 end
-
-                #RHS for Kelvin condition (negative strength of all previously shed vortices)
-                surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+                gamma[ib] = gamma[ib]*surf.uref*surf.c
+                src[ib] = src[ib]*surf.uref*surf.c
             end
+
+            for ib = 2:surf.ndiv
+                surf.bv[ib-1].s = (gamma[ib]+gamma[ib-1])*(surf.theta[2]-surf.theta[1])/2.
+                surf.bv[ib-1].x = (surf.bnd_x_chord[ib] + surf.bnd_x_chord[ib-1])/2.
+                surf.bv[ib-1].z = (surf.bnd_z_chord[ib] + surf.bnd_z_chord[ib-1])/2.
+                surf.src[ib-1].s = (src[ib] + src[ib-1])*(surf.theta[2]-surf.theta[1])/2.
+                surf.src[ib-1].x = surf.bv[ib-1].x
+                surf.src[ib-1].z = surf.bv[ib-1].z
+            end
+        end

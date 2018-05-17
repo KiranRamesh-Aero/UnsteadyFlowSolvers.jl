@@ -62,7 +62,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         tTot = nsteps*dtstar
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
-            if t > tTot
+            if tcur > tTot
                 break
             else
                 push!(writeArray, Int(round(tcur/dtstar)))
@@ -153,7 +153,7 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
         tTot = nsteps*dtstar
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
-            if t > tTot
+            if tcur > tTot
                 break
             else
                 push!(writeArray, Int(round(tcur/dtstar)))
@@ -252,7 +252,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         tTot = nsteps*dtstar
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
-            if t > tTot
+            if tcur > tTot
                 break
             else
                 push!(writeArray, Int(round(tcur/dtstar)))
@@ -384,7 +384,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         tTot = nsteps*dtstar
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
-            if t > tTot
+            if tcur > tTot
                 break
             else
                 push!(writeArray, Int(round(tcur/dtstar)))
@@ -694,6 +694,3 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
     mat, surf, curfield
 
 end
-
-
-

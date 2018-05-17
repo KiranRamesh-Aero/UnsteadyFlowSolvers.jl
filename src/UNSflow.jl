@@ -51,6 +51,7 @@ export
     ThreeDSurfSimple,
     KinemDef3D,
     ThreeDFieldSimple,
+    KelvinConditionLLT,
 
     # utility functions
     simpleTrapz,
@@ -96,6 +97,8 @@ export
     makeForcePlots,
     makeVortPlots2D
 
+    #3D low-order solver methods
+#    QSLLTlautat
 
 ### source files
 
@@ -116,6 +119,7 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
 # low-order 3D solvers
 include("lowOrder3D/typedefs.jl")            # type definitions
+#include("lowOrder3D/solvers.jl")             # solver methods
 
 # 2D plotting functions
 include("plots/plots2D.jl")

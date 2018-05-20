@@ -37,7 +37,6 @@ function calc_a0a13d(surf::ThreeDSurfSimple)
 end
 
 function calc_a2toan3d(surf::ThreeDSurfSimple)
-
     for ia = 2:surf.naterm
         for i = 1:surf.nspan
             surf.aterm3d[ia,i] = 0

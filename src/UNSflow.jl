@@ -100,6 +100,7 @@ export
     # 3D low-order solver methods
     QSLLTlautat,
     QSLLTlautatRoll,
+    QSLLTldvm,
 
     # 3D plot output functions
     makeForcePlots3Dstrip,

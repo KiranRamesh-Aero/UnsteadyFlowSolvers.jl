@@ -126,3 +126,66 @@ function (kelv::KelvinConditionLLT)(tev_iter::Array{Float64})
 
     return val
 end
+
+immutable KelvinKuttaLLT
+    surf :: ThreeDSurfSimple
+    field :: ThreeDFieldSimple
+    nshed :: Int
+end
+
+function (kelv::KelvinKuttaLLT)(tev_iter::Array{Float64})
+    val = zeros(kelv.surf.nspan + kelv.nshed)
+
+    cntr = kelv.surf.nspan + 1
+
+    #Assume symmetry condition for now
+    for i = 1:kelv.surf.nspan
+        kelv.field.f2d[i].tev[end].s = tev_iter[i]
+        if kelv.surf.s2d[i].levflag == 1
+            kelv.field.f2d[i].lev[end].s = tev_iter[cntr]
+            cntr += 1
+        end
+
+        #Update incduced velocities on airfoil
+        update_indbound(kelv.surf.s2d[i], kelv.field.f2d[i])
+
+        #Calculate downwash
+        update_downwash(kelv.surf.s2d[i], [kelv.field.f2d[i].u[1], kelv.field.f2d[i].w[1]])
+
+        #Calculate first two fourier coefficients
+        update_a0anda1(kelv.surf.s2d[i])
+
+        kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
+    end
+
+    calc_a0a13d(kelv.surf)
+
+    cntr = kelv.surf.nspan + 1
+
+    for i = 1:kelv.surf.nspan
+        val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i]
+        + kelv.surf.a03d[i]) + 0.5*kelv.surf.aterm3d[1,i]
+
+        nlev = length(kelv.field.f2d[i].lev)
+        ntev = length(kelv.field.f2d[i].tev)
+
+        for iv = 1:ntev
+            val[i] = val[i] + kelv.field.f2d[i].tev[iv].s
+        end
+        for iv = 1:nlev
+            val[i] = val[i] + kelv.field.f2d[i].lev[iv].s
+        end
+
+        if kelv.surf.s2d[i].levflag == 1
+            if kelv.surf.s2d[i].a0[1] > 0
+                lesp_cond = kelv.surf.s2d[i].lespcrit[1]
+            else
+                lesp_cond = -kelv.surf.s2d[i].lespcrit[1]
+            end
+            val[cntr] = kelv.surf.s2d[i].a0[1] + kelv.surf.a03d[1] - lesp_cond
+            cntr += 1
+        end
+    end
+
+    return val
+end

@@ -79,6 +79,8 @@ immutable TwoDSurf
             x[ib] = c/2.*(1-cos(theta[ib]))
         end
         if (coord_file != "FlatPlate")
+
+
             cam, cam_slope = camber_calc(x, coord_file)
         end
 
@@ -423,4 +425,3 @@ function (kelv::KelvinKutta2DOF)(v_iter::Array{Float64})
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
-

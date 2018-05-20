@@ -95,10 +95,16 @@ export
 
     # 2D plot output functions
     makeForcePlots,
-    makeVortPlots2D
+    makeVortPlots2D,
 
-    #3D low-order solver methods
-#    QSLLTlautat
+    # 3D low-order solver methods
+    QSLLTlautat,
+    QSLLTlautatRoll,
+
+    # 3D plot output functions
+    makeForcePlots3Dstrip,
+    makeVortPlots3Dstrip,
+    makeTevstrPlots3Dstrip
 
 ### source files
 
@@ -119,7 +125,9 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
 # low-order 3D solvers
 include("lowOrder3D/typedefs.jl")            # type definitions
-#include("lowOrder3D/solvers.jl")             # solver methods
+include("lowOrder3D/calcs.jl")               # calculation functions
+include("lowOrder3D/solvers.jl")             # solver methods
+include("lowOrder3D/postprocess.jl")         # postprocessing functions
 
 # 2D plotting functions
 include("plots/plots2D.jl")

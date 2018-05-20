@@ -34,9 +34,9 @@ immutable ThreeDSurfSimple
     bc :: Vector{Float64}
     nshed :: Vector{Float64}
     bcoeff :: Vector{Float64}
-    a03dprev :: Vector{Float64}
-    a03ddot :: Vector{Float64}
     levstr :: Vector{Float64}
+    fc :: Array{Float64}
+    aterm3d :: Array{Float64}
 
     function ThreeDSurfSimple(AR, kindef, coord_file, pvt, lespcrit = [10.;]; nspan = 10, cref = 1., uref=1., ndiv=70, naterm=35)
 
@@ -69,14 +69,17 @@ immutable ThreeDSurfSimple
         end
 
         a03d = zeros(nspan)
-        a03ddot = zeros(nspan)
-        a03dprev = zeros(nspan)
+        aterm3d = zeros(naterm, nspan)
+
         bc = zeros(nspan)
         nshed = [0.;]
         bcoeff = zeros(nspan)
         levstr = zeros(nspan)
+        fc = zeros(nspan,3)
 
-        new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef, psi, yle, s2d, a03d, bc, nshed, bcoeff, a03dprev, a03ddot, levstr)
+        new(cref, AR, uref, pvt, lespcrit, coord_file,  ndiv, nspan, naterm, kindef,
+        psi, yle, s2d, a03d, bc, nshed, bcoeff, levstr, fc, aterm3d)
+
     end
 end
 
@@ -86,15 +89,11 @@ immutable KelvinConditionLLT
 end
 
 function (kelv::KelvinConditionLLT)(tev_iter::Array{Float64})
-    val = zeros(2*kelv.surf.nspan)
-    lhs = zeros(kelv.surf.nspan,kelv.surf.nspan)
-    rhs = zeros(kelv.surf.nspan)
+    val = zeros(kelv.surf.nspan)
 
     #Assume symmetry condition for now
     for i = 1:kelv.surf.nspan
-        nlev = length(kelv.field.f2d[i].lev)
-        ntev = length(kelv.field.f2d[i].tev)
-        kelv.field.f2d[i].tev[ntev].s = tev_iter[i]
+        kelv.field.f2d[i].tev[end].s = tev_iter[i]
 
         #Update incduced velocities on airfoil
         update_indbound(kelv.surf.s2d[i], kelv.field.f2d[i])
@@ -106,10 +105,16 @@ function (kelv::KelvinConditionLLT)(tev_iter::Array{Float64})
         update_a0anda1(kelv.surf.s2d[i])
 
         kelv.surf.bc[i] = kelv.surf.s2d[i].a0[1] + 0.5*kelv.surf.s2d[i].aterm[1]
+        end
 
-        calc_a03dwlev(kelv.surf)
+    calc_a0a13d(kelv.surf)
 
-        val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i] + kelv.surf.a03d[i])
+    for i = 1:kelv.surf.nspan
+        val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i]
+        + kelv.surf.a03d[i]) + 0.5*kelv.surf.aterm3d[1,i]
+
+        nlev = length(kelv.field.f2d[i].lev)
+        ntev = length(kelv.field.f2d[i].tev)
 
         for iv = 1:ntev
             val[i] = val[i] + kelv.field.f2d[i].tev[iv].s
@@ -118,16 +123,6 @@ function (kelv::KelvinConditionLLT)(tev_iter::Array{Float64})
             val[i] = val[i] + kelv.field.f2d[i].lev[iv].s
         end
     end
-
-    for i = 1:kelv.surf.nspan
-        for n = 1:kelv.surf.nspan
-            nn = 2*n - 1
-            lhs[i,n] = sin(nn*kelv.surf.psi[i])*(sin(kelv.surf.psi[i]) + (nn*pi/(2*kelv.surf.AR)))
-        end
-        rhs[i] = pi*sin(kelv.surf.psi[i])*kelv.surf.bc[i]/(2*kelv.surf.AR)
-    end
-
-    val[kelv.surf.nspan+1:2*kelv.surf.nspan] = lhs*tev_iter[kelv.surf.nspan+1:2*kelv.surf.nspan] - rhs
 
     return val
 end

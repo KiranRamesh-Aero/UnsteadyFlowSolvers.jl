@@ -101,6 +101,7 @@ export
     QSLLTlautat,
     QSLLTlautatRoll,
     QSLLTldvm,
+    QSLLTlautatLin,
 
     # 3D plot output functions
     makeForcePlots3Dstrip,

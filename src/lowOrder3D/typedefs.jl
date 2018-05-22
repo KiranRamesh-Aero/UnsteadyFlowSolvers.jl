@@ -136,16 +136,19 @@ end
 function (kelv::KelvinKuttaLLT)(tev_iter::Array{Float64})
     val = zeros(kelv.surf.nspan + kelv.nshed)
 
-    cntr = kelv.surf.nspan + 1
-
     #Assume symmetry condition for now
     for i = 1:kelv.surf.nspan
         kelv.field.f2d[i].tev[end].s = tev_iter[i]
+    end
+
+    cntr = kelv.surf.nspan + 1
+    for i = 1:kelv.surf.nspan
         if kelv.surf.s2d[i].levflag == 1
             kelv.field.f2d[i].lev[end].s = tev_iter[cntr]
             cntr += 1
         end
-
+    end
+    for i = 1:kelv.surf.nspan
         #Update incduced velocities on airfoil
         update_indbound(kelv.surf.s2d[i], kelv.field.f2d[i])
 
@@ -160,7 +163,7 @@ function (kelv::KelvinKuttaLLT)(tev_iter::Array{Float64})
 
     calc_a0a13d(kelv.surf)
 
-    cntr = kelv.surf.nspan + 1
+
 
     for i = 1:kelv.surf.nspan
         val[i] = kelv.surf.s2d[i].uref*kelv.surf.s2d[i].c*pi*(kelv.surf.bc[i]
@@ -175,7 +178,10 @@ function (kelv::KelvinKuttaLLT)(tev_iter::Array{Float64})
         for iv = 1:nlev
             val[i] = val[i] + kelv.field.f2d[i].lev[iv].s
         end
+    end
 
+    cntr = kelv.surf.nspan + 1
+    for i = 1:kelv.surf.nspan
         if kelv.surf.s2d[i].levflag == 1
             if kelv.surf.s2d[i].a0[1] > 0
                 lesp_cond = kelv.surf.s2d[i].lespcrit[1]

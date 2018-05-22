@@ -13,7 +13,7 @@ AR = 10.
 
 pvt = 0.0
 
-geometry = "sd7003.dat"
+geometry = "FlatPlate"
 
 surf = ThreeDSurfSimple(AR, kinem, geometry, pvt)
 
@@ -34,7 +34,7 @@ writeInterval = t_tot/20.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, field = QSLLTlautatRoll(surf, field, nsteps, dtstar, startflag,
+mat, surf, field = QSLLTlautatLin(surf, field, nsteps, dtstar, startflag,
 writeflag, writeInterval, delvort)
 
 #maxwrite = 100; nround=6
@@ -45,4 +45,4 @@ makeVortPlots3Dstrip()
 
 makeTevstrPlots3Dstrip()
 
-#cleanWrite()
+cleanWrite()

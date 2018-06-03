@@ -361,7 +361,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
 end
 
-function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
+function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, t = 0.)
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
@@ -373,8 +373,11 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         latestTime = maximum(dirresults)
         mat = readdlm("resultsSummary")
         t = mat[end,1]
+    elseif startflag == 2
+        #for use in strip theory
+        mat = Array{Float64}(0, 8)
     else
-        throw("invalid start flag, should be 0 or 1")
+        throw("invalid start flag, should be 0 or 1 or 2")
     end
     mat = mat'
 
@@ -420,7 +423,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         #include vortives shed at current step (equal to term T1)
         #I1 has units if circulation, J1 is dimensionless
         T1[:] = surf.downwash[:]
-        I1 = surf.c*simpleTrapz(T1.*(cos(surf.theta) - 1), surf.theta)
+        I1 = surf.c*simpleTrapz(T1.*(cos.(surf.theta) - 1), surf.theta)
         J1 = -simpleTrapz(T1,surf.theta)/(surf.uref*pi)
 
         # T2 depends on recenetly shed TEV
@@ -443,7 +446,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
 
         sig_prev = sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev))
 
-        I2 = simpleTrapz(T2.*(cos(surf.theta) - 1.), surf.theta)
+        I2 = simpleTrapz(T2.*(cos.(surf.theta) - 1.), surf.theta)
         J2 = -simpleTrapz(T2, surf.theta)/(pi*surf.uref)
 
         tevstr = -(I1 + sig_prev)/(1 + I2)
@@ -451,7 +454,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         #Calc first 3 fourier coefficients and derivatives
         surf.a0[1] = J1 + J2*tevstr
         for ia = 1:3
-            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Calculate adot
@@ -513,7 +516,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         update_indbound(surf, curfield)
         update_downwash(surf, [curfield.u[1],curfield.w[1]])
         for ia = 4:surf.naterm
-            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Set previous values of aterm to be used for derivatives in next time step

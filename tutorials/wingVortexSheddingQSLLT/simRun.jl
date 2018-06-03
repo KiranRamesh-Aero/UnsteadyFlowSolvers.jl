@@ -37,7 +37,10 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, curfield = QSLLTlautatLin(surf, field, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+#maxwrite = 100
+#nround=6
+
+mat, surf, curfield = QSLLTldvmLin(surf, field, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
 
 makeForcePlots3Dstrip()

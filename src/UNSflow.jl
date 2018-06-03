@@ -102,6 +102,12 @@ export
     QSLLTlautatRoll,
     QSLLTldvm,
     QSLLTlautatLin,
+    QSLLTldvmLin,
+    StripldvmLin,
+
+    # 2D low-order solver function
+    calc_a0a13d,
+    calc_a2toan3d,
 
     # 3D plot output functions
     makeForcePlots3Dstrip,

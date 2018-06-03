@@ -177,7 +177,6 @@ immutable TwoDSurfThick
     ndiv :: Int8
     naterm :: Int8
     kindef :: KinemDef
-    th :: Float64
     cam :: Vector{Float64}
     cam_slope :: Vector{Float64}
     thick :: Vector{Float64}
@@ -224,58 +223,8 @@ immutable TwoDSurfThick
             theta[ib] = real(ib-1.)*dtheta
             x[ib] = c/2.*(1-cos(theta[ib]))
         end
-        if coord_file[1:4] == "NACA"
-            m = parse(Int, coord_file[5])/100.
-            p = parse(Int, coord_file[6])/10.
-            th = parse(Int, coord_file[7:8])/100.
 
-            b1 = 0.2969
-            b2 = -0.1260
-            b3 = -0.3516
-            b4 = 0.2843
-            b5 = -0.1015
-
-            for i = 2:ndiv
-                thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
-                thick_slope[i] = 5*th*(b1/(2*sqrt(x[i])) + b2 + 2*b3*x[i] + 3*b4*x[i]^2 + 4*b5*x[i]^3)
-            end
-            thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
-            thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
-            rho = 1.1019*th*th*c
-
-            for i = 1:ndiv
-                if x[i] < p*c
-                    cam[i] = c*m*(2*p*(x[i]/c - (x[i]/c)^2))/(p^2)
-                    cam_slope[i] = 2*m*(p - x[i]/c)/p^2
-                else
-                    cam[i] = c*m*(1. - 2*p + 2*p*x[i]/c - (x[i]/c)^2)/(1-p)^2
-                    cam_slope[i] = 2*m*(p - x[i]/c)/(1-p)^2
-                end
-            end
-
-        elseif coord_file[1:9] == "FlatPlate"
-            th = parse(Int, coord_file[10:12])/10000.
-            r = th*c/2
-            for i = 2:ndiv-1
-                if x[i] <= r
-                    thick[i] = sqrt(r^2 - (x[i] - r)^2)
-                    thick_slope[i] = -(x[i] - r)/(sqrt(r^2 - (x[i] - r)^2))
-                elseif  x[i] >= c-r
-                    thick[i] = sqrt(r^2 - (x[i] - c + r)^2)
-                    thick_slope[i] = -(x[i] - c + r)/sqrt(r^2 - (x[i] - c + r)^2)
-                else
-                    thick[i] = r
-                end
-            end
-            thick[1] = sqrt(r^2 - (x[1] - r)^2)
-            thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
-            thick[ndiv] = sqrt(r^2 - (x[ndiv] - c + r)^2)
-            thick_slope[ndiv] = 2*thick_slope[ndiv-1] - thick_slope[ndiv-2]
-
-            rho = r
-        else
-            cam, cam_slope = camber_calc(x, coord_file)
-        end
+        thick, thick_slope, rho, cam, cam_slope = camber_thick_calc(x, coord_file)
 
         kinem = KinemPar(0., 0., 0., 0., 0., 0.)
 
@@ -392,7 +341,7 @@ immutable TwoDSurfThick
         LHS[2*ndiv-3,2*naterm+2] = 1.
 
         levflag = [0]
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, th, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)
     end
 end
 

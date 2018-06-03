@@ -1,5 +1,5 @@
 """
-    cleanWrite()
+cleanWrite()
 
 Clears all timestamp directories in the current folder
 """
@@ -14,7 +14,7 @@ end
 
 
 """
-    simpleInterp(x1, x2, y1, y2, x)
+simpleInterp(x1, x2, y1, y2, x)
 
 Performs a linear interpolation between points (x1,y1) and (x2,y2) to
 find the value of `y` at `x`.
@@ -26,7 +26,7 @@ function simpleInterp(x1 ::Float64, x2 :: Float64, y1 :: Float64, y2 :: Float64,
 end
 
 """
-    find_tstep([kin])
+find_tstep([kin])
 
 kin is a definition of either Sin / Cos / Ramp kinematics
 
@@ -104,30 +104,160 @@ function camber_calc(x::Vector,airfoil::String)
     ndiv = length(x);
     c = x[ndiv];
 
-    cam = Array(Float64,ndiv)
-    cam_slope = Array(Float64,ndiv)
+    cam = Array{Float64}(ndiv)
+    cam_slope = Array{Float64}(ndiv)
 
-    in_air = readdlm(airfoil);
-    xcoord = in_air[:,1];
-    ycoord = in_air[:,2];
-    ncoord = length(xcoord);
-    xcoord_sum = Array(Float64,ncoord);
-    xcoord_sum[1] = 0;
+    in_air = readdlm(airfoil)
+    xcoord = in_air[:,1]
+    ycoord = in_air[:,2]
+    ncoord = length(xcoord)
+    xcoord_sum = Array{Float64}(ncoord)
+    xcoord_sum[1] = 0
     for i = 1:ncoord-1
-        xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
+        xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i])
     end
-    y_spl = Spline1D(xcoord_sum,ycoord);
-    y_ans = Array(Float64,2*ndiv);
+    y_spl = Spline1D(xcoord_sum,ycoord)
+    y_ans = Array{Float64}(2*ndiv)
 
     for i=1:ndiv
-        y_ans[i] = evaluate(y_spl,x[i]/c);
+        y_ans[i] = evaluate(y_spl,x[i]/c)
     end
     for i=ndiv+1:2*ndiv
-        y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c));
+        y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c))
     end
-    cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1];
-    cam[1] = 0;
-    cam_spl = Spline1D(x,cam);
-    cam_slope[1:ndiv] = derivative(cam_spl,x);
+    cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1]
+    cam[1] = 0
+    cam_spl = Spline1D(x,cam)
+    cam_slope[1:ndiv] = derivative(cam_spl,x)
     return cam, cam_slope
+end
+
+
+function camber_thick_calc(x::Vector,coord_file::String)
+    #Determine camber and camber slope on airfoil from airfoil input file
+
+    ndiv = length(x);
+    c = x[ndiv];
+
+    cam = Array{Float64}(ndiv)
+    cam_slope = Array{Float64}(ndiv)
+    thick = Array{Float64}(ndiv)
+    thick_slope = Array{Float64}(ndiv)
+
+    if coord_file[1:4] == "NACA"
+        m = parse(Int, coord_file[5])/100.
+        p = parse(Int, coord_file[6])/10.
+        th = parse(Int, coord_file[7:8])/100.
+
+        b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+        for i = 2:ndiv
+            thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
+            thick_slope[i] = 5*th*(b1/(2*sqrt(x[i])) + b2 + 2*b3*x[i] + 3*b4*x[i]^2 + 4*b5*x[i]^3)
+        end
+        thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
+        thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+        rho = 1.1019*th*th*c
+        for i = 1:ndiv
+            if x[i] < p*c
+                cam[i] = c*m*(2*p*(x[i]/c - (x[i]/c)^2))/(p^2)
+                cam_slope[i] = 2*m*(p - x[i]/c)/p^2
+            else
+                cam[i] = c*m*(1. - 2*p + 2*p*x[i]/c - (x[i]/c)^2)/(1-p)^2
+                cam_slope[i] = 2*m*(p - x[i]/c)/(1-p)^2
+            end
+        end
+
+        #These need to be corrected to our convention (thickness not perpendicular to camber)
+        coordu = zeros(ndiv,2)
+        coordl = zeros(ndiv,2)
+        for i = 1:ndiv
+            theta = atan(cam_slope[i])
+            coordu[i,1] = x[i] - thick[i]*sin(theta)
+            coordl[i,1] = x[i] + thick[i]*sin(theta)
+            coordu[i,2] = cam[i] + thick[i]*cos(theta)
+            coordl[i,2] = cam[i] - thick[i]*cos(theta)
+        end
+
+        zu_spl = Spline1D(coordu[:,1], coordu[:,2], k=1)
+        zl_spl = Spline1D(coordl[:,1], coordl[:,2], k=1)
+
+        zu = Array{Float64}(ndiv)
+        zl = Array{Float64}(ndiv)
+
+        for i=1:ndiv
+            zu[i] = evaluate(zu_spl,x[i]/c)
+            zl[i] = evaluate(zl_spl,x[i]/c)
+        end
+
+        cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
+        thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
+        cam_spl = Spline1D(x,cam,k=1)
+        thick_spl = Spline1D(x,thick,k=1)
+        cam_slope[1:ndiv] = derivative(cam_spl,x)
+        thick_slope[1:ndiv] = derivative(thick_spl,x)
+
+    elseif coord_file[1:9] == "FlatPlate"
+        th = parse(Int, coord_file[10:13])/10000.
+        r = th*c/2
+        for i = 2:ndiv-1
+            if x[i] <= r
+                thick[i] = sqrt(r^2 - (x[i] - r)^2)
+                thick_slope[i] = -(x[i] - r)/(sqrt(r^2 - (x[i] - r)^2))
+            elseif  x[i] >= c-r
+                thick[i] = sqrt(r^2 - (x[i] - c + r)^2)
+                thick_slope[i] = -(x[i] - c + r)/sqrt(r^2 - (x[i] - c + r)^2)
+            else
+                thick[i] = r
+            end
+        end
+        thick[1] = sqrt(r^2 - (x[1] - r)^2)
+        thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+        thick[ndiv] = sqrt(r^2 - (x[ndiv] - c + r)^2)
+        thick_slope[ndiv] = 2*thick_slope[ndiv-1] - thick_slope[ndiv-2]
+
+        rho = r
+        cam[1:ndiv] = 0.
+        cam_slope[1:ndiv] = 0.
+    elseif coord_file[1:8] == "Cylinder"
+        for i = 1:ndiv
+            theta = acos(1. - 2*x[i]/c)
+            thick[i] = 0.5*c*sin(theta)
+            cam[i] = 0
+            cam_slope[i] = 0
+        end
+        thick_spl = Spline1D(x,thick)
+        thick_slope[1:ndiv] = derivative(thick_spl,x)
+        rho = 0.5*c
+    else
+        coord = readdlm(coord_file)
+        ncoord = length(coord[:,1])
+        if (0. in coord[:,1]) == false
+            error("Airfoil file must contain leading edge coordinate (0,0)")
+        else
+            nle = find(x->x==0, coord[:,1])[1]
+            if coord[nle,2] != 0.
+                error("Airfoil leading edge must be at (0,0)")
+            end
+        end
+
+        zu_spl = Spline1D(reverse(coord[1:nle,1]), reverse(coord[1:nle,2]),k=1)
+        zl_spl = Spline1D(coord[nle:ncoord,1], coord[nle:ncoord,2],k=1)
+
+        zu = Array{Float64}(ndiv)
+        zl = Array{Float64}(ndiv)
+
+        for i=1:ndiv
+            zu[i] = evaluate(zu_spl,x[i]/c)
+            zl[i] = evaluate(zl_spl,x[i]/c)
+        end
+
+        cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
+        thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
+        cam_spl = Spline1D(x,cam)
+        thick_spl = Spline1D(x,thick)
+        cam_slope[1:ndiv] = derivative(cam_spl,x,k=1)
+        thick_slope[1:ndiv] = derivative(thick_spl,x,k=1)
+        rho = readdlm("rho")[1]
+    end
+    return thick, thick_slope,rho, cam, cam_slope
 end

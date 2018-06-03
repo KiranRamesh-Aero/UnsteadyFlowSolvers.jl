@@ -239,14 +239,19 @@ Simulates potential flow for an airfoil undergoing unsteady motion
             end
 
             mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
-             cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd])
+             cl, cd, cnc1, cnc2, cnc3, cnnc, cn, cs])
 
         end
 
         mat = mat'
+
+        f = open("resultsSummary", "w")
+        write(f, ["#time \t", "alpha (rad) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+        writedlm(f, mat)
+        close(f)
+
         mat, surf, curfield
     end
-
 
     function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
 
@@ -339,7 +344,7 @@ Simulates potential flow for an airfoil undergoing unsteady motion
         mat = mat'
 
         f = open("resultsSummary", "w")
-        write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+        write(f, ["#time \t", "alpha (rad) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
         writedlm(f, mat)
         close(f)
 

@@ -946,3 +946,26 @@ Algorithms for parameter delvort
                 surf.src[ib-1].z = surf.bv[ib-1].z
             end
         end
+        # 
+        # function calc_q_cp(surf:TwoDSurfThick)
+        #
+        #     gamma = zeros(surf.ndiv)
+        #     for ib = 2:surf.ndiv
+        #         gamma[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))/sin(surf.theta[ib])
+        #         for ia = 1:surf.naterm
+        #             gamma[ib] = gamma[ib] + surf.aterm[ia]*sin(ia*surf.theta[ib])
+        #         end
+        #         gamma[ib] = gamma[ib]*2.*surf.uref
+        #     end
+        #     for i = 1:surf.ndiv
+        #         u_u[i] = 0.5*gamma[i] + dphitdx[i] + dphiwdx[i] + surf.kinem.u*cos(surf.kinem.alpha)
+        #         + surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*(cam[i] + thick[i])
+        #         w_u[i] = dphildz[i] + 0.5*sigma[i] + dphiwdz + surf.kinem.u*sin(surf.kinem.alpha)
+        #         -surf.kinem.hdot*cos(surf.kinem.alpha) + surf.kinem.alphadot(surf.x[i] - surf.pvt*surf.c)
+        #
+        #         vu[i] = sqrt(u_u[i]^2 + w_u[i]^2)
+        #     end
+        #
+
+
+        end

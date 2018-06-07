@@ -25,7 +25,7 @@ immutable TwoDSurfPanel
     gam1 :: Vector{Float64}
     gam2 :: Vector{Float64}
     IC :: Array{Float64}
-       
+
     function TwoDSurfPanel(coord_file, pvt, kindef, lespcrit=zeros(1); c=1., uref=1., ndiv=200, initpos = [0.; 0.])
 
         bnd_x = zeros(ndiv)
@@ -64,8 +64,8 @@ immutable TwoDSurfPanel
             z1p[i] = Dierckx.evaluate(z_s, s1)
             z2p[i] = Dierckx.evaluate(z_s, s2)
             alpha[i] = atan((z2p[i] - z1p[i])/(x2p[i] - x1p[i]))
-            normx[i] = -(z2p[i] - z1p[i])
-            normz[i] = (x2p[i] - x1p[i])
+            normx[i] = -(z2p[i] - z1p[i])/sqrt((z2p[i] - z1p[i])^2 + (x2p[i] - x1p[i])^2)
+            normz[i] = (x2p[i] - x1p[i])/sqrt((z2p[i] - z1p[i])^2 + (x2p[i] - x1p[i])^2)
         end
 
         #Form influence coefficients
@@ -74,33 +74,37 @@ immutable TwoDSurfPanel
         for i = 1:ndiv-1
             for j = 1:ndiv-1
                 if j == 1
-                    _, _, ua, wa, _, _  = vor2dl(1., 1., x1p[j], z1p[j], x2p[j], z2p[j], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
+                    _, _, ua, wa, _, _  = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]),
+                     0.5*(z1p[i] + z2p[i]), x1p[j], z1p[j], x2p[j], z2p[j])
+
                     IC[i,j] = dot([ua; wa], [normx[i]; normz[i]])
-                    
+
                 elseif j == ndiv-1
-                    _, _, _, _, ub, wb = vor2dl(1., 1., x1p[j], z1p[j], x2p[j], z2p[j], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
-                    IC[i,j+1] = dot([ub; wb], [normx[i]; normz[i]])
+                    _, _, _, _, ub, wb = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]),
+                    0.5*(z1p[i] + z2p[i]), x1p[j], z1p[j], x2p[j], z2p[j])
+
+                    IC[i,j] = dot([ub; wb], [normx[i]; normz[i]])
 
                     #ua comes from j and ub comes from j-1
-                    _, _, ua, wa, _, _ = vor2dl(1., 1., x1p[j], z1p[j], x2p[j], z2p[j], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
-                    _, _, _, _, ub, wb = vor2dl(1., 1., x1p[j-1], z1p[j-1], x2p[j-1], z2p[j-1], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
-                    
+                    _, _, ua, wa, _, _ = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]), x1p[j], z1p[j], x2p[j], z2p[j])
+                    _, _, _, _, ub, wb = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]), x1p[j-1], z1p[j-1], x2p[j-1], z2p[j-1])
+
                     IC[i,j] = dot([ua + ub; wa + wb], [normx[i], normz[i]])
                 else
-                    _, _, ua, wa, _, _ = vor2dl(1., 1., x1p[j], z1p[j], x2p[j], z2p[j], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
-                    _, _, _, _, ub, wb = vor2dl(1., 1., x1p[j-1], z1p[j-1], x2p[j-1], z2p[j-1], 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]))
+                    _, _, ua, wa, _, _ = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]), x1p[j], z1p[j], x2p[j], z2p[j])
+                    _, _, _, _, ub, wb = vor2dl(1., 1., 0.5*(x1p[i] + x2p[i]), 0.5*(z1p[i] + z2p[i]), x1p[j-1], z1p[j-1], x2p[j-1], z2p[j-1])
                     IC[i,j] = dot([ua + ub; wa + wb], [normx[i], normz[i]])
                 end
             end
         end
         IC[ndiv,1] = 1.
         IC[ndiv,ndiv] = 1.
-        
+
         #camspl = Spline1D(theta, cam)
         #for i = 1:ndiv
         #    cam_slope[i] = Dierckx.derivative(camspl, theta[i])
         #end
-        
+
         if (typeof(kindef.alpha) == EldUpDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c

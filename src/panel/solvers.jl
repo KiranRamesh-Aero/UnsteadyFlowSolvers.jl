@@ -1,9 +1,9 @@
 include("../../src/UNSflow.jl")
 using UNSflow
 
-include("types.jl")
+include("typedefs.jl")
 include("calcs.jl")
-        
+
 alphadef = EldRampReturnDef(25,0.11,11)
 hdef = ConstDef(0.)
 udef = ConstDef(1.)

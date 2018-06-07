@@ -144,7 +144,7 @@ function camber_thick_calc(x::Vector,coord_file::String)
     thick = Array{Float64}(ndiv)
     thick_slope = Array{Float64}(ndiv)
 
-    if coord_file[1:4] == "NACA"
+    if coord_file[1:6] == "NACA00"
         m = parse(Int, coord_file[5])/100.
         p = parse(Int, coord_file[6])/10.
         th = parse(Int, coord_file[7:8])/100.
@@ -157,45 +157,69 @@ function camber_thick_calc(x::Vector,coord_file::String)
         thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
         thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
         rho = 1.1019*th*th*c
+        cam[1:ndiv] = 0.
+        cam_slope[1:ndiv] = 0.
+    # elseif coord_file[1:4] == "NACA"
+    #     m = parse(Int, coord_file[5])/100.
+    #     p = parse(Int, coord_file[6])/10.
+    #     th = parse(Int, coord_file[7:8])/100.
+    #
+    #     b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+    #     for i = 2:ndiv
+    #         thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
+    #         thick_slope[i] = 5*th*(b1/(2*sqrt(x[i])) + b2 + 2*b3*x[i] + 3*b4*x[i]^2 + 4*b5*x[i]^3)
+    #     end
+    #     thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
+    #     thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+    #     rho = 1.1019*th*th*c
+    #     for i = 1:ndiv
+    #         if x[i] < p*c
+    #             cam[i] = c*m*(2*p*(x[i]/c - (x[i]/c)^2))/(p^2)
+    #             cam_slope[i] = 2*m*(p - x[i]/c)/p^2
+    #         else
+    #             cam[i] = c*m*(1. - 2*p + 2*p*x[i]/c - (x[i]/c)^2)/(1-p)^2
+    #             cam_slope[i] = 2*m*(p - x[i]/c)/(1-p)^2
+    #         end
+    #     end
+    #
+    #     #These need to be corrected to our convention (thickness not perpendicular to camber)
+    #     coordu = zeros(ndiv,2)
+    #     coordl = zeros(ndiv,2)
+    #     for i = 1:ndiv
+    #         theta = atan(cam_slope[i])
+    #         coordu[i,1] = x[i] - thick[i]*sin(theta)
+    #         coordl[i,1] = x[i] + thick[i]*sin(theta)
+    #         coordu[i,2] = cam[i] + thick[i]*cos(theta)
+    #         coordl[i,2] = cam[i] - thick[i]*cos(theta)
+    #     end
+    #
+    #     zu_spl = Spline1D(coordu[:,1], coordu[:,2], k=1)
+    #     zl_spl = Spline1D(coordl[:,1], coordl[:,2], k=1)
+    #
+    #     zu = Array{Float64}(ndiv)
+    #     zl = Array{Float64}(ndiv)
+    #
+    #     for i=1:ndiv
+    #         zu[i] = evaluate(zu_spl,x[i]/c)
+    #         zl[i] = evaluate(zl_spl,x[i]/c)
+    #     end
+    #
+    #     cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
+    #     thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
+    #     cam_spl = Spline1D(x,cam,k=1)
+    #     thick_spl = Spline1D(x,thick,k=1)
+    #     cam_slope[1:ndiv] = derivative(cam_spl,x)
+    #     thick_slope[1:ndiv] = derivative(thick_spl,x)
+    elseif coord_file[1:8] == "Cylinder"
         for i = 1:ndiv
-            if x[i] < p*c
-                cam[i] = c*m*(2*p*(x[i]/c - (x[i]/c)^2))/(p^2)
-                cam_slope[i] = 2*m*(p - x[i]/c)/p^2
-            else
-                cam[i] = c*m*(1. - 2*p + 2*p*x[i]/c - (x[i]/c)^2)/(1-p)^2
-                cam_slope[i] = 2*m*(p - x[i]/c)/(1-p)^2
-            end
+            theta = acos(1. - 2*x[i]/c)
+            thick[i] = 0.5*c*sin(theta)
         end
-
-        #These need to be corrected to our convention (thickness not perpendicular to camber)
-        coordu = zeros(ndiv,2)
-        coordl = zeros(ndiv,2)
-        for i = 1:ndiv
-            theta = atan(cam_slope[i])
-            coordu[i,1] = x[i] - thick[i]*sin(theta)
-            coordl[i,1] = x[i] + thick[i]*sin(theta)
-            coordu[i,2] = cam[i] + thick[i]*cos(theta)
-            coordl[i,2] = cam[i] - thick[i]*cos(theta)
-        end
-
-        zu_spl = Spline1D(coordu[:,1], coordu[:,2], k=1)
-        zl_spl = Spline1D(coordl[:,1], coordl[:,2], k=1)
-
-        zu = Array{Float64}(ndiv)
-        zl = Array{Float64}(ndiv)
-
-        for i=1:ndiv
-            zu[i] = evaluate(zu_spl,x[i]/c)
-            zl[i] = evaluate(zl_spl,x[i]/c)
-        end
-
-        cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
-        thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
-        cam_spl = Spline1D(x,cam,k=1)
-        thick_spl = Spline1D(x,thick,k=1)
-        cam_slope[1:ndiv] = derivative(cam_spl,x)
+        thick_spl = Spline1D(x,thick)
         thick_slope[1:ndiv] = derivative(thick_spl,x)
-
+        cam[1:ndiv] = 0.
+        cam_slope[1:ndiv] = 0.
+        rho = 0.5*c
     elseif coord_file[1:9] == "FlatPlate"
         th = parse(Int, coord_file[10:13])/10000.
         r = th*c/2
@@ -218,16 +242,6 @@ function camber_thick_calc(x::Vector,coord_file::String)
         rho = r
         cam[1:ndiv] = 0.
         cam_slope[1:ndiv] = 0.
-    elseif coord_file[1:8] == "Cylinder"
-        for i = 1:ndiv
-            theta = acos(1. - 2*x[i]/c)
-            thick[i] = 0.5*c*sin(theta)
-            cam[i] = 0
-            cam_slope[i] = 0
-        end
-        thick_spl = Spline1D(x,thick)
-        thick_slope[1:ndiv] = derivative(thick_spl,x)
-        rho = 0.5*c
     else
         coord = readdlm(coord_file)
         ncoord = length(coord[:,1])
@@ -255,8 +269,8 @@ function camber_thick_calc(x::Vector,coord_file::String)
         thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
         cam_spl = Spline1D(x,cam)
         thick_spl = Spline1D(x,thick)
-        cam_slope[1:ndiv] = derivative(cam_spl,x,k=1)
-        thick_slope[1:ndiv] = derivative(thick_spl,x,k=1)
+        cam_slope[1:ndiv] = derivative(cam_spl,x)
+        thick_slope[1:ndiv] = derivative(thick_spl,x)
         rho = readdlm("rho")[1]
     end
     return thick, thick_slope,rho, cam, cam_slope

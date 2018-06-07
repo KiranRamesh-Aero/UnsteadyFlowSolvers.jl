@@ -202,7 +202,9 @@ Simulates potential flow for an airfoil undergoing unsteady motion
                 surf.aterm[i] = soln[i+1]
                 surf.bterm[i] = soln[i+surf.naterm+1]
             end
-            tevstr = soln[2*surf.naterm+2]
+            surf.b0[1] = soln[2*surf.naterm+2]
+            surf.b0[2] = soln[2*surf.naterm+3]
+            tevstr = soln[2*surf.naterm+4]
             push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
 
             #Calculate adot

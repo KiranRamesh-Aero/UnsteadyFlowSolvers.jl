@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 using UNSflow
 
-alphadef = ConstDef(10.*pi/180)
+alphadef = ConstDef(0.*pi/180)
 
 hdef = ConstDef(0.)
 
@@ -11,7 +11,7 @@ kinem = KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "sd7003.dat"
+geometry = "NACA0012"
 
 surf = TwoDSurfThick(geometry, pvt, kinem)
 

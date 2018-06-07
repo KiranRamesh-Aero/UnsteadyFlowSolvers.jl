@@ -88,6 +88,7 @@ export
     # Postprocessing functions
     calc_forces,
     writeStamp,
+    calc_q_cp,
 
     # 2D plotting functions
     viewVort2D,

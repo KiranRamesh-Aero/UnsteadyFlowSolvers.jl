@@ -574,25 +574,25 @@ end
 function update_boundpos(surf::TwoDSurfThick, dt::Float64)
     for i = 1:surf.ndiv
         surf.bnd_x_u[i] = surf.bnd_x_u[i] + dt*((surf.pvt*surf.c - surf.x[i])*
-        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i]
-        + surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] +
+        surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
 
-        surf.bnd_z_u[i] = surf.bnd_z_u[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c
-        - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] +
+        surf.bnd_z_u[i] = surf.bnd_z_u[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c -
+        surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] +
         surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
 
         surf.bnd_x_l[i] = surf.bnd_x_l[i] + dt*((surf.pvt*surf.c - surf.x[i])*
-        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i]
-        - surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+        sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] -
+        surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
 
         surf.bnd_z_l[i] = surf.bnd_z_l[i] + dt*(surf.kinem.hdot + (surf.pvt*
-        surf.c - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i]
-        - surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
+        surf.c - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] -
+        surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
 
         surf.bnd_x_chord[i] = surf.bnd_x_chord[i] + dt*((surf.pvt*surf.c - surf.x[i])*
         sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u)
-        surf.bnd_z_chord[i] = surf.bnd_z_chord[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c
-        - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
+        surf.bnd_z_chord[i] = surf.bnd_z_chord[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c -
+        surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
     end
 
     return surf
@@ -883,13 +883,13 @@ Algorithms for parameter delvort
                 dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
                 dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
 
-                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l)
-                - 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l)
-                - 0.5*surf.thick_slope[i]*(dphidx_u  - dphidx_l)
+                surf.LHS[i-1,4+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) -
+                0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) -
+                0.5*surf.thick_slope[i]*(dphidx_u  - dphidx_l)
 
-                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l)
-                - 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l)
-                - 0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
+                surf.LHS[surf.ndiv+i-3,4+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) -
+                0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) -
+                0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
 
             end
 
@@ -906,17 +906,17 @@ Algorithms for parameter delvort
                 dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
                 dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
 
-                surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i]
-                - surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
+                surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i] -
+                surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
                 dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
                 surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) +
                 surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) -
                 surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
 
-                surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i]
-                + surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l))
-                + surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha)
-                + surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+                surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i] +
+                surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l)) +
+                surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
+                surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
             end
 
             #RHS for Kelvin condition (negative strength of all previously shed vortices)
@@ -928,7 +928,9 @@ Algorithms for parameter delvort
             gamma = zeros(surf.ndiv)
             src = zeros(surf.ndiv)
             for ib = 1:surf.ndiv
-                gamma[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))
+                gamma[ib] = surf.a0[1]*(1 + cos(surf.theta[ib]))
+                src[ib] = surf.b0[1]*(1 + cos(surf.theta[ib]))
+                src[ib] += surf.b0[2]*(1 - cos(surf.theta[ib]))
                 for ia = 1:surf.naterm
                     gamma[ib] += surf.aterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
                     src[ib] += surf.bterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
@@ -945,27 +947,4 @@ Algorithms for parameter delvort
                 surf.src[ib-1].x = surf.bv[ib-1].x
                 surf.src[ib-1].z = surf.bv[ib-1].z
             end
-        end
-        # 
-        # function calc_q_cp(surf:TwoDSurfThick)
-        #
-        #     gamma = zeros(surf.ndiv)
-        #     for ib = 2:surf.ndiv
-        #         gamma[ib] = (surf.a0[1]*(1 + cos(surf.theta[ib])))/sin(surf.theta[ib])
-        #         for ia = 1:surf.naterm
-        #             gamma[ib] = gamma[ib] + surf.aterm[ia]*sin(ia*surf.theta[ib])
-        #         end
-        #         gamma[ib] = gamma[ib]*2.*surf.uref
-        #     end
-        #     for i = 1:surf.ndiv
-        #         u_u[i] = 0.5*gamma[i] + dphitdx[i] + dphiwdx[i] + surf.kinem.u*cos(surf.kinem.alpha)
-        #         + surf.kinem.hdot*sin(surf.kinem.alpha) - surf.kinem.alphadot*(cam[i] + thick[i])
-        #         w_u[i] = dphildz[i] + 0.5*sigma[i] + dphiwdz + surf.kinem.u*sin(surf.kinem.alpha)
-        #         -surf.kinem.hdot*cos(surf.kinem.alpha) + surf.kinem.alphadot(surf.x[i] - surf.pvt*surf.c)
-        #
-        #         vu[i] = sqrt(u_u[i]^2 + w_u[i]^2)
-        #     end
-        #
-
-
         end

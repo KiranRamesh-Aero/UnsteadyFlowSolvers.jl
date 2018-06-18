@@ -883,11 +883,11 @@ Algorithms for parameter delvort
                 dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
                 dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
 
-                surf.LHS[i-1,4+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) -
+                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) -
                 0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) -
                 0.5*surf.thick_slope[i]*(dphidx_u  - dphidx_l)
 
-                surf.LHS[surf.ndiv+i-3,4+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) -
+                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) -
                 0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) -
                 0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
 
@@ -921,6 +921,10 @@ Algorithms for parameter delvort
 
             #RHS for Kelvin condition (negative strength of all previously shed vortices)
             surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
+            #RHS for stagnation point
+            dphidz_u = surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha)
+            dphidx_u = surf.uind_u[1]*cos(surf.kinem.alpha) - surf.wind_u[1]*sin(surf.kinem.alpha)
+            surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + dphidx_u)
         end
 
         #Update position and strengths of bound vortices and sources
@@ -929,8 +933,6 @@ Algorithms for parameter delvort
             src = zeros(surf.ndiv)
             for ib = 1:surf.ndiv
                 gamma[ib] = surf.a0[1]*(1 + cos(surf.theta[ib]))
-                src[ib] = surf.b0[1]*(1 + cos(surf.theta[ib]))
-                src[ib] += surf.b0[2]*(1 - cos(surf.theta[ib]))
                 for ia = 1:surf.naterm
                     gamma[ib] += surf.aterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])
                     src[ib] += surf.bterm[ia]*sin(ia*surf.theta[ib])*sin(surf.theta[ib])

@@ -307,12 +307,12 @@ function calc_q_cp(surf::TwoDSurfThick)
     u1c[1] = 2*u1c[2] - u1c[3]
     u1c[surf.ndiv] = 2*u1c[surf.ndiv-1] - u1c[surf.ndiv-2]
 
-    lamb =mean(surf.cam_slope[1:5])
+    lamb = mean(surf.cam_slope[1:5])
     rho = surf.rho
-    vu = zeros(surf.ndiv)
-    vl = zeros(surf.ndiv)
-    vu_van = zeros(surf.ndiv)
-    vl_van = zeros(surf.ndiv)
+    qu = zeros(surf.ndiv)
+    ql = zeros(surf.ndiv)
+    quc = zeros(surf.ndiv)
+    qlc = zeros(surf.ndiv)
 
     for i = 1:surf.ndiv
         u_u = u1c[i] + u1t[i] + surf.uind_u[i] + surf.kinem.u*cos(surf.kinem.alpha) +

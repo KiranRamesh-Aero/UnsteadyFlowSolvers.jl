@@ -196,7 +196,6 @@ immutable TwoDSurfThick
     wind_l :: Vector{Float64}
     downwash :: Vector{Float64}
     a0 :: Vector{Float64}
-    b0 ::Vector{Float64}
     aterm :: Vector{Float64}
     a0dot :: Vector{Float64}
     adot :: Vector{Float64}
@@ -292,7 +291,7 @@ immutable TwoDSurfThick
         uind_u = zeros(ndiv); uind_l = zeros(ndiv); wind_u = zeros(ndiv); wind_l = zeros(ndiv)
         downwash = zeros(ndiv); a0 = zeros(1); a0dot = zeros(1); aterm = zeros(naterm)
         adot = zeros(3); a0prev = zeros(1); aprev = zeros(3); bterm = zeros(naterm);
-        b0 = zeros(2);
+
         bv = TwoDVort[]
         src = TwoDSource[]
 
@@ -307,49 +306,49 @@ immutable TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(ndiv*2-3,naterm*2+4)
-        RHS = zeros(ndiv*2-3)
+        LHS = zeros(ndiv*2-2,naterm*2+2)
+        RHS = zeros(ndiv*2-2)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
 
             #Sweep all rows (corresponding to ndiv) for lifting equation
             #A0 term
-            LHS[i-1,1] = uref*(-1 + thick[i]/(c*sin(theta[i])*sin(theta[i]/2)^2) - thick_slope[i]*cot(theta[i]/2))
+            LHS[i-1,1] = -uref*(1. + thick_slope[i]*(1+cos(theta[i]))/sin(theta[i]))
 
             #Sweep columns for aterms
             for n = 1:naterm
-                LHS[i-1,n+1] = uref*(cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]) + 2*thick[i]*n*cos(n*theta[i])/(c*sin(theta[i])))
+                LHS[i-1,n+1] = uref*(cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]))
             end
 
             #Sweep columns for bterm
             for n = 1:naterm
-                LHS[i-1,n+naterm+1] = uref*(cam_slope[i]*cos(n*theta[i]) - 2*cam[i]*n*sin(n*theta[i])/(c*sin(theta[i])))
+                LHS[i-1,n+naterm+1] = uref*cam_slope[i]*cos(n*theta[i])
             end
-            #b0 and bt
-            LHS[i-1,2*naterm+2] = -uref*cam_slope[i]
-            LHS[i-1,2*naterm+3] = uref*cam_slope[i]
 
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
-            LHS[ndiv+i-3,1]  = uref*(cam[i]/(c*sin(theta[i])*sin(theta[i]/2)^2) - cam_slope[i]*cot(theta[i]/2))
+            LHS[ndiv+i-3,1]  = -uref*(cam_slope[i]*cot(theta[i]/2))
             for n = 1:naterm
-                LHS[ndiv+i-3,1+n]  = -uref*(cam_slope[i]*sin(n*theta[i]) + 2*cam[i]*n*cos(n*theta[i])/(c*sin(theta[i])))
+                LHS[ndiv+i-3,1+n]  = -uref*cam_slope[i]*sin(n*theta[i])
             end
             for n = 1:naterm
-                LHS[ndiv+i-3,1+naterm+n] = uref*(sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]) - 2*thick[i]*n*sin(n*theta[i])/(c*sin(theta[i])))
+                LHS[ndiv+i-3,1+naterm+n] = uref*(sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]))
             end
-            LHS[ndiv+i-3,2*naterm+2] = -uref*(thick_slope[i] - (1. + cos(theta[i]))/sin(theta[i]))
-            LHS[ndiv+i-3,2*naterm+3] = uref*(thick_slope[i] + (1. - cos(theta[i]))/sin(theta[i]))
+            #Stagnation point at leading edge
+            for n = 1:naterm
+                LHS[2*ndiv-2] = -n
+            end
         end
 
         #Terms for Kelvin condition
         LHS[2*ndiv-3,1] = uref*c*pi
         LHS[2*ndiv-3,2] = uref*c*pi/2
-        LHS[2*ndiv-3,2*naterm+4] = 1.
+        LHS[2*ndiv-3,2*naterm+2] = 1.
+
 
         levflag = [0]
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, b0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)
     end
 end
 

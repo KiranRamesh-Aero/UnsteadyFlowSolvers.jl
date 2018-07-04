@@ -434,6 +434,88 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
     return curfield
 end
 
+# Function for calculating the wake rollup
+function wakeroll(surf::TwoDSurfThick, curfield::TwoDFlowField, dt)
+
+    nlev = length(curfield.lev)
+    ntev = length(curfield.tev)
+    nextv = length(curfield.extv)
+
+    #Clean induced velocities
+    for i = 1:ntev
+        curfield.tev[i].vx = 0
+        curfield.tev[i].vz = 0
+    end
+
+    for i = 1:nlev
+        curfield.lev[i].vx = 0
+        curfield.lev[i].vz = 0
+    end
+
+    for i = 1:nextv
+        curfield.extv[i].vx = 0
+        curfield.extv[i].vz = 0
+    end
+
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev; curfield.extv])
+
+    #Add the influence of velocities induced by bound vortices
+    utemp = zeros(ntev + nlev + nextv)
+    wtemp = zeros(ntev + nlev + nextv)
+    utemp, wtemp = ind_vel(surf.bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev); map(q -> q.x, curfield.extv)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev); map(q -> q.z, curfield.extv) ])
+
+    for i = 1:ntev
+        curfield.tev[i].vx += utemp[i]
+        curfield.tev[i].vz += wtemp[i]
+    end
+    for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vx += utemp[i]
+        curfield.lev[i-ntev].vz += wtemp[i]
+    end
+    for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vx += utemp[i]
+        curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+
+    #Add effect of sources
+    utemp, wtemp = ind_vel_src(surf.src, [map(q -> q.x, curfield.tev);
+    map(q -> q.x, curfield.lev); map(q -> q.x, curfield.extv)],
+    [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev);
+    map(q -> q.z, curfield.extv)])
+
+    for i = 1:ntev
+        curfield.tev[i].vx += utemp[i]
+        curfield.tev[i].vz += wtemp[i]
+    end
+    for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vx += utemp[i]
+        curfield.lev[i-ntev].vz += wtemp[i]
+    end
+    for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vx += utemp[i]
+        curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+
+    #Convect free vortices with their induced velocities
+    for i = 1:ntev
+        curfield.tev[i].x += dt*curfield.tev[i].vx
+        curfield.tev[i].z += dt*curfield.tev[i].vz
+    end
+    for i = 1:nlev
+        curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].z += dt*curfield.lev[i].vz
+    end
+    for i = 1:nextv
+        curfield.extv[i].x += dt*curfield.extv[i].vx
+        curfield.extv[i].z += dt*curfield.extv[i].vz
+    end
+
+    return curfield
+end
+
+
+
 function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
 
     nlev = length(curfield.lev)
@@ -493,6 +575,8 @@ function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
 
     return curfield
 end
+
+
 
 # Places a trailing edge vortex
 function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
@@ -619,6 +703,24 @@ function ind_vel(src::Vector{TwoDVort},t_x,t_z)
             distsq = xdist*xdist + zdist*zdist
             uind[itr] = uind[itr] - src[isr].s*zdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
             wind[itr] = wind[itr] + src[isr].s*xdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
+        end
+    end
+    return uind, wind
+end
+
+# Function to calculate induced velocities by a set of sources at a target location
+function ind_vel_src(src::Vector{TwoDSource},t_x,t_z)
+    #'s' stands for source and 't' for target
+    uind = zeros(length(t_x))
+    wind = zeros(length(t_x))
+
+    for itr = 1:length(t_x)
+	for isr = 1:length(src)
+            xdist = src[isr].x - t_x[itr]
+            zdist = src[isr].z - t_z[itr]
+            distsq = xdist*xdist + zdist*zdist
+            uind[itr] = uind[itr] - src[isr].s*xdist/(2*pi*distsq)
+            wind[itr] = wind[itr] - src[isr].s*zdist/(2*pi*distsq)
         end
     end
     return uind, wind

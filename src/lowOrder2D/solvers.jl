@@ -224,7 +224,7 @@ Simulates potential flow for an airfoil undergoing unsteady motion
             update_bv_src(surf)
 
             #Wake rollup
-            #wakeroll(surf, curfield, dt)
+            wakeroll(surf, curfield, dt)
 
             #Force calculation
             cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd = calc_forces(surf, int_wax_prev, dt)
@@ -236,6 +236,14 @@ Simulates potential flow for an airfoil undergoing unsteady motion
 
             for i = 1:surf.ndiv
                 int_wax_prev[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
+            end
+
+            # write flow details if required
+            if writeflag == 1
+                if istep in writeArray
+                    dirname = "$(round(t,nround))"
+                    writeStamp(dirname, t, surf, curfield)
+                end
             end
 
             mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],

@@ -135,4 +135,3 @@ function makeForcePlots()
     savefig("forcePlots/cm.png")
     close()
 end
-

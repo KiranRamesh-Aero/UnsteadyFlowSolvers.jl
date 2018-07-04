@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 using UNSflow
 
-alphadef = ConstDef(5.*pi/180)
+alphadef = ConstDef(45.*pi/180)
 
 hdef = ConstDef(0.)
 
@@ -25,7 +25,7 @@ nsteps =Int(round(t_tot/dtstar))+1
 
 startflag = 0
 
-writeflag = 0
+writeflag = 1
 
 writeInterval = t_tot/10.
 
@@ -34,7 +34,7 @@ delvort = delNone()
 
 mat, surf, curfield = lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-#makeVortPlots2D()
+makeVortPlots2D()
 
 makeForcePlots()
 

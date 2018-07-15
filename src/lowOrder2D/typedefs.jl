@@ -306,46 +306,41 @@ immutable TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(ndiv*2-2,naterm*2+2)
-        RHS = zeros(ndiv*2-2)
+        LHS = zeros(ndiv*2-3,naterm*2+2)
+        RHS = zeros(ndiv*2-3)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
 
             #Sweep all rows (corresponding to ndiv) for lifting equation
             #A0 term
-            LHS[i-1,1] = -uref*(1. + thick_slope[i]*(1+cos(theta[i]))/sin(theta[i]))
+            LHS[i-1,1] = -(1. + thick_slope[i]*cot(theta[i]/2))
 
             #Sweep columns for aterms
             for n = 1:naterm
-                LHS[i-1,n+1] = uref*(cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]))
+                LHS[i-1,n+1] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i])
             end
 
             #Sweep columns for bterm
             for n = 1:naterm
-                LHS[i-1,n+naterm+1] = uref*cam_slope[i]*cos(n*theta[i])
+                LHS[i-1,n+naterm+1] = cam_slope[i]*cos(n*theta[i])
             end
 
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
-            LHS[ndiv+i-3,1]  = -uref*(cam_slope[i]*cot(theta[i]/2))
+            LHS[ndiv+i-3,1]  = -cam_slope[i]*cot(theta[i]/2)
             for n = 1:naterm
-                LHS[ndiv+i-3,1+n]  = -uref*cam_slope[i]*sin(n*theta[i])
+                LHS[ndiv+i-3,1+n]  = -cam_slope[i]*sin(n*theta[i])
             end
             for n = 1:naterm
-                LHS[ndiv+i-3,1+naterm+n] = uref*(sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]))
-            end
-            #Stagnation point at leading edge
-            for n = 1:naterm
-                LHS[2*ndiv-2] = -n
+                LHS[ndiv+i-3,1+naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i])
             end
         end
 
         #Terms for Kelvin condition
-        LHS[2*ndiv-3,1] = uref*c*pi
-        LHS[2*ndiv-3,2] = uref*c*pi/2
+        LHS[2*ndiv-3,1] = pi
+        LHS[2*ndiv-3,2] = pi/2
         LHS[2*ndiv-3,2*naterm+2] = 1.
-
 
         levflag = [0]
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)

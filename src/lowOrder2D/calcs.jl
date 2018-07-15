@@ -975,23 +975,27 @@ Algorithms for parameter delvort
 
             dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
 
-            u_u_dummy, w_u_dummy = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
-            u_l_dummy, w_l_dummy = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+            uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+            ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
 
             for i = 2:surf.ndiv-1
-                dphidz_u = w_u_dummy[i]*cos(surf.kinem.alpha) + u_u_dummy[i]*sin(surf.kinem.alpha)
-                dphidz_l = w_l_dummy[i]*cos(surf.kinem.alpha) + u_l_dummy[i]*sin(surf.kinem.alpha)
+                wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
 
-                dphidx_u = u_u_dummy[i]*cos(surf.kinem.alpha) - w_u_dummy[i]*sin(surf.kinem.alpha)
-                dphidx_l = u_l_dummy[i]*cos(surf.kinem.alpha) - w_l_dummy[i]*sin(surf.kinem.alpha)
+                wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
 
-                surf.LHS[i-1,2+2*surf.naterm] = 0.5*(dphidz_u + dphidz_l) -
-                0.5*surf.cam_slope[i]*(dphidx_u + dphidx_l) -
-                0.5*surf.thick_slope[i]*(dphidx_u  - dphidx_l)
+                wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
 
-                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = 0.5*(dphidz_u - dphidz_l) -
-                0.5*surf.cam_slope[i]*(dphidx_u - dphidx_l) -
-                0.5*surf.thick_slope[i]*(dphidx_u + dphidx_l)
+                wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+                surf.LHS[i-1,2+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+                surf.thick_slope[i]*wlx + wlz
+
+                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+                surf.thick_slope[i]*wtx + wtz
 
             end
 
@@ -1002,31 +1006,35 @@ Algorithms for parameter delvort
         function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
             for i = 2:surf.ndiv-1
                 #RHS for lifting equation
-                dphidz_u = surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha)
-                dphidz_l = surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha)
 
-                dphidx_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
-                dphidx_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+                wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+                surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
 
-                surf.RHS[i-1] = -surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[i] -
-                surf.pvt*surf.c) + surf.kinem.hdot*cos(surf.kinem.alpha) - 0.5*(dphidz_u +
-                dphidz_l) + surf.cam_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
-                surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) +
-                surf.thick_slope[i]*(0.5*(dphidx_u - dphidx_l)) -
-                surf.kinem.alphadot*(surf.cam[i]*surf.cam_slope[i] + surf.thick[i]*surf.thick_slope[i])
+                wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+                surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
 
-                surf.RHS[surf.ndiv+i-3] = -surf.kinem.alphadot*(surf.cam[i]*surf.thick_slope[i] +
-                surf.thick[i]*surf.cam_slope[i]) + surf.cam_slope[i]*(0.5*(dphidx_u - dphidx_l)) +
-                surf.thick_slope[i]*(surf.kinem.u*cos(surf.kinem.alpha) +
-                surf.kinem.hdot*sin(surf.kinem.alpha) + 0.5*(dphidx_u + dphidx_l)) - 0.5*(dphidz_u - dphidz_l)
+                wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+                surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+
+                wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+                surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+
+                surf.RHS[i-1] = -(surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha)/surf.uref -
+                surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)/surf.uref +
+                (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha)/surf.uref - wlz/surf.uref +
+                surf.cam_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                surf.kinem.alphadot*surf.cam[i]) +
+                surf.thick_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i])
+
+                surf.RHS[surf.ndiv+i-3] = surf.cam_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i]) +
+                surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                surf.kinem.alphadot*surf.cam[i]) - wtz
             end
 
             #RHS for Kelvin condition (negative strength of all previously shed vortices)
-            surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))
-            #RHS for stagnation point
-            dphidz_u = surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha)
-            dphidx_u = surf.uind_u[1]*cos(surf.kinem.alpha) - surf.wind_u[1]*sin(surf.kinem.alpha)
-            surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + dphidx_u)
+            surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
         end
 
         #Update position and strengths of bound vortices and sources

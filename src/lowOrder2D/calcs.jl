@@ -381,6 +381,58 @@ function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
     return curfield
 end
 
+function wakeroll(curfield::TwoDVFlowField, dt)
+
+    nlev = length(curfield.lev)
+    ntev = length(curfield.tev)
+    nextv = length(curfield.extv)
+
+    #Clean induced velocities
+    for i = 1:ntev
+        curfield.tev[i].vx = 0
+        curfield.tev[i].vz = 0
+        curfield.tev[i].dvc = 0
+    end
+
+    for i = 1:nlev
+        curfield.lev[i].vx = 0
+        curfield.lev[i].vz = 0
+        curfield.lev[i].dvc = 0
+    end
+
+    for i = 1:nextv
+        curfield.extv[i].vx = 0
+        curfield.extv[i].vz = 0
+        curfield.extv[i].dvc = 0
+    end
+
+
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev; curfield.extv], curfield.nu)
+
+    #Convect free vortices with their induced velocities
+    #Update core size of vortices
+    for i = 1:ntev
+        curfield.tev[i].x += dt*curfield.tev[i].vx
+        curfield.tev[i].z += dt*curfield.tev[i].vz
+        curfield.tev[i].vc = sqrt(dt*curfield.tev[i].dvc + curfield.tev[i].vc^2)
+    end
+
+    for i = 1:nlev
+        curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].z += dt*curfield.lev[i].vz
+        curfield.lev[i].vc = sqrt(dt*curfield.lev[i].dvc + curfield.lev[i].vc^2)
+    end
+    for i = 1:nextv
+        curfield.extv[i].x += dt*curfield.extv[i].vx
+        curfield.extv[i].z += dt*curfield.extv[i].vz
+        curfield.extv[i].vc = sqrt(dt*curfield.extv[i].dvc + curfield.extv[i].vc^2)
+    end
+
+    return curfield
+end
+
+
 # Places a trailing edge vortex
 function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     ntev = length(field.tev)
@@ -501,6 +553,46 @@ function mutual_ind(vorts::Vector{TwoDVort})
 
             vorts[i].vx += dz * vorts[j].s * magitr
             vorts[i].vz -= dx * vorts[j].s * magitr
+        end
+    end
+    return vorts
+end
+
+function mutual_ind(vorts::Vector{TwoDVVort}, nu::Float64)
+
+    for i = 1:length(vorts)
+        for j = i+1:length(vorts)
+            dx = vorts[i].x - vorts[j].x
+            dz = vorts[i].z - vorts[j].z
+            #source- tar
+            dsq = dx*dx + dz*dz
+
+            magitr = 1./(2*pi*sqrt(vorts[j].vc*vorts[j].vc*vorts[j].vc*vorts[j].vc + dsq*dsq))
+            magjtr = 1./(2*pi*sqrt(vorts[i].vc*vorts[i].vc*vorts[i].vc*vorts[i].vc + dsq*dsq))
+
+            #Convectiom
+            vorts[j].vx -= dz * vorts[i].s * magjtr
+            vorts[j].vz += dx * vorts[i].s * magjtr
+
+            vorts[i].vx += dz * vorts[j].s * magitr
+            vorts[i].vz -= dx * vorts[j].s * magitr
+
+            #Diffusion velocity
+            wi = vorts[i].s*vorts[i].vc^4/(pi*(dsq^2 + vorts.vc[i]^4)^(3/2))
+            wj = vorts[j].s*vorts[j].vc^4/(pi*(dsq^2 + vorts.vc[j]^4)^(3/2))
+
+            magitr = 6.*nu*dsq*vorts[j].vc^4*vorts[j].s/(pi*wj*(dsq^2 + vorts[j].vc^4)^(5/2))
+            magjtr = 6.*nu*dsq*vorts[i].vc^4*vorts[i].s/(pi*wi*(dsq^2 + vorts[i].vc^4)^(5/2))
+
+            vorts[i].vx -= dx * magitr
+            vorts[i].vz -= dz * magitr
+
+            vorts[j].vx += dx * magjtr
+            vorts[j].vz += dz * magjtr
+
+            #Diffusion vortex core expansion
+            vorts[i].dvc += 6*nu*vorts[i].vc^2*dsq*(3*vorts[j].vc^4 - dsq^2)/(vorts[j].vc^4 + dsq^2)^2
+            vorts[j].dvc += 6*nu*vorts[j].vc^2*dsq*(3*vorts[i].vc^4 - dsq^2)/(vorts[i].vc^4 + dsq^2)^2
         end
     end
     return vorts

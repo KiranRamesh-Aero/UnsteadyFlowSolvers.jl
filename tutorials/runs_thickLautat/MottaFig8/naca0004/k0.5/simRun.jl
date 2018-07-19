@@ -1,7 +1,7 @@
-push!(LOAD_PATH,"../../src/")
+push!(LOAD_PATH,"../../../UNSflow/src/")
 using UNSflow
 
-k = 0.1
+k = 0.5
 amp = 1.*pi/180
 
 alphadef = SinDef(0., amp, k, 0.)
@@ -20,7 +20,7 @@ surf = TwoDSurfThick(geometry, pvt, kinem)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.15#find_tstep(hdef)
+dtstar = 0.15#find_tstep(alphadef)
 
 T = pi/k
 t_tot = 5.*T

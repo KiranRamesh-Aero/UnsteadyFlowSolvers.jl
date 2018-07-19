@@ -306,8 +306,8 @@ immutable TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(ndiv*2-3,naterm*2+2)
-        RHS = zeros(ndiv*2-3)
+        LHS = zeros(ndiv*2-2,naterm*2+3)
+        RHS = zeros(ndiv*2-2)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1

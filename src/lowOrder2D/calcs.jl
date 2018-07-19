@@ -1002,6 +1002,86 @@ Algorithms for parameter delvort
             return surf, xloc_tev, zloc_tev
         end
 
+        function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
+            #Calculate the missing column in LHS that depends on last shed vortex location
+
+            ntev = length(curfield.tev)
+            nlev = length(curfield.lev)
+
+            if ntev == 0
+                xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+                zloc_tev = surf.bnd_z_chord[surf.ndiv]
+            else
+                xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+                zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1./3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+            end
+
+            if surf.levflag[1] == 0
+
+                le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
+                le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind[1]
+
+                xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
+                zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
+            else
+                xloc = surf.bnd_x[1]+(1./3.)*(curfield.lev[nlev].x - surf.bnd_x[1])
+                zloc = surf.bnd_z[1]+(1./3.)*(curfield.lev[nlev].z - surf.bnd_z[1])
+            end
+
+            dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+
+            uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+            ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
+            for i = 2:surf.ndiv-1
+                wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+
+                wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+
+                wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+
+                wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+                surf.LHS[i-1,2+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+                surf.thick_slope[i]*wlx + wlz
+
+                surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+                surf.thick_slope[i]*wtx + wtz
+
+            end
+
+            dummyvort = TwoDVort(xloc_lev, zloc_lev, 1., vcore, 0., 0.)
+
+            for i = 2:surf.ndiv-1
+                wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+
+                wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+
+                wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+
+                wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+                surf.LHS[i-1,3+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+                surf.thick_slope[i]*wlx + wlz
+
+                surf.LHS[surf.ndiv+i-3,3+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+                surf.thick_slope[i]*wtx + wtz
+            end
+
+            LHS[2*ndiv-3,2*naterm+3] = 1.
+
+            LHS[2*ndiv-2,1] = 1.
+
+            return surf, xloc_tev, zloc_tev, xloc_lev, zloc_lev
+        end
 
         function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
             for i = 2:surf.ndiv-1
@@ -1036,6 +1116,47 @@ Algorithms for parameter delvort
             #RHS for Kelvin condition (negative strength of all previously shed vortices)
             surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
         end
+
+        function update_thickRHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField)
+            for i = 2:surf.ndiv-1
+                #RHS for lifting equation
+
+                wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+                surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
+
+                wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+                surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
+
+                wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+                surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+
+                wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+                surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+
+                surf.RHS[i-1] = -(surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha)/surf.uref -
+                surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)/surf.uref +
+                (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha)/surf.uref - wlz/surf.uref +
+                surf.cam_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                surf.kinem.alphadot*surf.cam[i]) +
+                surf.thick_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i])
+
+                surf.RHS[surf.ndiv+i-3] = surf.cam_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i]) +
+                surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                surf.kinem.alphadot*surf.cam[i]) - wtz
+            end
+
+            #RHS for Kelvin condition (negative strength of all previously shed vortices)
+            surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+
+            if surf.a0[1] > 0.
+                surf.RHS[2*surf.ndiv-2] = surf.lespcrit[1]
+            else
+                surf.RHS[2*surf.ndiv-2] = -surf.lespcrit[1]
+            end
+        end
+
 
         #Update position and strengths of bound vortices and sources
         function update_bv_src(surf::TwoDSurfThick)

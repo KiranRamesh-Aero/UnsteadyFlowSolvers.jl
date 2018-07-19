@@ -1,10 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 using UNSflow
 
-k = 0.1
-amp = 1.*pi/180
-
-alphadef = SinDef(0., amp, k, 0.)
+alphadef = ConstDef(45.*pi/180)
 
 hdef = ConstDef(0.)
 
@@ -14,16 +11,17 @@ kinem = KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "NACA0004"
+geometry = "FlatPlate0417"
 
-surf = TwoDSurfThick(geometry, pvt, kinem)
+lespcrit = [0.1;]
+
+surf = TwoDSurfThick(geometry, pvt, kinem, lespcrit)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.15#find_tstep(hdef)
+dtstar = 0.015
 
-T = pi/k
-t_tot = 5.*T
+t_tot = 10.
 
 nsteps =Int(round(t_tot/dtstar))+1
 

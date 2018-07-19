@@ -1,4 +1,4 @@
-push!(LOAD_PATH,"../../src/")
+push!(LOAD_PATH,"../../../UNSflow/src/")
 using UNSflow
 
 k = 0.1
@@ -14,13 +14,13 @@ kinem = KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "NACA0004"
+geometry = "NACA0012"
 
 surf = TwoDSurfThick(geometry, pvt, kinem)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.15#find_tstep(hdef)
+dtstar = 0.15#find_tstep(alphadef)
 
 T = pi/k
 t_tot = 5.*T

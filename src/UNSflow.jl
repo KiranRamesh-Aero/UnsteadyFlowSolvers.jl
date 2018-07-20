@@ -14,6 +14,8 @@ pygui(:tk)
 using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
 xticks, yticks, subplot, legend, axis, savefig, close
 
+using SpecialFunctions: erf
+
 using LaTeXStrings: @L_str
 
 export

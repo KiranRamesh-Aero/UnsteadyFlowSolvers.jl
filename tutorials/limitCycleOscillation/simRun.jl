@@ -34,11 +34,15 @@ curfield = TwoDFlowField()
 
 dtstar = 0.015
 
-nsteps = 50000
+nsteps = 1000
+
+t_tot = nsteps * dtstar / u
 
 startflag = 0
 
 writeflag = 0
+
+writeInterval = t_tot/20.
 
 delvort = delSpalart(500, 12, 1e-5)
 

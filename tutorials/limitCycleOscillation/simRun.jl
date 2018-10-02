@@ -39,6 +39,7 @@ nsteps = 50000
 startflag = 0
 
 writeflag = 0
+writeInterval = dtstar * nsteps/20.
 
 delvort = delSpalart(500, 12, 1e-5)
 

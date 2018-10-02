@@ -1,11 +1,11 @@
-function viewVort2D(tev::Array{Float64}, lev::Array{Float64}, bv::Array{Float64})
+function viewVort2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matrix{Float64})
     scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
     sc2 = scatter(bv[:,2], bv[:,3], s=5, c=bv[:,1], edgecolors="none")
     plot(bv[:,2], bv[:,3], color = "black", linewidth=1.0)
 end
 
-function viewVortConnect2D(tev::Array{Float64}, lev::Array{Float64}, bv::Array{Float64})
+function viewVortConnect2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matrix{Float64})
     scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
     sc2 = scatter(bv[:,2], bv[:,3], s=5, c=bv[:,1], edgecolors="none")
@@ -17,17 +17,17 @@ end
 
 function makeVortPlots2D()
     dirvec = readdir()
-    dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
     #Determine axis limits
     dirmax = maximum(dirresults)
     cd("$(dirmax)")
-    tev = readdlm("tev")
-    lev = try
-        readdlm("lev")
+    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    lev =   try
+                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
             catch
-        Array{Float64}(0,3)
-    end
-    bv = readdlm("boundv")
+                zeros(0,3)
+            end
+    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
 
     xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
@@ -43,13 +43,13 @@ function makeVortPlots2D()
         if dirresults[i] != 0
             dirstr="$(dirresults[i])"
             cd(dirstr)
-            tev = readdlm("tev")
-            lev = try
-                readdlm("lev")
-            catch
-                Array{Float64}(0,3)
-            end
-            bv = readdlm("boundv")
+            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            lev =   try
+                        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                    catch
+                        zeros(0,3)
+                    end
+            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
 
             viewVort2D(tev, lev, bv)
             axis([xmin-1, xmax+1, zmin-1, zmax+1])
@@ -67,7 +67,7 @@ function makeForcePlots()
     end
     mkdir("forcePlots")
 
-    mat = readdlm("resultsSummary")
+    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
 
     t = mat[:,1]
     alpha = mat[:,2]*180/pi
@@ -135,4 +135,3 @@ function makeForcePlots()
     savefig("forcePlots/cm.png")
     close()
 end
-

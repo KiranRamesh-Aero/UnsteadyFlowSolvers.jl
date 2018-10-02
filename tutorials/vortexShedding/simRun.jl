@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 using UNSflow
 
-alphadef = EldUpDef(45.*pi/180, 0.4, 0.8)
+alphadef = EldUpDef(45. *pi/180, 0.4, 0.8)
 
 hdef = ConstDef(0.)
 

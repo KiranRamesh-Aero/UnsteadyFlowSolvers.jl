@@ -8,7 +8,7 @@ radius `vc`.
 interaction calculations
 
 """
-type TwoDVort
+mutable struct  TwoDVort
     x :: Float64
     z :: Float64
     s :: Float64
@@ -17,7 +17,7 @@ type TwoDVort
     vz :: Float64
 end
 
-immutable TwoDFlowField
+struct TwoDFlowField
     velX :: MotionDef
     velZ :: MotionDef
     u :: Vector{Float64}
@@ -35,7 +35,7 @@ immutable TwoDFlowField
     end
 end
 
-immutable TwoDSurf
+struct TwoDSurf
     c :: Float64
     uref :: Float64
     coord_file :: String
@@ -76,7 +76,7 @@ immutable TwoDSurf
         dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
             theta[ib] = real(ib-1.)*dtheta
-            x[ib] = c/2.*(1-cos(theta[ib]))
+            x[ib] = c/2. *(1-cos(theta[ib]))
         end
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
@@ -159,7 +159,7 @@ immutable TwoDSurf
     end
 end
 
-type TwoDOFPar
+mutable struct TwoDOFPar
     x_alpha :: Float64
     r_alpha :: Float64
     kappa :: Float64
@@ -174,7 +174,7 @@ type TwoDOFPar
 end
 
 #For airfoil with 2DOF in pitch and plunge
-type KinemPar2DOF
+mutable struct KinemPar2DOF
     alpha :: Float64
     h :: Float64
     alphadot :: Float64
@@ -203,7 +203,7 @@ type KinemPar2DOF
     end
 end
 
-immutable TwoDSurf2DOF
+struct TwoDSurf2DOF
     c :: Float64
     uref :: Float64
     coord_file :: String
@@ -242,7 +242,7 @@ immutable TwoDSurf2DOF
 	dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
             theta[ib] = real(ib-1.)*dtheta
-            x[ib] = c/2.*(1-cos(theta[ib]))
+            x[ib] = c/2. *(1-cos(theta[ib]))
         end
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
@@ -270,7 +270,7 @@ immutable TwoDSurf2DOF
     end
 end
 
-immutable KelvinCondition
+struct KelvinCondition
     surf :: TwoDSurf
     field :: TwoDFlowField
 end
@@ -306,7 +306,7 @@ function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     return val
 end
 
-immutable KelvinCondition2DOF
+struct KelvinCondition2DOF
     surf :: TwoDSurf2DOF
     field :: TwoDFlowField
 end
@@ -338,7 +338,7 @@ function (kelv::KelvinCondition2DOF)(tev_iter::Array{Float64})
     return val
 end
 
-immutable KelvinKutta
+struct KelvinKutta
     surf :: TwoDSurf
     field :: TwoDFlowField
 end
@@ -381,7 +381,7 @@ function (kelv::KelvinKutta)(v_iter::Array{Float64})
     return val
 end
 
-immutable KelvinKutta2DOF
+struct KelvinKutta2DOF
     surf :: TwoDSurf2DOF
     field :: TwoDFlowField
 end
@@ -423,4 +423,3 @@ function (kelv::KelvinKutta2DOF)(v_iter::Array{Float64})
     #Add kelv_enforced if necessary - merging will be better
     return val
 end
-

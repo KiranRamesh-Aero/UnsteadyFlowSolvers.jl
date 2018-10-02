@@ -112,7 +112,15 @@ function update_externalvel(curfield::TwoDFlowField, t)
         curfield.u[1] = curfield.velX(t)
         curfield.w[1] = curfield.velZ(t)
     end
+    if (typeof(curfield.velX) == StepGustDef)
+        curfield.u[1] = curfield.velX(t)
+    end
+    if (typeof(curfield.velZ) == StepGustDef)
+        curfield.w[1] = curfield.velZ(t)
+    end
 end
+
+
 
 # Function updating the dimensional kinematic parameters
 function update_kinem(surf::TwoDSurf, t)
@@ -362,6 +370,31 @@ function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
     for i = ntev+nlev+1:ntev+nlev+nextv
         curfield.extv[i-ntev-nlev].vx += utemp[i]
         curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+
+    #Add influence of gusts on vorticites (only for StepGustDef)
+
+    if (typeof(curfield.velX) == StepGustDef)
+       for i = 1:ntev
+        curfield.tev[i].vx += curfield.velX(t)
+       end
+       for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vx += curfield.velX(t)
+       end
+       for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vx += curfield.velX(t)
+       end
+    end
+    if (typeof(curfield.velZ) == StepGustDef)
+       for i = 1:ntev
+        curfield.tev[i].vz += curfield.velZ(t)
+       end
+       for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vz += curfield.velZ(t)
+       end
+       for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vz += curfield.velZ(t)
+       end
     end
 
     #Convect free vortices with their induced velocities

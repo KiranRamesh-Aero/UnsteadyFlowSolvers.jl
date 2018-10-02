@@ -267,6 +267,9 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         #Udpate current time
         t = t + dt
 
+        #Update external flowfield
+        update_externalvel(curfield, t)
+
         #Update kinematic parameters
         update_kinem(surf, t)
 
@@ -600,6 +603,9 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
     for istep = 1:nsteps
         #Udpate current time
         t = t + dt
+
+        #Update external flowfield
+        update_externalvel(curfield, t)
 
         #Update kinematic parameters (based on 2DOF response)
         update_kinem(surf, dt, cl, cm)

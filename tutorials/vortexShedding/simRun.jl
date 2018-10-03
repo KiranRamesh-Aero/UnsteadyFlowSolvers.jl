@@ -2,7 +2,7 @@ push!(LOAD_PATH,"../../src/")
 import UNSflow
 
 
-alphadef = UNSflow.EldUpDef(45.*pi/180, 0.4, 0.8)
+alphadef = UNSflow.EldUpDef(45. *pi/180, 0.4, 0.8)
 
 hdef = UNSflow.ConstDef(0.)
 

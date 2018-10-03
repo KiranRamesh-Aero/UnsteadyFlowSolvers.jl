@@ -1,6 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 
+
 alphadef = UNSflow.ConstDef(4.*pi/180)
 
 hdef = UNSflow.SinDef(0., 0.05, 3.93, 0.)
@@ -19,7 +20,7 @@ curfield = UNSflow.TwoDFlowField()
 
 dtstar = UNSflow.find_tstep(hdef)
 
-t_tot = 5.*pi/hdef.k
+t_tot = 5. *pi/hdef.k
 
 nsteps =Int(round(t_tot/dtstar))+1
 

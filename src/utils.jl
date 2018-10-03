@@ -5,7 +5,7 @@ Clears all timestamp directories in the current folder
 """
 function cleanWrite()
     dirvec = readdir()
-    dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
     for i =1:length(dirresults)
         rm("$(dirresults[i])", force=true, recursive=true)
     end
@@ -85,7 +85,7 @@ function find_tstep(kin :: ConstDef)
 end
 
 # Numerical integration method: Trapezoidal
-function simpleTrapz{T<:Real}(y::Vector{T}, x::Vector{T})
+function simpleTrapz(y::Vector{T}, x::Vector{T}) where {T<:Real}
     local len = length(y)
     if (len != length(x))
         error("Vectors must be of same length")
@@ -104,20 +104,22 @@ function camber_calc(x::Vector,airfoil::String)
     ndiv = length(x);
     c = x[ndiv];
 
-    cam = Array{Float64}(ndiv)
-    cam_slope = Array{Float64}(ndiv)
 
-    in_air = readdlm(airfoil);
+    cam = zeros(ndiv)
+    cam_slope = zeros(ndiv)
+    in_air = DelimitedFiles.readdlm(airfoil, Float64);
     xcoord = in_air[:,1];
     ycoord = in_air[:,2];
     ncoord = length(xcoord);
-    xcoord_sum = Array{Float64}(ncoord);
+    xcoord_sum = zeros(ncoord);
+
     xcoord_sum[1] = 0;
     for i = 1:ncoord-1
         xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
     end
     y_spl = Spline1D(xcoord_sum,ycoord);
-    y_ans = Array{Float64}(2*ndiv);
+
+    y_ans = zeros(2*ndiv);
 
     for i=1:ndiv
         y_ans[i] = evaluate(y_spl,x[i]/c);

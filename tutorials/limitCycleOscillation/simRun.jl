@@ -41,6 +41,7 @@ t_tot = nsteps * dtstar / u
 startflag = 0
 
 writeflag = 0
+writeInterval = dtstar * nsteps/20.
 
 writeInterval = t_tot/20.
 

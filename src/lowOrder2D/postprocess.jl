@@ -16,8 +16,8 @@ function calc_forces(surf::TwoDSurf)
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
     end
-    nonl = nonl*2./(surf.uref*surf.uref*surf.c)
-    nonl_m = nonl_m*2./(surf.uref*surf.uref*surf.c*surf.c)
+    nonl = nonl*2. /(surf.uref*surf.uref*surf.c)
+    nonl_m = nonl_m*2. /(surf.uref*surf.uref*surf.c*surf.c)
 
     # Normal force coefficient
     cn = cnc + cnnc + nonl
@@ -27,7 +27,7 @@ function calc_forces(surf::TwoDSurf)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
     #Pitching moment is clockwise or nose up positive
-    cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
+    cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 3. *surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
     return cl, cd, cm
 end
 
@@ -49,8 +49,8 @@ function calc_forces(surf::TwoDSurf2DOF)
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
     end
-    nonl = nonl*2./(surf.uref*surf.uref*surf.c)
-    nonl_m = nonl_m*2./(surf.uref*surf.uref*surf.c*surf.c)
+    nonl = nonl*2. /(surf.uref*surf.uref*surf.c)
+    nonl_m = nonl_m*2. /(surf.uref*surf.uref*surf.c*surf.c)
 
     # Normal force coefficient
     cn = cnc + cnnc + nonl
@@ -60,7 +60,7 @@ function calc_forces(surf::TwoDSurf2DOF)
     cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
 
     #Pitching moment is clockwise or nose up positive
-    cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7.*surf.a0dot[1]/16. + 3.*surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
+    cm = cn*surf.pvt - 2*pi*((surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 3. *surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
     return cl, cd, cm
 end
 
@@ -73,16 +73,16 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     cd(dirname)
 
     f = open("timeKinem", "w")
-    write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
-    writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
+    Serialization.Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
+    DelimitedFiles.writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
     close(f)
 
     f = open("FourierCoeffs", "w")
-    write(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
+    Serialization.serialize(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
     matfour = zeros(surf.naterm+1, 2)
     matfour[:,1] = [surf.a0[1];surf.aterm[:]]
     matfour[1:4,2] = [surf.a0dot[1];surf.adot[:]]
-    writedlm(f, matfour)
+    DelimitedFiles.writedlm(f, matfour)
     close(f)
 
     # f = open("forces", "w")
@@ -93,30 +93,30 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     # close(f)
 
     f = open("tev", "w")
-    write(f, ["#strength \t", "x-position \t", "z-position \n"])
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
     tevmat = zeros(length(curfield.tev), 3)
     for i = 1:length(curfield.tev)
         tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
     end
-    writedlm(f, tevmat)
+    DelimitedFiles.writedlm(f, tevmat)
     close(f)
 
     f = open("lev", "w")
-    write(f, ["#strength \t", "x-position \t", "z-position \n"])
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
     levmat = zeros(length(curfield.lev), 3)
     for i = 1:length(curfield.lev)
         levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
     end
-    writedlm(f, levmat)
+    DelimitedFiles.writedlm(f, levmat)
     close(f)
 
     f = open("boundv", "w")
-    write(f, ["#strength \t", "x-position \t", "z-position \n"])
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
     bvmat = zeros(length(surf.bv), 3)
     for i = 1:length(surf.bv)
         bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
     end
-    writedlm(f, bvmat)
+    DelimitedFiles.writedlm(f, bvmat)
     close(f)
     cd("..")
 end
@@ -131,7 +131,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf2DOF, curfield::T
 
     f = open("timeKinem", "w")
     write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
-    writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
+    DelimitedFiles.writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
     close(f)
 
     f = open("FourierCoeffs", "w")
@@ -139,7 +139,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf2DOF, curfield::T
     matfour = zeros(surf.naterm+1, 2)
     matfour[:,1] = [surf.a0[1];surf.aterm[:]]
     matfour[1:4,2] = [surf.a0dot[1];surf.adot[:]]
-    writedlm(f, matfour)
+    DelimitedFiles.writedlm(f, matfour)
     close(f)
 
     # f = open("forces", "w")
@@ -155,7 +155,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf2DOF, curfield::T
     for i = 1:length(curfield.tev)
         tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
     end
-    writedlm(f, tevmat)
+    DelimitedFiles.writedlm(f, tevmat)
     close(f)
 
     f = open("lev", "w")
@@ -164,7 +164,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf2DOF, curfield::T
     for i = 1:length(curfield.lev)
         levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
     end
-    writedlm(f, levmat)
+    DelimitedFiles.writedlm(f, levmat)
     close(f)
 
     f = open("boundv", "w")
@@ -173,7 +173,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf2DOF, curfield::T
     for i = 1:length(surf.bv)
         bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
     end
-    writedlm(f, bvmat)
+    DelimitedFiles.writedlm(f, bvmat)
     close(f)
     cd("..")
 end

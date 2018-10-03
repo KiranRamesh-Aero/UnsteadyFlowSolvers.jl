@@ -6,6 +6,10 @@ import Dierckx: Spline1D, derivative, evaluate
 
 import ForwardDiff
 
+import DelimitedFiles
+
+import Serialization
+
 import NLsolve: nlsolve, not_in_place
 
 import PyCall

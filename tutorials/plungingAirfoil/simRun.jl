@@ -1,23 +1,24 @@
 push!(LOAD_PATH,"../../src/")
-using UNSflow
+import UNSflow
 
-alphadef = ConstDef(4. *pi/180)
 
-hdef = SinDef(0., 0.05, 3.93, 0.)
+alphadef = UNSflow.ConstDef(4.*pi/180)
 
-udef = ConstDef(1.)
+hdef = UNSflow.SinDef(0., 0.05, 3.93, 0.)
 
-full_kinem = KinemDef(alphadef, hdef, udef)
+udef = UNSflow.ConstDef(1.)
+
+full_kinem = UNSflow.KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
 geometry = "sd7003.dat"
 
-surf = TwoDSurf(geometry, pvt, full_kinem)
+surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem)
 
-curfield = TwoDFlowField()
+curfield = UNSflow.TwoDFlowField()
 
-dtstar = find_tstep(hdef)
+dtstar = UNSflow.find_tstep(hdef)
 
 t_tot = 5. *pi/hdef.k
 
@@ -30,12 +31,12 @@ writeflag = 1
 writeInterval = t_tot/20.
 
 #delvort = delSpalart(500, 12, 1e-5)
-delvort = delNone()
+delvort = UNSflow.delNone()
 
-mat, surf, curfield = lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = UNSflow.lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-makeVortPlots2D()
+UNSflow.makeVortPlots2D()
 
-makeForcePlots()
+UNSflow.makeForcePlots()
 
-cleanWrite()
+UNSflow.cleanWrite()

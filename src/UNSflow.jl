@@ -2,19 +2,19 @@ __precompile__(true)
 
 module UNSflow
 
-using Dierckx: Spline1D, derivative, evaluate
+import Dierckx: Spline1D, derivative, evaluate
 
-using ForwardDiff
+import ForwardDiff
 
-using NLsolve: nlsolve, not_in_place
+import NLsolve: nlsolve, not_in_place
 
-using PyCall
-pygui(:tk)
+import PyCall
+PyCall.pygui(:tk)
 
-using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
+import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
 xticks, yticks, subplot, legend, axis, savefig, close
 
-using LaTeXStrings: @L_str
+import LaTeXStrings: @L_str
 
 export
     # kinematics types and funtions

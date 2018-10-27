@@ -2,7 +2,7 @@ push!(LOAD_PATH,"../../src/")
 import UNSflow
 
 
-alphadef = UNSflow.EldUpDef(45.*pi/180, 0.4, 0.8)
+alphadef = UNSflow.EldUpDef(45. *pi/180, 0.4, 0.8)
 
 hdef = UNSflow.ConstDef(0.)
 
@@ -24,7 +24,7 @@ dtstar = UNSflow.find_tstep(alphadef)
 
 t_tot = 9.
 
-nsteps =Int(round(t_tot/dtstar))+1
+nsteps = Int(round(t_tot/dtstar))+1
 
 startflag = 0
 
@@ -39,6 +39,6 @@ mat, surf, curfield = UNSflow.ldvm(surf, curfield, nsteps, dtstar,startflag, wri
 
 UNSflow.makeVortPlots2D()
 
-UNSflow.makeForcePlots()
+UNSflow.makeForcePlots2D()
 
 UNSflow.cleanWrite()

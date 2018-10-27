@@ -49,6 +49,6 @@ delvort = UNSflow.delSpalart(500, 12, 1e-5)
 
 mat, surf, curfield = UNSflow.ldvm(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-UNSflow.makeForcePlots()
+UNSflow.makeForcePlots2D()
 
 #cleanWrite()

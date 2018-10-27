@@ -45,6 +45,13 @@ function update_indbound(surf::TwoDSurf, curfield::TwoDFlowField)
     return surf
 end
 
+function add_indbound_b(surf::TwoDSurf, surfj::TwoDSurf)
+     uind, wind = ind_vel(surfj.bv, surf.bnd_x, surf.bnd_z)
+     surf.uind[:] += uind
+     surf.wind[:] += wind
+    return surf
+end
+
 function update_indbound(surf::TwoDSurf2DOF, curfield::TwoDFlowField)
     surf.uind[1:surf.ndiv], surf.wind[1:surf.ndiv] = ind_vel([curfield.tev; curfield.lev; curfield.extv], surf.bnd_x, surf.bnd_z)
     return surf
@@ -329,6 +336,71 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
     return curfield
 end
 
+function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, dt)
+
+    nlev = length(curfield.lev)
+    ntev = length(curfield.tev)
+    nextv = length(curfield.extv)
+    nsurf = length(surf)
+
+    #Clean induced velocities
+    for i = 1:ntev
+        curfield.tev[i].vx = 0
+        curfield.tev[i].vz = 0
+    end
+
+    for i = 1:nlev
+        curfield.lev[i].vx = 0
+        curfield.lev[i].vz = 0
+    end
+
+    for i = 1:nextv
+        curfield.extv[i].vx = 0
+        curfield.extv[i].vz = 0
+    end
+
+    #Velocities induced by free vortices on each other
+    mutual_ind([curfield.tev; curfield.lev; curfield.extv])
+
+    #Add the influence of velocities induced by bound vortices
+    utemp = zeros(ntev + nlev + nextv)
+    wtemp = zeros(ntev + nlev + nextv)
+    for is = 1:nsurf
+        ut, wt = ind_vel(surf[is].bv, [map(q -> q.x, curfield.tev); map(q -> q.x, curfield.lev); map(q -> q.x, curfield.extv)], [map(q -> q.z, curfield.tev); map(q -> q.z, curfield.lev); map(q -> q.z, curfield.extv) ])
+        utemp += ut
+        wtemp += wt
+    end
+    for i = 1:ntev
+        curfield.tev[i].vx += utemp[i]
+        curfield.tev[i].vz += wtemp[i]
+    end
+    for i = ntev+1:ntev+nlev
+        curfield.lev[i-ntev].vx += utemp[i]
+        curfield.lev[i-ntev].vz += wtemp[i]
+    end
+    for i = ntev+nlev+1:ntev+nlev+nextv
+        curfield.extv[i-ntev-nlev].vx += utemp[i]
+        curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+
+    #Convect free vortices with their induced velocities
+    for i = 1:ntev
+        curfield.tev[i].x += dt*curfield.tev[i].vx
+        curfield.tev[i].z += dt*curfield.tev[i].vz
+    end
+    for i = 1:nlev
+            curfield.lev[i].x += dt*curfield.lev[i].vx
+        curfield.lev[i].z += dt*curfield.lev[i].vz
+    end
+    for i = 1:nextv
+        curfield.extv[i].x += dt*curfield.extv[i].vx
+        curfield.extv[i].z += dt*curfield.extv[i].vz
+    end
+
+    return curfield
+end
+
+
 function wakeroll(surf::TwoDSurf2DOF, curfield::TwoDFlowField, dt)
 
     nlev = length(curfield.lev)
@@ -429,6 +501,25 @@ function place_tev(surf::TwoDSurf,field::TwoDFlowField,dt)
     return field
 end
 
+function place_tev(surf::Vector{TwoDSurf},field::TwoDFlowField,dt)
+    nsurf = length(surf)
+    ntev = length(field.tev)
+    if ntev < nsurf
+        for i = 1:nsurf
+            xloc = surf[i].bnd_x[end] + 0.5*surf[i].kinem.u*dt
+            zloc = surf[i].bnd_z[end]
+            push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))
+        end
+    else
+        for i = 1:nsurf
+            xloc = surf[i].bnd_x[end]+(1. /3.)*(field.tev[ntev-nsurf+i].x - surf[i].bnd_x[end])
+            zloc = surf[i].bnd_z[end]+(1. /3.)*(field.tev[ntev-nsurf+i].z - surf[i].bnd_z[end])
+            push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))
+        end
+    end
+    return field
+end
+
 function place_tev(surf::TwoDSurf2DOF,field::TwoDFlowField,dt)
     ntev = length(field.tev)
     if ntev == 0
@@ -460,6 +551,30 @@ function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
 
     push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
 
+    return field
+end
+
+function place_lev(surf::Vector{TwoDSurf},field::TwoDFlowField,dt,shed_ind::Vector{Int})
+    nsurf = length(surf) 
+    nlev = length(field.lev)
+
+    for i = 1:nsurf
+        if i in shed_ind
+            if (surf[i].levflag[1] == 0)
+                le_vel_x = surf[i].kinem.u - surf[i].kinem.alphadot*sin(surf[i].kinem.alpha)*surf[i].pvt*surf[i].c + surf[i].uind[1]
+                le_vel_z = -surf[i].kinem.alphadot*cos(surf[i].kinem.alpha)*surf[i].pvt*surf[i].c- surf[i].kinem.hdot + surf[i].wind[1]
+                xloc = surf[i].bnd_x[1] + 0.5*le_vel_x*dt
+                zloc = surf[i].bnd_z[1] + 0.5*le_vel_z*dt
+                push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))
+            else
+                xloc = surf[i].bnd_x[1]+(1. /3.)*(field.lev[nlev-nsurf+i].x - surf[i].bnd_x[1])
+                zloc = surf[i].bnd_z[1]+(1. /3.)*(field.lev[nlev-nsurf+i].z - surf[i].bnd_z[1])
+                push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))            
+            end
+        else
+            push!(field.lev, TwoDVort(0., 0., 0., 0., 0., 0.))
+        end
+    end
     return field
 end
 
@@ -568,7 +683,7 @@ There is no universal set of parameters that work for all problem. If
 using vortex control, test and calibrate choice of parameters
 
 """
-function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: TwoDFlowField)
+function controlVortCount(delvort :: delVortDef, surf_locx :: Float64, surf_locz :: Float64, curfield :: TwoDFlowField)
 
     if typeof(delvort) == delNone
 
@@ -578,13 +693,13 @@ function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: T
         if length(curfield.tev) > delvort.limit
             #Check possibility of merging the last vortex with the closest 20 vortices
             gamma_j = curfield.tev[1].s
-            d_j = sqrt((curfield.tev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+            d_j = sqrt((curfield.tev[1].x- surf_locx)^2 + (curfield.tev[1].z - surf_locz)^2)
             z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
 
 
             for i = 2:20
                 gamma_k = curfield.tev[i].s
-                d_k = sqrt((curfield.tev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                d_k = sqrt((curfield.tev[i].x - surf_locx)^2 + (curfield.tev[i].z - surf_locz)^2)
                 z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
 
                 fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
@@ -609,12 +724,12 @@ function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: T
                 #Check possibility of merging the last vortex with the closest 20 vortices
 
                 gamma_j = curfield.lev[1].s
-                d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                d_j = sqrt((curfield.lev[1].x - surf_locx)^2 + (curfield.lev[1].z - surf_locz)^2)
                 z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
 
                 for i = 2:20
                     gamma_k = curfield.lev[i].s
-                    d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
+                    d_k = sqrt((curfield.lev[i].x - surf_locx)^2 + (curfield.lev[i].z - surf_locz)^2)
                     z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
 
                     fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
@@ -623,76 +738,6 @@ function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf, curfield :: T
                         #Merge the 2 vortices into the one at k
                          curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j + gamma_k))
                         curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j + gamma_k))
-                        curfield.lev[i].s += curfield.lev[1].s
-
-                        for j = 1:length(curfield.lev)-1
-                            curfield.lev[j] = curfield.lev[j+1]
-                        end
-
-                        pop!(curfield.lev)
-
-                        break
-                    end
-                end
-            end
-        end
-    end
-end
-
-function controlVortCount(delvort :: delVortDef, surf :: TwoDSurf2DOF, curfield :: TwoDFlowField)
-
-    if typeof(delvort) == delNone
-
-    elseif typeof(delvort) == delSpalart
-        D0 = delvort.dist*surf.c
-        V0 = delvort.tol
-        if length(curfield.tev) > delvort.limit
-            #Check possibility of merging the last vortex with the closest 20 vortices
-            gamma_j = curfield.tev[1].s
-            d_j = sqrt((curfield.tev[1].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[1].z - surf.bnd_z[div(surf.ndiv,2)])^2)
-            z_j = sqrt(curfield.tev[1].x^2 + curfield.tev[1].z^2)
-
-            for i = 2:20
-                gamma_k = curfield.tev[i].s
-                d_k = sqrt((curfield.tev[i].x - surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.tev[i].z - surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_k = sqrt(curfield.tev[i].x^2 + curfield.tev[i].z^2)
-
-                fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
-
-                if fact < V0
-                    #Merge the 2 vortices into the one at k
-                    curfield.tev[i].x = (abs(gamma_j)*curfield.tev[1].x + abs(gamma_k)*curfield.tev[i].x)/(abs(gamma_j) + abs(gamma_k))
-                    curfield.tev[i].z = (abs(gamma_j)*curfield.tev[1].z + abs(gamma_k)*curfield.tev[i].z)/(abs(gamma_j) + abs(gamma_k))
-                    curfield.tev[i].s += curfield.tev[1].s
-
-                    for j = 1:length(curfield.tev)-1
-                        curfield.tev[j] = curfield.tev[j+1]
-                    end
-
-                    pop!(curfield.tev)
-
-                    break
-                end
-            end
-
-            if length(curfield.lev) > delvort.limit
-                #Check possibility of merging the last vortex with the closest 20 vortices
-
-                gamma_j = curfield.lev[1].s
-                d_j = sqrt((curfield.lev[1].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[1].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                z_j = sqrt(curfield.lev[1].x^2 + curfield.lev[1].z^2)
-
-                for i = 2:20
-                    gamma_k = curfield.lev[i].s
-                    d_k = sqrt((curfield.lev[i].x- surf.bnd_x[div(surf.ndiv,2)])^2 + (curfield.lev[i].z- surf.bnd_z[div(surf.ndiv,2)])^2)
-                    z_k = sqrt(curfield.lev[i].x^2 + curfield.lev[i].z^2)
-
-                    fact = abs(gamma_j*gamma_k)*abs(z_j - z_k)/(abs(gamma_j + gamma_k)*(D0 + d_j)^1.5*(D0 + d_k)^1.5)
-
-                    if fact < V0
-                        #Merge the 2 vortices into the one at k
-                         curfield.lev[i].x = (abs(gamma_j)*curfield.lev[1].x + abs(gamma_k)*curfield.lev[i].x)/(abs(gamma_j) + abs(gamma_k))
-                        curfield.lev[i].z = (abs(gamma_j)*curfield.lev[1].z + abs(gamma_k)*curfield.lev[i].z)/(abs(gamma_j) + abs(gamma_k))
                         curfield.lev[i].s += curfield.lev[1].s
 
                         for j = 1:length(curfield.lev)-1

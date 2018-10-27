@@ -1,4 +1,4 @@
-__precompile__(true)
+#__precompile__(true)
 
 module UNSflow
 
@@ -12,13 +12,18 @@ import Serialization
 
 import NLsolve: nlsolve, not_in_place
 
-import PyCall
-PyCall.pygui(:tk)
-
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
-xticks, yticks, subplot, legend, axis, savefig, close
+    xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
+    close, tight_layout
+    
+
+import Plots: @layout
+
 
 import LaTeXStrings: @L_str
+
+#For use in development and debugging
+import Revise
 
 export
     # kinematics types and funtions
@@ -88,6 +93,10 @@ export
     ldvm,
     ldvmLin,
 
+    #3D low-order solver methods
+    QSLLT_lautat,
+
+    
     # Postprocessing functions
     calc_forces,
     writeStamp,
@@ -97,9 +106,13 @@ export
     viewVortConnect2D,
 
     # 2D plot output functions
-    makeForcePlots,
-    makeVortPlots2D
-
+    makeForcePlots2D,
+    makeVortPlots2D,
+    
+    # 3D plot output functions
+    makeForcePlots3D,
+    makeVortPlots3D,
+    makeInfoPlots3D
 
 ### source files
 
@@ -120,8 +133,12 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
 # low-order 3D solvers
 include("lowOrder3D/typedefs.jl")            # type definitions
+include("lowOrder3D/calcs.jl")               # calculation functions
+include("lowOrder3D/solvers.jl")             # solver methods
+include("lowOrder3D/postprocess.jl")         # postprocessing functions
 
 # 2D plotting functions
 include("plots/plots2D.jl")
+include("plots/plots3D.jl")
 
 end

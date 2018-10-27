@@ -37,6 +37,6 @@ mat, surf, curfield = UNSflow.lautatRoll(surf, curfield, nsteps, dtstar,startfla
 
 UNSflow.makeVortPlots2D()
 
-UNSflow.makeForcePlots()
+UNSflow.makeForcePlots2D()
 
 UNSflow.cleanWrite()

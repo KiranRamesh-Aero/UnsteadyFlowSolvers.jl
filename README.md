@@ -3,6 +3,8 @@ and aeroelasticity managed by Dr. Kiran Ramesh at the University of Glasgow. The
 are written in Julia, are based on the discrete-vortex method and cater to various
 applications. 
 
+This project is currently supported by EPSRC grant EP/R008035/1. 
+
 [Julia](http://julialang.org) is a new high-level, high-performance dynamic programming
 language for technical computing. Julia’s novel features are a
 sophisticated compiler, distributed parallel execution, numerical

@@ -59,7 +59,7 @@ function makeForcePlots3D()
     for i = 1:nspan
         alpha = mat[:,Int((i-1)*8+5)]*180/pi
         alpha_all = [alpha_all; alpha]
-        h = mat[:,Int((i-1)*8+6)]*180/pi
+        h = mat[:,Int((i-1)*8+6)]
         h_all = [h_all; h]
     end
     for i = 1:nspan
@@ -382,7 +382,7 @@ function makeInfoPlots3D()
             for i = 1:nspan
                 alpha = mat[:,Int((i-1)*8+5)]*180/pi
                 alpha_all = [alpha_all; alpha]
-                h = mat[:,Int((i-1)*8+6)]*180/pi
+                h = mat[:,Int((i-1)*8+6)]
                 h_all = [h_all; h]
             end
             

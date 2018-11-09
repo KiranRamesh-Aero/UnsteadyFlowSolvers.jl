@@ -95,7 +95,7 @@ export
 
     #3D low-order solver methods
     QSLLT_lautat,
-
+    QSLLT_ldvm,
     
     # Postprocessing functions
     calc_forces,

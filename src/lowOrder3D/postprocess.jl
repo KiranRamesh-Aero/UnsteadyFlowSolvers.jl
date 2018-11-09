@@ -77,12 +77,19 @@ function writeStamp(dirname::String, t::Float64, surf::ThreeDSurfSimple, curfiel
     cd("..")
 end
 
-function calc_forces(surf::ThreeDSurfSimple)
+function calc_forces(surf::ThreeDSurfSimple, field :: ThreeDFieldSimple, dt :: Float64)
 
     cl = zeros(surf.nspan)
     cd = zeros(surf.nspan)
     cm = zeros(surf.nspan)
 
+    lev_s = zeros(surf.nspan)
+    for i = 1:surf.nspan
+        if surf.s2d[i].levflag[1] == 1
+            lev_s[i] = field.f2d[i].lev[end].s
+        end
+    end
+    
     for i = 1:surf.nspan
         # First term in eqn (2.30) Ramesh et al. in coefficient form
         wi = 0
@@ -94,8 +101,8 @@ function calc_forces(surf::ThreeDSurfSimple)
         cnc = 2*pi*(surf.s2d[i].kinem.u*cos(surf.s2d[i].kinem.alpha)/surf.s2d[i].uref + surf.s2d[i].kinem.hdot*sin(surf.s2d[i].kinem.alpha)/surf.s2d[i].uref + wi*sin(surf.s2d[i].kinem.alpha))*(surf.s2d[i].a0[1] + surf.s2d[i].aterm[1]/2.)
 
         # Second term in eqn (2.30) Ramesh et al. in coefficient form
-        cnnc = 2*pi*(3*surf.s2d[i].c*surf.s2d[i].a0dot[1]/(4*surf.s2d[i].uref) + surf.s2d[i].c*surf.s2d[i].adot[1]/(4*surf.s2d[i].uref) + surf.s2d[i].c*surf.s2d[i].adot[2]/(8*surf.s2d[i].uref))
-
+        cnnc = 2*pi*(3*surf.s2d[i].c*surf.s2d[i].a0dot[1]/(4*surf.s2d[i].uref) + surf.s2d[i].c*surf.s2d[i].adot[1]/(4*surf.s2d[i].uref) + surf.s2d[i].c*surf.s2d[i].adot[2]/(8*surf.s2d[i].uref)) + (2*lev_s[i]/(dt*surf.s2d[i].uref^2))
+        
         # Suction force given in eqn (2.31) Ramesh et al.
         cs = 2*pi*surf.s2d[i].a0[1]*surf.s2d[i].a0[1]
 

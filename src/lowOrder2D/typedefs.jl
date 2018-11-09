@@ -471,6 +471,8 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
         #Calculate downwash
         update_downwash(kelv.surf[i], [kelv.field.u[1],kelv.field.w[1]])
     end
+
+    levcount = 0
     for i = 1:nsurf
         #Update Fourier coefficients and bv strength
         update_a0anda1(kelv.surf[i])
@@ -480,15 +482,15 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
         if i in kelv.shed_ind
             val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.) -
                 kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0prev[1] + kelv.surf[i].aprev[1]/2.) +
-                kelv.field.tev[ntev-nsurf+i].s + kelv.field.lev[nlev-nsurf+kelv.shed_ind[i]].s
-            
-            if (kelv.surf[kelv.shed_ind[i]].a0[1] > 0)
-                lesp_cond = kelv.surf[kelv.shed_ind[i]].lespcrit[1]
+                kelv.field.tev[ntev-nsurf+i].s + kelv.field.lev[nlev-nsurf+i].s
+            levcount += 1
+            if (kelv.surf[i].a0[1] > 0)
+                lesp_cond = kelv.surf[i].lespcrit[1]
             else
-                lesp_cond = -kelv.surf[kelv.shed_ind[i]].lespcrit[1]
+                lesp_cond = -kelv.surf[i].lespcrit[1]
             end
             
-            val[i+nsurf] = kelv.surf[kelv.shed_ind[i]].a0[1] - lesp_cond
+            val[levcount+nsurf] = kelv.surf[i].a0[1] - lesp_cond
         else
             val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.) -
                 kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0prev[1] + kelv.surf[i].aprev[1]/2.) +

@@ -213,3 +213,54 @@ function wakeroll(surf3d::ThreeDSurfSimple, field3d::ThreeDFieldSimple, dt)
     return field3d
 end
 
+function update_kinemCantilever(surf::ThreeDSurfSimple, dt::Float64, kinem::KinemCantilever, Phi::Array{Float64}, m_eta_s_etadd::Array{Float64}, m_eta_s_etad::Array{Float64}, m_eta_s_eta::Array{Float64}, cl::Array{Float64}, cm::Array{Float64})
+
+    Qvecloc = zeros(4, surf.nspan)
+    
+    rho = 1.1
+    q = 1. *pi/180
+    
+    pdyn = 0.5*rho*surf.uref^2
+    
+    #Update previous terms
+    kinem.eta_pr = kinem.eta
+    kinem.etad_pr3 = kinem.etad_pr2
+    kinem.etad_pr2 = kinem.etad_pr
+    kinem.etad_pr = kinem.etad
+    kinem.etadd_pr3 = kinem.etadd_pr2
+    kinem.etadd_pr2 = kinem.etadd_pr
+
+    for i = 1:surf.nspan
+        if i == 1
+            yl = -0.5*surf.AR*surf.cref
+            yu = 0.5*(surf.yle[i] + surf.yle[i+1])
+        elseif i == surf.nspan
+            yl = 0.5*(surf.yle[i] + surf.yle[i-1])
+            yu = 0. 
+        else
+            yl = 0.5*(surf.yle[i] + surf.yle[i-1])
+            yu = 0.5*(surf.yle[i] + surf.yle[i+1])
+        end
+        dy = yu - yl
+        Qvecloc[:,surf.nspan-i+1] = Phi[:,:,i]'*pdyn*[-cl[i]*dy*surf.s2d[i].c; cm[i]*dy*surf.s2d[i].c^2; 0];
+    end
+    
+    Qvec = sum(Qvecloc,dims=2)
+    
+    kinem.etadd_pr = m_eta_s_etadd\(-m_eta_s_etad*kinem.etad - m_eta_s_eta*kinem.eta + Qvec)
+
+    kinem.etad = kinem.etad_pr + (dt/12.)*(23*kinem.etadd_pr - 16*kinem.etadd_pr2 + 5*kinem.etadd_pr3)
+    
+    kinem.eta = kinem.eta_pr + (dt/12)*(23*kinem.etad_pr - 16*kinem.etad_pr2 + 5*kinem.etad_pr3)
+    
+    for i = 1:surf.nspan
+        vecphys = Phi[:,:,i]*kinem.eta
+        vecphys_dot = Phi[:,:,i]*kinem.etad
+        j = surf.nspan - i + 1
+        surf.s2d[j].kinem.h = -vecphys[1]
+        surf.s2d[j].kinem.alpha = vecphys[2] + q
+        surf.s2d[j].kinem.hdot = -vecphys_dot[1]
+        surf.s2d[j].kinem.alphadot = vecphys_dot[2]
+    end
+        
+end

@@ -204,19 +204,31 @@ function makeVortPlots3D()
     mid_ind= floor(Int, nspan/2)
 
     tev, _ = DelimitedFiles.readdlm("tev-1", '\t', Float64, header=true)
+    if length(tev[:,1]) > 1
+        tev = tev[2:end,:]
+    end
     lev =   try
         DelimitedFiles.readdlm("lev-1", '\t', Float64, header=true)[1]
     catch
         zeros(0,3)
     end
-    bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
+    if length(lev[:,1]) > 1
+        lev = lev[2:end,:]
+    end
+    bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)    
     for i in [mid_ind; root_ind]
         tevt, _ = DelimitedFiles.readdlm("tev-$i", '\t', Float64, header=true)
+        if length(tevt[:,1]) > 1
+            tevt = tevt[2:end,:]
+        end
         tev = [tev; tevt]
         levt = try
             DelimitedFiles.readdlm("lev-$i", '\t', Float64, header=true)[1]
         catch
             zeros(0,3)
+        end
+        if length(levt[:,1]) > 1
+            levt = levt[2:end,:]
         end
         lev = [lev; levt]
         bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)
@@ -310,20 +322,32 @@ function makeInfoPlots3D()
 
     #Axis limits for vorticity plots based on last time step
     tev, _ = DelimitedFiles.readdlm("tev-1", '\t', Float64, header=true)
+    if length(tev[:,1]) > 1
+        tev = tev[2:end,:]
+    end
     lev =   try
         DelimitedFiles.readdlm("lev-1", '\t', Float64, header=true)[1]
     catch
         zeros(0,3)
     end
-    
+    lev, _ = DelimitedFiles.readdlm("lev-1", '\t', Float64, header=true)
+    if length(lev[:,1]) > 1
+        lev = lev[2:end,:]
+    end
     bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
     for i in [mid_ind; root_ind]
         tevt, _ = DelimitedFiles.readdlm("tev-$i", '\t', Float64, header=true)
+        if length(tevt[:,1]) > 1
+            tevt = tevt[2:end,:]
+        end
         tev = [tev; tevt]
         levt = try
             DelimitedFiles.readdlm("lev-$i", '\t', Float64, header=true)[1]
         catch
             zeros(0,3)
+        end
+        if length(levt[:,1]) > 1
+            levt = levt[2:end,:]
         end
         lev = [lev; levt]
         bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)

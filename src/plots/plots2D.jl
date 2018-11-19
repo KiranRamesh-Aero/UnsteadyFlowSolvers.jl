@@ -291,3 +291,82 @@ function makeForcePlots2D()
     end
 
 end
+
+function checkConverge(k::Float64)
+    
+    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    
+    T = pi/k
+
+    end_cycle = mat[end,1]
+
+    #Find number of cycles
+    ncyc = 0
+    for i = 1:1000
+        t_l = real(i)*T
+        if t_l > end_cycle
+            break
+        end
+        ncyc = ncyc + 1
+    end
+
+    #Lift convergence 
+    figure
+    for i = 1:ncyc
+        start_t = real(i-1)*T
+        end_t = real(i)*T
+        start_ind = argmin(abs.(mat[:,1] .- start_t))
+        end_ind = argmin(abs.(mat[:,1] .- end_t))
+        plot((mat[start_ind:end_ind,1] .- start_t)/T, mat[start_ind:end_ind,6])
+    end
+    xmin = 0.
+    xmax = 1.
+    zmin = minimum(mat[:,6])
+    zmax = maximum(mat[:,6])
+    axis([xmin, xmax, zmin, zmax])        
+
+    xlabel(L"$t^*$")
+    ylabel(L"$C_l$")
+    savefig("forcePlots/cl-convergence.png")
+    close()
+
+    #Drag convergence 
+    figure
+    for i = 1:ncyc
+        start_t = real(i-1)*T
+        end_t = real(i)*T
+        start_ind = argmin(abs.(mat[:,1] .- start_t))
+        end_ind = argmin(abs.(mat[:,1] .- end_t))
+        plot((mat[start_ind:end_ind,1] .- start_t)/T, mat[start_ind:end_ind,7])
+    end
+    xmin = 0.
+    xmax = 1.
+    zmin = minimum(mat[:,7])
+    zmax = maximum(mat[:,7])
+    axis([xmin, xmax, zmin, zmax])        
+
+    xlabel(L"$t^*$")
+    ylabel(L"$C_d$")
+    savefig("forcePlots/cd-convergence.png")
+    close()
+
+    #Pitching moment convergence 
+    figure
+    for i = 1:ncyc
+        start_t = real(i-1)*T
+        end_t = real(i)*T
+        start_ind = argmin(abs.(mat[:,1] .- start_t))
+        end_ind = argmin(abs.(mat[:,1] .- end_t))
+        plot((mat[start_ind:end_ind,1] .- start_t)/T, mat[start_ind:end_ind,8])
+    end
+    xmin = 0.
+    xmax = 1.
+    zmin = minimum(mat[:,8])
+    zmax = maximum(mat[:,8])
+    axis([xmin, xmax, zmin, zmax])        
+
+    xlabel(L"$t^*$")
+    ylabel(L"$C_m$")
+    savefig("forcePlots/cm-convergence.png")
+    close()
+end

@@ -56,21 +56,21 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
     end
     mat = mat'
 
+    dt = dtstar*surf.c/surf.uref
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
-
-    dt = dtstar*surf.c/surf.uref
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -109,7 +109,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t,nround))"
+                dirname = "$(round(t,sigdigits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -147,21 +147,23 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
     end
     mat = mat'
 
+    dt = dtstar*surf.c/surf.uref
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
 
-    dt = dtstar*surf.c/surf.uref
+
 
     #Intialise flowfield
     for istep = 1:nsteps
@@ -208,7 +210,7 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t, digits=nround))"
+                dirname = "$(round(t, sigdigits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -246,21 +248,21 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     end
     mat = mat'
 
+    dt = dtstar*surf.c/surf.uref
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
-
-    dt = dtstar*surf.c/surf.uref
 
     # time stepping
     for istep = 1:nsteps
@@ -334,7 +336,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t, digits=nround))"
+                dirname = "$(round(t, sigdigits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -374,22 +376,22 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
     end
     mat = mat'
 
+    dt = dtstar*minimum(map(q->q.c/q.uref, surf))
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
     
-    dt = dtstar*minimum(map(q->q.c/q.uref, surf))
-
     lesp = zeros(nsurf)
     cl = zeros(nsurf)
     cd = zeros(nsurf)
@@ -478,9 +480,9 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         for i = 1:nsurf
             #Set previous values of aterm to be used for derivatives in next time step
             surf[i].a0prev[1] = surf[i].a0[1]
-                for ia = 1:3
-                    surf[i].aprev[ia] = surf[i].aterm[ia]
-                end
+            for ia = 1:3
+                surf[i].aprev[ia] = surf[i].aterm[ia]
+            end
         end
         
         # Delete or merge vortices if required
@@ -499,7 +501,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t, digits=nround))"
+                dirname = "$(round(t, sigdigits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -513,15 +515,15 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         mat = hcat(mat,matvect)
         
     end
-    
-    mat = mat'
 
-    f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
-    DelimitedFiles.writedlm(f, mat)
-    close(f)
+mat = mat'
 
-    mat, surf, curfield
+f = open("resultsSummary", "w")
+Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
+DelimitedFiles.writedlm(f, mat)
+close(f)
+
+mat, surf, curfield
 
 end
 
@@ -543,21 +545,22 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
     end
     mat = mat'
 
+    dt = dtstar*surf.c/surf.uref
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
 
-    dt = dtstar*surf.c/surf.uref
     vcore = 0.02*surf.c
 
     T1 = zeros(surf.ndiv)
@@ -689,45 +692,45 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
             surf.levflag[1] = 0
         end
 
-        #Set previous values of aterm to be used for derivatives in next time step
-        surf.a0prev[1] = surf.a0[1]
-        for ia = 1:3
-            surf.aprev[ia] = surf.aterm[ia]
-        end
+#Set previous values of aterm to be used for derivatives in next time step
+surf.a0prev[1] = surf.a0[1]
+for ia = 1:3
+    surf.aprev[ia] = surf.aterm[ia]
+end
 
-        #Calculate bound vortex strengths
-        update_bv(surf)
+#Calculate bound vortex strengths
+update_bv(surf)
 
-        # Delete or merge vortices if required
-        controlVortCount(delvort, surf.bnd_x[round(surf.ndiv/2)], surf.bnd_z[round(surf.ndiv/2)], curfield)
+# Delete or merge vortices if required
+controlVortCount(delvort, surf.bnd_x[round(surf.ndiv/2)], surf.bnd_z[round(surf.ndiv/2)], curfield)
 
-        # free wake rollup
-        wakeroll(surf, curfield, dt)
+# free wake rollup
+wakeroll(surf, curfield, dt)
 
-        # Calculate force and moment coefficients
-        cl, cd, cm = calc_forces(surf)
+# Calculate force and moment coefficients
+cl, cd, cm = calc_forces(surf)
 
-        # write flow details if required
-        if writeflag == 1
-            if istep in writeArray
-                dirname = "$(round(t,sigdigits=nround))"
-                writeStamp(dirname, t, surf, curfield)
-            end
-        end
-
-        # for writing in resultsSummary
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
-
+# write flow details if required
+if writeflag == 1
+    if istep in writeArray
+        dirname = "$(round(t,sigdigits=nround))"
+        writeStamp(dirname, t, surf, curfield)
     end
+end
 
-    mat = mat'
+# for writing in resultsSummary
+mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
 
-    f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, mat)
-    close(f)
+end
 
-    mat, surf, curfield
+mat = mat'
+
+f = open("resultsSummary", "w")
+Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+DelimitedFiles.writedlm(f, mat)
+close(f)
+
+mat, surf, curfield
 
 end
 
@@ -752,21 +755,22 @@ function ldvmLin(surf::Vector{TwoDSurf}, curfield::TwoDFlowField,
     end
     mat = mat'
 
+    dt = dtstar*minimum(map(q->q.c/q.uref, surf))
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
 
-    dt = dtstar*minimum(map(q->q.c/q.uref, surf))
     vcore = 0.02*minimum(map(q->q.c, surf))
 
     T1 = zeros(surf[1].ndiv)
@@ -905,214 +909,214 @@ function ldvmLin(surf::Vector{TwoDSurf}, curfield::TwoDFlowField,
         println(curfield.tev)
         
         #Check if LEV shedding on any of the surfaces
-        levshedflag = 0
-        for is = 1:nsurf
-            if abs(surf[is].a0[1]) > surf[is].lespcrit[1]
-                levshedflag = 1
-                break
-            end
-        end
+levshedflag = 0
+for is = 1:nsurf
+    if abs(surf[is].a0[1]) > surf[is].lespcrit[1]
+        levshedflag = 1
+        break
+    end
+end
 
-        #println(curfield.tev)
- 
-        
-        if levshedflag == 1
-            #2D iteration for lev and tev strengths
-            
-            tev_1d = curfield.tev[end-nsurf+1:end]
-            for iv = 1:nsurf
-                pop!(curfield.tev)
-            end
-
-            iter = 0
-            
-            while true
-                iter += 1
-                
-                if iter > 1
-                    tev_iterprev = map(q->q.s, curfield.tev[end-nsurf+1:end])
-                    for iv = 1:nsurf
-                        pop!(curfield.tev)
-                        pop!(curfield.lev)
-                    end
-                end
-                
-                for is = 1:nsurf
-                    for js = 1:nsurf
-                        if is != js
-                            #add influence of other surfaces to downwash
-                            add_indbound_b(surf[is], surf[js])
-                        end
-                    end
-                    
-                    #Calculate downwash
-                    update_downwash(surf[is], [curfield.u[1],curfield.w[1]])
-                end
+#println(curfield.tev)
 
 
-                for is = 1:nsurf
-                    if abs(surf[is].a0[1]) > surf[is].lespcrit[1]
-                        if (surf[is].a0[1] >= 0.)
-                            lesp_cond = surf[is].lespcrit[1]
-                        else
-                            lesp_cond = -surf[is].lespcrit[1]
-                        end
-
-                        T1[:] = surf[is].downwash[:]
-                        I1 = surf[is].c*simpleTrapz(T1.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
-                        J1 = -simpleTrapz(T1,surf[is].theta)/(surf[is].uref*pi)
-
-                        # T2 depends on recenetly shed TEV
-                        ntev = length(curfield.tev)
-                        if ntev < nsurf
-                            xloc_tev = surf[is].bnd_x[surf[is].ndiv] + 0.5*surf[is].kinem.u*dt
-                            zloc_tev = surf[is].bnd_z[surf[is].ndiv]
-                        else
-                            xloc_tev = surf[is].bnd_x[surf[is].ndiv] + (1. /3.)*(curfield.tev[ntev-nsurf+is].x - surf[is].bnd_x[surf[is].ndiv])
-                            zloc_tev = surf[is].bnd_z[surf[is].ndiv] + (1. /3.)*(curfield.tev[ntev-nsurf+is].z - surf[is].bnd_z[surf[is].ndiv])
-                        end
-
-                        for ib = 1:surf[is].ndiv
-                            xdist = surf[is].bnd_x[ib] - xloc_tev
-                            zdist = surf[is].bnd_z[ib] - zloc_tev
-                            distsq = xdist*xdist + zdist*zdist
-                            T2[ib] = (surf[is].cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
-                        end
-                        
-                        #sig_prev = sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev))
-                        sig_prev = -surf[is].uref*surf[is].c*pi*(surf[is].a0prev[1] + surf[is].aprev[1]/2. )
-
-                        I2 = simpleTrapz(T2.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
-                        J2 = -simpleTrapz(T2, surf[is].theta)/(pi*surf[is].uref)
-
-                        # T3 depends on recenetly shed LEV
-                        nlev = length(curfield.lev)
-                        if surf[is].levflag[1] == 0
-                            le_vel_x = surf[is].kinem.u - surf[is].kinem.alphadot*sin(surf[is].kinem.alpha)*surf[is].pvt*surf[is].c + surf[is].uind[1]
-                            le_vel_z = -surf[is].kinem.alphadot*cos(surf[is].kinem.alpha)*surf[is].pvt*surf[is].c- surf[is].kinem.hdot + surf[is].wind[1]
-                            xloc_lev = surf[is].bnd_x[1] + 0.5*le_vel_x*dt
-                            zloc_lev = surf[is].bnd_z[1] + 0.5*le_vel_z*dt
-                        else
-                            xloc_lev = surf[is].bnd_x[1] + (1. /3.)*(curfield.lev[nlev-nsurf+is].x - surf[is].bnd_x[1])
-                            zloc_lev = surf[is].bnd_z[1]+(1. /3.)*(curfield.lev[nlev-nsurf+is].z - surf[is].bnd_z[1])
-                        end
-
-                        for ib = 1:surf[is].ndiv
-                            xdist = surf[is].bnd_x[ib] - xloc_lev
-                            zdist = surf[is].bnd_z[ib] - zloc_lev
-                            distsq = xdist*xdist + zdist*zdist
-                            T3[ib] = (surf[is].cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
-                        end
-                        I3 = simpleTrapz(T3.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
-                        J3 = -simpleTrapz(T3, surf[is].theta)/(pi*surf[is].uref)
-                        
-                        det = J3*(I2 + 1. ) - J2*(I3 + 1. )
-                        
-                        tevstr = (-J3*(I1 + sig_prev) + (I3 + 1)*(J1 - lesp_cond))/det
-                        levstr = (J2*(I1 + sig_prev) - (I2 + 1)*(J1 - lesp_cond))/det
-                        
-                        #Recalculate required fourier terms
-                        surf[is].a0[1] = J1 + J2*tevstr + J3*levstr
-                        for ia = 1:3
-                            surf[is].aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf[is].theta), surf[is].theta) +
-                                                      tevstr*simpleTrapz(T2.*cos.(ia*surf[is].theta), surf[is].theta) +
-                                                      levstr*simpleTrapz(T3.*cos.(ia*surf[is].theta), surf[is].theta))/(pi*surf[is].uref)
-                        end
-                        
-                        for ia = 4:surf[is].naterm
-                            surf[is].aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf[is].theta), surf[is].theta) +
-                                                      tevstr*simpleTrapz(T2.*cos.(ia*surf[is].theta), surf[is].theta) +
-                                                      levstr*simpleTrapz(T3.*cos.(ia*surf[is].theta), surf[is].theta))/(pi*surf[is].uref)
-                        end
-                     
-                        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
-                        push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
-                    else
-                        push!(curfield.tev, tev_1d[is])
-                        push!(curfield.lev, TwoDVort(0., 0., 0., 0., 0., 0.))
-                    end
-                    
-                    #Set previous values of aterm to be used for derivatives in next time step
-                    surf[is].a0prev[1] = surf[is].a0[1]
-                    for ia = 1:3
-                        surf[is].aprev[ia] = surf[is].aterm[ia]
-                    end
-
-                    #Calculate bound vortex strengths
-                    update_bv(surf[is])
-                end
-                
-                println(curfield.tev)
-                println(curfield.lev)
-                if iter > 1
-                    error("stop here")
-                end
-                
-                #Check residual and exit iteration if converged
-                res = 1.
-                if iter > 1
-                    res = sum(map(q->q.s, curfield.tev[end-nsurf+1:end]) .-  tev_iterprev)
-                    #println("2D   ", "iter$iter", "     ", res) 
-                end
-                if res < 1e-6 || iter > 60
-                    #println(iter)
-                    break
-                end
-                
-            end #end of iteration
-
-            for i = 1:nsurf
-                if curfield.lev[end-nsurf+i].vc != 0.
-                    surf[i].levflag[1] = 1
-                end
-            end
-        end #end of 2D problem
-        
-        # Delete or merge vortices if required
-        mean_bndx = sum(map(q->q.bnd_x[Int(round(q.ndiv/2))], surf))/nsurf
-        mean_bndz = sum(map(q->q.bnd_z[Int(round(q.ndiv/2))], surf))/nsurf
-        controlVortCount(delvort, mean_bndx, mean_bndz, curfield)
-
-        # free wake rollup
-        wakeroll(surf, curfield, dt)
-
-        # Calculate force and moment coefficients
-        for is = 1:nsurf
-            cl[is], cd[is], cm[is] = calc_forces(surf[is])
-        end
-
-        #write flow details if required
-        if writeflag == 1
-            if istep in writeArray
-                dirname = "$(round(t,sigdigits=nround))"
-                writeStamp(dirname, t, surf, curfield)
-            end
-        end
-
-        # for writing in resultsSummary
-        matvect = [t;]
-        for is = 1:nsurf
-            matvect = [matvect;[surf[is].kinem.alpha, surf[is].kinem.h,
-                                surf[is].kinem.u, surf[is].a0[1], cl[is], cd[is], cm[is]]]
-        end
-        mat = hcat(mat,matvect)
-
+if levshedflag == 1
+    #2D iteration for lev and tev strengths
+    
+    tev_1d = curfield.tev[end-nsurf+1:end]
+    for iv = 1:nsurf
+        pop!(curfield.tev)
     end
 
-    mat = mat'
+    iter = 0
+    
+    while true
+        iter += 1
+        
+        if iter > 1
+            tev_iterprev = map(q->q.s, curfield.tev[end-nsurf+1:end])
+            for iv = 1:nsurf
+                pop!(curfield.tev)
+                pop!(curfield.lev)
+            end
+        end
+        
+        for is = 1:nsurf
+            for js = 1:nsurf
+                if is != js
+                    #add influence of other surfaces to downwash
+                    add_indbound_b(surf[is], surf[js])
+                end
+            end
+            
+            #Calculate downwash
+            update_downwash(surf[is], [curfield.u[1],curfield.w[1]])
+        end
 
-    f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
-    DelimitedFiles.writedlm(f, mat)
-    close(f)
 
-    mat, surf, curfield
+        for is = 1:nsurf
+            if abs(surf[is].a0[1]) > surf[is].lespcrit[1]
+                if (surf[is].a0[1] >= 0.)
+                    lesp_cond = surf[is].lespcrit[1]
+                else
+                    lesp_cond = -surf[is].lespcrit[1]
+                end
+
+                T1[:] = surf[is].downwash[:]
+                I1 = surf[is].c*simpleTrapz(T1.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
+                J1 = -simpleTrapz(T1,surf[is].theta)/(surf[is].uref*pi)
+
+                # T2 depends on recenetly shed TEV
+                ntev = length(curfield.tev)
+                if ntev < nsurf
+                    xloc_tev = surf[is].bnd_x[surf[is].ndiv] + 0.5*surf[is].kinem.u*dt
+                    zloc_tev = surf[is].bnd_z[surf[is].ndiv]
+                else
+                    xloc_tev = surf[is].bnd_x[surf[is].ndiv] + (1. /3.)*(curfield.tev[ntev-nsurf+is].x - surf[is].bnd_x[surf[is].ndiv])
+                    zloc_tev = surf[is].bnd_z[surf[is].ndiv] + (1. /3.)*(curfield.tev[ntev-nsurf+is].z - surf[is].bnd_z[surf[is].ndiv])
+                end
+
+                for ib = 1:surf[is].ndiv
+                    xdist = surf[is].bnd_x[ib] - xloc_tev
+                    zdist = surf[is].bnd_z[ib] - zloc_tev
+                    distsq = xdist*xdist + zdist*zdist
+                    T2[ib] = (surf[is].cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
+                end
+                
+                #sig_prev = sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev))
+                sig_prev = -surf[is].uref*surf[is].c*pi*(surf[is].a0prev[1] + surf[is].aprev[1]/2. )
+
+                I2 = simpleTrapz(T2.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
+                J2 = -simpleTrapz(T2, surf[is].theta)/(pi*surf[is].uref)
+
+                # T3 depends on recenetly shed LEV
+                nlev = length(curfield.lev)
+                if surf[is].levflag[1] == 0
+                    le_vel_x = surf[is].kinem.u - surf[is].kinem.alphadot*sin(surf[is].kinem.alpha)*surf[is].pvt*surf[is].c + surf[is].uind[1]
+                    le_vel_z = -surf[is].kinem.alphadot*cos(surf[is].kinem.alpha)*surf[is].pvt*surf[is].c- surf[is].kinem.hdot + surf[is].wind[1]
+                    xloc_lev = surf[is].bnd_x[1] + 0.5*le_vel_x*dt
+                    zloc_lev = surf[is].bnd_z[1] + 0.5*le_vel_z*dt
+                else
+                    xloc_lev = surf[is].bnd_x[1] + (1. /3.)*(curfield.lev[nlev-nsurf+is].x - surf[is].bnd_x[1])
+                    zloc_lev = surf[is].bnd_z[1]+(1. /3.)*(curfield.lev[nlev-nsurf+is].z - surf[is].bnd_z[1])
+                end
+
+                for ib = 1:surf[is].ndiv
+                    xdist = surf[is].bnd_x[ib] - xloc_lev
+                    zdist = surf[is].bnd_z[ib] - zloc_lev
+                    distsq = xdist*xdist + zdist*zdist
+                    T3[ib] = (surf[is].cam_slope[ib]*zdist + xdist)/(2*pi*sqrt(distsq^2 + vcore^4))
+                end
+                I3 = simpleTrapz(T3.*(cos.(surf[is].theta) .- 1. ), surf[is].theta)
+                J3 = -simpleTrapz(T3, surf[is].theta)/(pi*surf[is].uref)
+                
+                det = J3*(I2 + 1. ) - J2*(I3 + 1. )
+                
+                tevstr = (-J3*(I1 + sig_prev) + (I3 + 1)*(J1 - lesp_cond))/det
+                levstr = (J2*(I1 + sig_prev) - (I2 + 1)*(J1 - lesp_cond))/det
+                
+                #Recalculate required fourier terms
+                surf[is].a0[1] = J1 + J2*tevstr + J3*levstr
+                for ia = 1:3
+                    surf[is].aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf[is].theta), surf[is].theta) +
+                                              tevstr*simpleTrapz(T2.*cos.(ia*surf[is].theta), surf[is].theta) +
+                                              levstr*simpleTrapz(T3.*cos.(ia*surf[is].theta), surf[is].theta))/(pi*surf[is].uref)
+                end
+                
+                for ia = 4:surf[is].naterm
+                    surf[is].aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf[is].theta), surf[is].theta) +
+                                              tevstr*simpleTrapz(T2.*cos.(ia*surf[is].theta), surf[is].theta) +
+                                              levstr*simpleTrapz(T3.*cos.(ia*surf[is].theta), surf[is].theta))/(pi*surf[is].uref)
+                end
+                
+                push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+                push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
+            else
+                push!(curfield.tev, tev_1d[is])
+                push!(curfield.lev, TwoDVort(0., 0., 0., 0., 0., 0.))
+            end
+            
+            #Set previous values of aterm to be used for derivatives in next time step
+            surf[is].a0prev[1] = surf[is].a0[1]
+            for ia = 1:3
+                surf[is].aprev[ia] = surf[is].aterm[ia]
+            end
+
+            #Calculate bound vortex strengths
+            update_bv(surf[is])
+        end
+
+println(curfield.tev)
+println(curfield.lev)
+if iter > 1
+    error("stop here")
+end
+
+#Check residual and exit iteration if converged
+res = 1.
+if iter > 1
+    res = sum(map(q->q.s, curfield.tev[end-nsurf+1:end]) .-  tev_iterprev)
+    #println("2D   ", "iter$iter", "     ", res) 
+end
+if res < 1e-6 || iter > 60
+    #println(iter)
+    break
+end
+
+end #end of iteration
+
+for i = 1:nsurf
+    if curfield.lev[end-nsurf+i].vc != 0.
+        surf[i].levflag[1] = 1
+    end
+end
+end #end of 2D problem
+
+# Delete or merge vortices if required
+mean_bndx = sum(map(q->q.bnd_x[Int(round(q.ndiv/2))], surf))/nsurf
+mean_bndz = sum(map(q->q.bnd_z[Int(round(q.ndiv/2))], surf))/nsurf
+controlVortCount(delvort, mean_bndx, mean_bndz, curfield)
+
+# free wake rollup
+wakeroll(surf, curfield, dt)
+
+# Calculate force and moment coefficients
+for is = 1:nsurf
+    cl[is], cd[is], cm[is] = calc_forces(surf[is])
+end
+
+#write flow details if required
+if writeflag == 1
+    if istep in writeArray
+        dirname = "$(round(t,sigdigits=nround))"
+        writeStamp(dirname, t, surf, curfield)
+    end
+end
+
+# for writing in resultsSummary
+matvect = [t;]
+for is = 1:nsurf
+    matvect = [matvect;[surf[is].kinem.alpha, surf[is].kinem.h,
+                        surf[is].kinem.u, surf[is].a0[1], cl[is], cd[is], cm[is]]]
+end
+mat = hcat(mat,matvect)
+
+end
+
+mat = mat'
+
+f = open("resultsSummary", "w")
+Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
+DelimitedFiles.writedlm(f, mat)
+close(f)
+
+mat, surf, curfield
 
 end
 
 
 
-function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
+function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, kinem::KinemPar2DOF, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
@@ -1129,36 +1133,38 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
     end
     mat = mat'
 
+    dt = dtstar*surf.c/surf.uref
+    
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
-        tTot = nsteps*dtstar
+        tTot = nsteps*dt
         for i = 1:maxwrite
             tcur = writeInterval*real(i)
             if t > tTot
                 break
             else
-                push!(writeArray, Int(round(tcur/dtstar)))
+                push!(writeArray, Int(round(tcur/dt)))
             end
         end
     end
 
-    dt = dtstar*surf.c/surf.uref
 
+    
     cl = 0.
     cm = 0.
-
+    
     #Intialise flowfield
-
+    
     for istep = 1:nsteps
         #Udpate current time
         t = t + dt
 
         #Update external flowfield
         update_externalvel(curfield, t)
-
+        
         #Update kinematic parameters (based on 2DOF response)
-        update_kinem(surf, dt, cl, cm)
+        update_kinem2DOF(surf, strpar, kinem, dt, cl, cm)
 
         #Update bound vortex positions
         update_boundpos(surf, dt)
@@ -1166,19 +1172,13 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         #Add a TEV with dummy strength
         place_tev(surf,curfield,dt)
 
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+        
         #Solve for TEV strength to satisfy Kelvin condition
-        kelv = KelvinCondition2DOF(surf,curfield)
+        kelv = KelvinCondition(surf,curfield)
         soln = nlsolve(not_in_place(kelv), [-0.01])
         curfield.tev[length(curfield.tev)].s = soln.zero[1]
-
-        #Update induced velocities on airfoil
-        update_indbound(surf, curfield)
-
-        #Calculate downwash
-        update_downwash(surf, [curfield.u[1],curfield.w[1]])
-
-        #Calculate first two fourier coefficients
-        update_a0anda1(surf)
 
         #Update adot
         update_a2a3adot(surf,dt)
@@ -1189,17 +1189,15 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         if (abs(lesp)>surf.lespcrit[1])
             #2D iteration if LESP_crit is exceeded
             #Remove the previous tev
-            pop!(curfield.tev)
-            #Add a TEV with dummy strength
-            place_tev(surf,curfield,dt)
+
             #Add a LEV with dummy strength
             place_lev(surf,curfield,dt)
 
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
-            kelvkutta = KelvinKutta2DOF(surf,curfield)
+            kelvkutta = KelvinKutta(surf,curfield)
             soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
             (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero[1], soln.zero[2]
-
+            
             #set flag for levshedding=on
             surf.levflag[1] = 1
         else
@@ -1208,7 +1206,7 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
 
         #Update rest of Fourier terms
         update_a2toan(surf)
-
+        
         #Set previous values of aterm to be used for derivatives in next time step
         surf.a0prev[1] = surf.a0[1]
         for ia = 1:3
@@ -1219,7 +1217,7 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         update_bv(surf)
 
         # Delete or merge vortices if required
-        controlVortCount(delvort, surf, curfield)
+        controlVortCount(delvort, surf.bnd_x[Int(round(surf.ndiv/2))], surf.bnd_z[Int(round(surf.ndiv/2))], curfield)
 
         # free wake rollup
         wakeroll(surf, curfield, dt)
@@ -1230,23 +1228,153 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t,nround))"
+                dirname = "$(round(t,sigdigits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
-
+        
         # for writing in resultsSummary
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
-
+        
     end
-
+    
     mat = mat'
-
+    
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
+end
 
+function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
+                dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000.,
+                delvort = delNone(); maxwrite = 100, nround=6)
+
+    # If a restart directory is provided, read in the simulation data
+    if startflag == 0
+        mat = zeros(0, 13)
+        t = 0.
+    elseif startflag == 1
+        dirvec = readdir()
+        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        latestTime = maximum(dirresults)
+        mat = readdlm("resultsSummary")
+        t = mat[end,1]
+    else
+        throw("invalid start flag, should be 0 or 1")
+    end
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+    
+    # if writeflag is on, determine the timesteps to write at
+    if writeflag == 1
+        writeArray = Int64[]
+        tTot = nsteps*dt
+        for i = 1:maxwrite
+            tcur = writeInterval*real(i)
+            if t > tTot
+                break
+            else
+                push!(writeArray, Int(round(tcur/dt)))
+            end
+        end
+    end
+
+    vcore = 0.02*surf.c
+
+    wa_x = zeros(surf.ndiv)
+    int_wax_prev = zeros(surf.ndiv)
+
+    for istep = 1:nsteps
+
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+
+        #Set up the matrix problem
+        surf, xloc_tev, zloc_tev = update_thickLHS(surf, curfield, dt, vcore)
+
+        #Construct RHS vector
+        update_thickRHS(surf, curfield)
+
+        #Now solve the matrix problem
+        soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
+
+        #Assign the solution
+        surf.a0[1] = soln[1]
+        for i = 1:surf.naterm
+            surf.aterm[i] = soln[i+1]
+            surf.bterm[i] = soln[i+surf.naterm+1]
+        end
+        tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+
+        #Calculate adot
+        surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+        for ia = 1:3
+            surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+        end
+
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+
+        #Update induced velocities to include effect of last shed vortex
+        update_indbound(surf, curfield)
+
+        #Calculate bound vortex strengths
+        update_bv_src(surf)
+
+        #Wake rollup
+        wakeroll(surf, curfield, dt)
+
+        #Force calculation
+        cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd = calc_forces(surf, int_wax_prev, dt)
+
+        #Precalculation for apparent mass at next time step
+        for i = 1:surf.ndiv
+            wa_x[i] = 0.5*(surf.uind_u[i] - surf.uind_l[i])
+        end
+
+        for i = 1:surf.ndiv
+            int_wax_prev[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
+        end
+
+        # write flow details if required
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(t,sigdigits=nround))"
+                writeStamp(dirname, t, surf, curfield)
+            end
+        end
+
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
+                        cl, cd, cnc1, cnc2, cnc3, cnnc, cn, cs])
+
+    end
+
+    mat = mat'
+
+    f = open("resultsSummary", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (rad) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
+    close(f)
+
+    mat, surf, curfield
 end

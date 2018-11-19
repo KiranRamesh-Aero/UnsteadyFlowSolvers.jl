@@ -43,13 +43,10 @@ export
     TwoDSurf,
     TwoDOFPar,
     KinemPar2DOF,
-    TwoDSurf2DOF,
     TwoDVort,
     TwoDFlowField,
     KelvinCondition,
-    KelvinCondition2DOF,
     KelvinKutta,
-    KelvinKutta2DOF,
 
     # vortex count control utility
     delVortDef,
@@ -86,10 +83,11 @@ export
     update_externalvel,
     controlVortCount,
     update_kinem,
-
+    update_kinem2DOF,
+    
     #2D low-order solver methods
     lautat,
-    lautatRoll,
+    #lautatRoll,
     ldvm,
     ldvmLin,
 

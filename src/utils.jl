@@ -133,3 +133,97 @@ function camber_calc(x::Vector,airfoil::String)
     cam_slope[1:ndiv] = derivative(cam_spl,x);
     return cam, cam_slope
 end
+
+function camber_thick_calc(x::Vector,coord_file::String)
+    #Determine camber and camber slope on airfoil from airfoil input file
+
+    ndiv = length(x);
+    c = x[ndiv];
+
+    cam = zeros(ndiv)
+    cam_slope = zeros(ndiv)
+    thick = zeros(ndiv)
+    thick_slope = zeros(ndiv)
+
+    if coord_file[1:6] == "NACA00"
+        m = parse(Int, coord_file[5])/100.
+        p = parse(Int, coord_file[6])/10.
+        th = parse(Int, coord_file[7:8])/100.
+        
+        b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+        for i = 2:ndiv
+            thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
+            thick_slope[i] = 5*th*(b1/(2*sqrt(x[i])) + b2 + 2*b3*x[i] + 3*b4*x[i]^2 + 4*b5*x[i]^3)
+        end
+        thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
+        thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+        rho = 1.1019*th*th*c
+        cam[1:ndiv] .= 0.
+        cam_slope[1:ndiv] .= 0.
+
+    elseif coord_file[1:8] == "Cylinder"
+        for i = 1:ndiv
+            theta = acos(1. - 2*x[i]/c)
+            thick[i] = 0.5*c*sin(theta)
+        end
+        thick_spl = Spline1D(x,thick)
+        thick_slope[1:ndiv] = derivative(thick_spl,x)
+        cam[1:ndiv] .= 0.
+        cam_slope[1:ndiv] .= 0.
+        rho = 0.5*c
+    elseif coord_file[1:9] == "FlatPlate"
+        th = parse(Int, coord_file[10:13])/10000.
+        r = th*c/2
+        for i = 2:ndiv-1
+            if x[i] <= r
+                thick[i] = sqrt(r^2 - (x[i] - r)^2)
+                thick_slope[i] = -(x[i] - r)/(sqrt(r^2 - (x[i] - r)^2))
+            elseif  x[i] >= c-r
+                thick[i] = sqrt(r^2 - (x[i] - c + r)^2)
+                thick_slope[i] = -(x[i] - c + r)/sqrt(r^2 - (x[i] - c + r)^2)
+            else
+                thick[i] = r
+            end
+        end
+        thick[1] = sqrt(r^2 - (x[1] - r)^2)
+        thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+        thick[ndiv] = sqrt(r^2 - (x[ndiv] - c + r)^2)
+        thick_slope[ndiv] = 2*thick_slope[ndiv-1] - thick_slope[ndiv-2]
+
+        rho = r
+        cam[1:ndiv] = 0.
+        cam_slope[1:ndiv] = 0.
+    else
+        coord = readdlm(coord_file)
+        ncoord = length(coord[:,1])
+        if (0. in coord[:,1]) == false
+            error("Airfoil file must contain leading edge coordinate (0,0)")
+        else
+            nle = find(x->x==0, coord[:,1])[1]
+            if coord[nle,2] != 0.
+                error("Airfoil leading edge must be at (0,0)")
+            end
+        end
+
+        zu_spl = Spline1D(reverse(coord[1:nle,1]), reverse(coord[1:nle,2]),k=1)
+        zl_spl = Spline1D(coord[nle:ncoord,1], coord[nle:ncoord,2],k=1)
+
+        zu = Array{Float64}(ndiv)
+        zl = Array{Float64}(ndiv)
+
+        for i=1:ndiv
+            zu[i] = evaluate(zu_spl,x[i]/c)
+            zl[i] = evaluate(zl_spl,x[i]/c)
+        end
+
+        cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
+        thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
+        cam_spl = Spline1D(x,cam)
+        thick_spl = Spline1D(x,thick)
+        cam_slope[1:ndiv] = derivative(cam_spl,x)
+        thick_slope[1:ndiv] = derivative(thick_spl,x)
+        rho = readdlm("rho")[1]
+    end
+    return thick, thick_slope,rho, cam, cam_slope
+end
+

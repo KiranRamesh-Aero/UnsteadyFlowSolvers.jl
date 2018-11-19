@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 
-alpha_init = 10*pi/180
+alpha_init = 10. *pi/180
 alphadot_init = 0.
 h_init = 0.
 hdot_init = 0.
@@ -22,19 +22,25 @@ cubic_alpha_1 = 1.
 cubic_alpha_3 = 0.
 strpar = UNSflow.TwoDOFPar(x_alpha, r_alpha, kappa, w_alpha, w_h, w_alphadot, w_hdot, cubic_h_1, cubic_h_3, cubic_alpha_1, cubic_alpha_3)
 
+#Dummy kinematic definitions to initialise surface
+alphadef = UNSflow.ConstDef(alpha_init)
+hdef = UNSflow.ConstDef(h_init)
+udef = UNSflow.ConstDef(1.) #This is relative to uref
+startkinem = UNSflow.KinemDef(alphadef, hdef, udef)
+
 lespcrit = [0.11;]
 
 pvt = 0.35
 
 c = 1.
 
-surf = UNSflow.TwoDSurf2DOF(c, u, "FlatPlate", pvt, strpar, kinem, lespcrit)
+surf = UNSflow.TwoDSurf("FlatPlate", pvt, startkinem, lespcrit, c=c, uref=u)
 
 curfield = UNSflow.TwoDFlowField()
 
 dtstar = 0.015
 
-nsteps = 1000
+nsteps = 50000
 
 t_tot = nsteps * dtstar / u
 
@@ -47,7 +53,7 @@ writeInterval = t_tot/20.
 
 delvort = UNSflow.delSpalart(500, 12, 1e-5)
 
-mat, surf, curfield = UNSflow.ldvm(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = UNSflow.ldvm2DOF(surf, curfield, strpar, kinem, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
 UNSflow.makeForcePlots2D()
 

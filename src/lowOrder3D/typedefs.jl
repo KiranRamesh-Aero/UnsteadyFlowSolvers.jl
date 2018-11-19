@@ -253,3 +253,23 @@ function (kelv::KelvinKuttaQSLLT_sep)(v_iter::Array{Float64})
             
     return val
 end
+
+mutable struct KinemCantilever
+    eta :: Array{Float64}
+    etad :: Array{Float64}
+    etadd :: Array{Float64}
+    eta_pr :: Array{Float64}
+    etad_pr :: Array{Float64}
+    etadd_pr :: Array{Float64}
+    eta_pr2 :: Array{Float64}
+    etad_pr2 :: Array{Float64}
+    etadd_pr2 :: Array{Float64}
+    eta_pr3 :: Array{Float64}
+    etad_pr3 :: Array{Float64}
+    etadd_pr3 :: Array{Float64}
+
+    function KinemCantilever(eta, etad)
+        z = zeros(length(eta))
+        new(eta, etad, z, eta, etad, z, eta, etad, z, eta, etad, z)
+    end
+end

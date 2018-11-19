@@ -1,5 +1,9 @@
-julia 0.6
+julia 1.0
 Dierckx
 ForwardDiff
+DelimitedFiles
+Serialization
 NLsolve
-
+PyPlot
+Plots
+LaTeXStrings

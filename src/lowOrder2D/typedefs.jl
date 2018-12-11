@@ -40,8 +40,8 @@ struct TwoDSurf
     uref :: Float64
     coord_file :: String
     pvt :: Float64
-    ndiv :: Int8
-    naterm :: Int8
+    ndiv :: Int16
+    naterm :: Int16
     kindef :: KinemDef
     cam :: Vector{Float64}
     cam_slope :: Vector{Float64}
@@ -63,8 +63,9 @@ struct TwoDSurf
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
     initpos :: Vector{Float64}
-
-    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.])
+    rho :: Float64
+    
+    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 1.)
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -81,7 +82,6 @@ struct TwoDSurf
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
-
         #camspl = Spline1D(theta, cam)
         #for i = 1:ndiv
         #    cam_slope[i] = Dierckx.derivative(camspl, theta[i])
@@ -147,7 +147,7 @@ struct TwoDSurf
         a0 = zeros(1)
         a0dot = zeros(1)
         aterm = zeros(naterm)
-        adot = zeros(3)
+        adot = zeros(naterm)
         a0prev = zeros(1)
         aprev = zeros(3)
         bv = TwoDVort[]
@@ -155,7 +155,7 @@ struct TwoDSurf
             push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
         end
         levflag = [0]
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos)
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
     end
 end
 
@@ -416,8 +416,8 @@ struct TwoDSurfThick
     uref :: Float64
     coord_file :: String
     pvt :: Float64
-    ndiv :: Int8
-    naterm :: Int8
+    ndiv :: Int16
+    naterm :: Int16
     kindef :: KinemDef
     cam :: Vector{Float64}
     cam_slope :: Vector{Float64}
@@ -548,8 +548,8 @@ struct TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(ndiv*2-2,naterm*2+3)
-        RHS = zeros(ndiv*2-2)
+        LHS = zeros(2*ndiv-1,naterm*2+3)
+        RHS = zeros(2*ndiv-1)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
@@ -583,6 +583,17 @@ struct TwoDSurfThick
         LHS[2*ndiv-3,1] = pi
         LHS[2*ndiv-3,2] = pi/2
         LHS[2*ndiv-3,2*naterm+2] = 1.
+
+#Stagnation point for thickness equation at LE
+for n = 1:naterm
+    LHS[2*ndiv-2,n+naterm+1] = -1.
+end
+
+#Stagnation point for thickness equation at TE
+for n = 1:2:naterm-1
+    LHS[2*ndiv-1,n+naterm+1] = 1.
+    LHS[2*ndiv-1,n+naterm+2] = -1.
+end
 
         levflag = [0]
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)

@@ -23,17 +23,17 @@ geometry = "FlatPlate"
 
 lespcrit = [0.02;]
 
-surf = UNSflow.ThreeDSurfSimple(AR, full_kinem, geometry, pvt, lespcrit, nspan=10, cref=c, uref=u)
+#surf = UNSflow.ThreeDSurfSimple(AR, full_kinem, geometry, pvt, lespcrit, nspan=10, cref=c, uref=u)
 
-curfield = UNSflow.ThreeDFieldSimple()
+#curfield = UNSflow.ThreeDFieldSimple()
 
 eta = zeros(4)
 etad = zeros(4)
-kinem = UNSflow.KinemCantilever(eta, etad)
+#kinem = UNSflow.KinemCantilever(eta, etad)
 
 dtstar = 0.015
 
-nsteps = 80000
+nsteps = 40000
 
 t_tot = nsteps*dtstar*c/u
 

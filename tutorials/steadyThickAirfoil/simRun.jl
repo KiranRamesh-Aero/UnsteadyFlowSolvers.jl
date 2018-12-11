@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 
-alphadef = UNSflow.ConstDef(0. *pi/180)
+alphadef = UNSflow.ConstDef(10. *pi/180)
 
 hdef = UNSflow.ConstDef(0.)
 
@@ -11,13 +11,13 @@ full_kinem = UNSflow.KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "Cylinder"
+geometry = "NACA0012"
 
-surf = UNSflow.TwoDSurfThick(geometry, pvt, full_kinem)
+surf = UNSflow.TwoDSurfThick(geometry, pvt, full_kinem, ndiv=140, naterm=138)
 
 curfield = UNSflow.TwoDFlowField()
 
-dtstar = UNSflow.find_tstep(alphadef)
+dtstar = 0.015#UNSflow.find_tstep(alphadef)
 
 t_tot = 5.
 
@@ -34,8 +34,10 @@ delvort = UNSflow.delNone()
 
 mat, surf, curfield = UNSflow.lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-UNSflow.makeVortPlots2D()
+#UNSflow.makeVortPlots2D()
 
-UNSflow.makeForcePlots2D()
+#UNSflow.makeForcePlots2D()
+
+#UNSflow.makeInfoPlots2D()
 
 UNSflow.cleanWrite()

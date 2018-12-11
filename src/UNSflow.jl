@@ -12,6 +12,8 @@ import Serialization
 
 import NLsolve: nlsolve, not_in_place
 
+import Statistics: mean
+
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout

@@ -11,6 +11,18 @@ function update_a2a3adot(surf::TwoDSurf,dt)
     return surf
 end
 
+function update_atermdot(surf::TwoDSurf,dt)
+    for ia = 2:naterm
+        surf.aterm[ia] = simpleTrapz(surf.downwash.*cos.(ia*surf.theta),surf.theta)
+        surf.aterm[ia] = 2. *surf.aterm[ia]/(surf.uref*pi)
+    end
+    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+    for ia = 1:naterm
+        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+    end
+    return surf
+end
+
 function update_adot(surf::TwoDSurf,dt)
     surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
     for ia = 1:3
@@ -30,6 +42,7 @@ function add_indbound_b(surf::TwoDSurf, surfj::TwoDSurf)
     surf.uind[:] += uind
     surf.wind[:] += wind
     return surf
+    
 end
 
 # Function for updating the downwash
@@ -234,6 +247,20 @@ function wakeroll(surf::TwoDSurf, curfield::TwoDFlowField, dt)
         curfield.extv[i-ntev-nlev].vz += wtemp[i]
     end
 
+    #Add the influence of freestream velocities
+    for i = 1:ntev
+        curfield.tev[i].vx += curfield.u[1]
+        curfield.tev[i].vz += curfield.w[1]
+    end
+    for i = 1:nlev
+        curfield.lev[i].vx += curfield.u[1]
+        curfield.lev[i].vz += curfield.w[1]
+    end
+    for i = 1:nextv
+        curfield.extv[i].vx += curfield.u[1]
+        curfield.extv[i].vz += curfield.w[1]
+    end
+
     #Convect free vortices with their induced velocities
     for i = 1:ntev
         curfield.tev[i].x += dt*curfield.tev[i].vx
@@ -296,6 +323,20 @@ function wakeroll(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, dt)
     for i = ntev+nlev+1:ntev+nlev+nextv
         curfield.extv[i-ntev-nlev].vx += utemp[i]
         curfield.extv[i-ntev-nlev].vz += wtemp[i]
+    end
+
+    #Add the influence of freestream velocities
+    for i = 1:ntev
+        curfield.tev[i].vx += curfield.u[1]
+        curfield.tev[i].vz += curfield.w[1]
+    end
+    for i = 1:nlev
+        curfield.lev[i].vx += curfield.u[1]
+        curfield.lev[i].vz += curfield.w[1]
+    end
+    for i = 1:nextv
+        curfield.extv[i].vx += curfield.u[1]
+        curfield.extv[i].vz += curfield.w[1]
     end
 
     #Convect free vortices with their induced velocities
@@ -912,7 +953,7 @@ end
 function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
     for i = 2:surf.ndiv-1
         #RHS for lifting equation
-
+        
         wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
                    surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
 
@@ -940,7 +981,13 @@ function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
     end
 
     #RHS for Kelvin condition (negative strength of all previously shed vortices)
-    surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    #surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
+
+    surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
+    surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
 end
 
 function update_thickRHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField)
@@ -1025,3 +1072,5 @@ function ind_vel_src(src::Vector{TwoDSource},t_x,t_z)
     end
     return uind, wind
 end
+
+    

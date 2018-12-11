@@ -194,6 +194,20 @@ function wakeroll(surf3d::ThreeDSurfSimple, field3d::ThreeDFieldSimple, dt)
             curfield.extv[i-ntev-nlev].vx += utemp[i]
             curfield.extv[i-ntev-nlev].vz += wtemp[i]
         end
+
+            #Add the influence of freestream velocities
+        for i = 1:ntev
+            curfield.tev[i].vx += curfield.u[1]
+            curfield.tev[i].vz += curfield.w[1]
+        end
+        for i = 1:nlev
+        curfield.lev[i].vx += curfield.u[1]
+            curfield.lev[i].vz += curfield.w[1]
+        end
+        for i = 1:nextv
+            curfield.extv[i].vx += curfield.u[1]
+            curfield.extv[i].vz += curfield.w[1]
+        end
         
         #Convect free vortices with their induced velocities
         for i = 1:ntev
@@ -242,7 +256,7 @@ function update_kinemCantilever(surf::ThreeDSurfSimple, dt::Float64, kinem::Kine
             yu = 0.5*(surf.yle[i] + surf.yle[i+1])
         end
         dy = yu - yl
-        Qvecloc[:,surf.nspan-i+1] = Phi[:,:,i]'*pdyn*[-cl[i]*dy*surf.s2d[i].c; cm[i]*dy*surf.s2d[i].c^2; 0];
+        Qvecloc[:,surf.nspan-i+1] = Phi[:,:,surf.nspan-i+1]'*pdyn*[-cl[i]*dy*surf.s2d[i].c; cm[i]*dy*surf.s2d[i].c^2; 0];
     end
     
     Qvec = sum(Qvecloc,dims=2)

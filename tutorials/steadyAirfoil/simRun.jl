@@ -33,7 +33,7 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = UNSflow.delNone()
 
-mat, surf, curfield = UNSflow.lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = UNSflow.lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort, wakerollup=1)
 
 UNSflow.makeVortPlots2D()
 

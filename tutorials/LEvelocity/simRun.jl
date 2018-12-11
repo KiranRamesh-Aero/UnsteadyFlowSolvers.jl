@@ -14,7 +14,7 @@ pvt = 0.25
 
 geometry = "FlatPlate"
 
-lespc = [0.15;]
+lespc = [10.15;]
 
 #The value of leading-edge radius (rho) must be specified according to geometry
 surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem, lespc, rho=0.016)

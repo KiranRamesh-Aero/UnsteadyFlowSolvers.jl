@@ -1,5 +1,3 @@
-#module IBLUNSflow
-
 function ldvmLinIterative(surf::TwoDSurf, curfield::TwoDFlowField, dt::Float64 ,t::Float64,vcore::Float64, T1::Array{Float64,1}, T2::Array{Float64,1}, T3::Array{Float64,1}, delvort = delNone())
 
     # If a restart directory is provided, read in the simulation data
@@ -193,43 +191,27 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     T3 = zeros(surf.ndiv)
 
   # initiliase the viscous parameters
-    println("Initiliase Viscous Data")
     invis, fluxSplitPar, soln, opCond = initiliaseData(ncell)
 
-    println("Starting time loop")
 
     for istep = 1:nsteps
         #Update current time
         t = t + dt
-     #istep=istep+1
-    println("Step number:$(istep) Time: $(t), the step-size $(dt)")
-    surf, curfield, cl, cd, cm = UNSflow.ldvmLinIterative(surf, curfield, dt ,t, vcore, T1, T2,T3)
-    #if (istep==1)
-    update(surf,invis,curfield,opCond)
-    #end
-    soln, dt_v, dt_vv = solveBL(invis,fluxSplitPar,soln,opCond,dt,t,ncell)
-    UNSflow.identifyFlowSeperation(surf,fluxSplitPar,soln,invis.ue_us,opCond.x,opCond.Re,ncell)
-     println("the visocous time-step size= $(dt_vv)")
+        surf, curfield, cl, cd, cm = UNSflow.ldvmLinIterative(surf, curfield, dt ,t, vcore, T1, T2,T3)
+        update(surf,invis,curfield,opCond)
+        soln, dt_v, dt_vv = solveBL(invis,fluxSplitPar,soln,opCond,dt,t,ncell)
+        UNSflow.identifyFlowSeperation(surf,fluxSplitPar,soln,invis.ue_us,opCond.x,opCond.Re,ncell)
 
-    if(istep==1000)
-        break
-    end
-    if writeflag == 1
-        if istep in writeArray
-            dirname = "$(round(t,sigdigits=nround))"
-            writeStamp(dirname, t, surf, curfield)
+
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(t,sigdigits=nround))"
+                writeStamp(dirname, t, surf, curfield)
+            end
         end
-    end
 
     # for writing in resultsSummary
-    mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
-
-
-    #if dt_v<dt
-        #println("Adjusting time-step $(dt) to $(dt_v)")
-        #dt=dt_v
-
-    #end
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
 
     end
 
@@ -243,102 +225,85 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     mat, surf, curfield, soln, fluxSplitPar, invis
 end
 
-function solveBL(invis::invisicidTransport, fluxSplitPar::fluxSplittingParameters, soln::solutions, opCond::operationalConditions, dt::Float64 ,t::Float64,ncell::Int64)
+function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions, dt::Float64 ,t::Float64,ncell::Int64)
 
-println("Enter solveBL")
-#n_elem = length(invis.ue_us)
-flux  = zeros(2,2,ncell+2)
-fluxt  = zeros(2,2,ncell+2)
-rhst= zeros(2,ncell+2)
-rhs= zeros(2,ncell+2)
-uet = zeros(ncell+2)
-uex = zeros(ncell+2)
-ue= zeros(ncell+2)
-ue_t0 = zeros(ncell+2)
-xbl= zeros(ncell+2)
+    flux  = zeros(2,2,ncell+2)
+    fluxt  = zeros(2,2,ncell+2)
+    rhst= zeros(2,ncell+2)
+    rhs= zeros(2,ncell+2)
+    uet = zeros(ncell+2)
+    uex = zeros(ncell+2)
+    ue= zeros(ncell+2)
+    ue_t0 = zeros(ncell+2)
+    xbl= zeros(ncell+2)
 
-ue[:] = invis.ue_us[:]
-ue_t0[:] = invis.ue_us_t0[:]
-xbl[:]= opCond.x[:]
-dx= opCond.dx
+    ue[:] = invis.ue_us[:]
+    ue_t0[:] = invis.ue_us_t0[:]
+    xbl[:]= opCond.x[:]
+    dx= opCond.dx
 
-uet = zeros(ncell+2)#UNSflow.derivatives(ue,ue_t0, dt, ncell)
-uex = UNSflow.derivatives(ue, xbl, ncell)  # correct the time derivative
-
-
-
-soln.sol[1,1] = 2*soln.sol[1,2] - soln.sol[1,3]
-soln.sol[1,ncell+2] = 2*soln.sol[1,ncell+1] - soln.sol[1,ncell]
-
-soln.sol[2,1] = 2*soln.sol[2,2] - soln.sol[2,3]
-soln.sol[2,ncell+2] = 2*soln.sol[2,ncell+1] - soln.sol[2,ncell]
-
-#soln.sol[:,1] = soln.sol[:,2]
-
-#soln.sol[1,1] =0.025
-#soln.sol[2,1] =0.0354
-
-#soln.sol[:,ncell+2] = soln.sol[:,ncell+1]
-
-UNSflow.correlateFunction(fluxSplitPar,soln.sol,ncell)
-UNSflow.calcEigenValues(soln,fluxSplitPar,ue,ncell);
-dt_v=UNSflow.calcDt(opCond, soln, ncell)
-# adding a smaller-timestep
-dt_vv=dt_v
-dt_v=dt
-UNSflow.calcFluxes(fluxSplitPar, flux, ue, soln,ncell)
-rhst =UNSflow.rhs(soln,fluxSplitPar,uet,uex,ue,ncell)
-UNSflow.fluxSplittingSchema(flux,soln,rhst,dt_v,dx,ncell)
-
-#soln.solt[1,1] =0.025
-#soln.solt[2,1] =0.0354
-soln.solt[1,1] = 2*soln.solt[1,2] - soln.solt[1,3]
-soln.solt[2,1] = 2*soln.solt[2,2] - soln.solt[2,3]
-
-soln.solt[1,ncell+2] = 2*soln.solt[1,ncell+1] - soln.solt[1,ncell]
-soln.solt[2,ncell+2] = 2*soln.solt[2,ncell+1] - soln.solt[2,ncell]
-
-UNSflow.correlateFunction(fluxSplitPar,soln.solt,ncell);
-UNSflow.calcEigenValues(soln,fluxSplitPar,ue,ncell);
-UNSflow.calcFluxes(fluxSplitPar,fluxt,ue,soln,ncell)
-rhs =UNSflow.rhs(soln,fluxSplitPar,uet,uex,ue,ncell)
-UNSflow.fluxSplittingSchema(flux,fluxt,soln,rhs,dt_v,dx,ncell)
-UNSflow.correlateFunction(fluxSplitPar,soln.sol,ncell);
-
-#UNSflow.identifyFlowSeperation(surf,fluxSplitPar,soln,ue,xbl,opCond.Re,ncell)
-
-invis.ue_us_t0[:]=ue[:]
-dt=dt_v
-
-#UNSflow.calcEigenValues(soln,fluxSpitPar,invis.ue_us);
-#dt_v=UNSflow.calcDt(opCond, soln)
-
-return soln, dt_v, dt_vv
-end
-
-function viscousSolverParameters()
+    if ue_t0==zeros(ncell+2)
+        uet = zeros(ncell+2)
+    else
+        UNSflow.derivatives(ue,ue_t0, dt, ncell)
+    end
+    uex = UNSflow.derivatives(ue, xbl, ncell)  # correct the time derivative
 
 
-end
+    soln.sol[1,1] = 2*soln.sol[1,2] - soln.sol[1,3]
+    soln.sol[1,ncell+2] = 2*soln.sol[1,ncell+1] - soln.sol[1,ncell]
+    soln.sol[2,1] = 2*soln.sol[2,2] - soln.sol[2,3]
+    soln.sol[2,ncell+2] = 2*soln.sol[2,ncell+1] - soln.sol[2,ncell]
 
-function updateTimeSteps()
+    #soln.sol[:,1] = soln.sol[:,2]
+    #soln.sol[1,1] =0.025
+    #soln.sol[2,1] =0.0354
+    #soln.sol[:,ncell+2] = soln.sol[:,ncell+1]
 
+    UNSflow.correlateFunction(fluxSplitPar,soln.sol,ncell)
+    UNSflow.calcEigenValues(soln,fluxSplitPar,ue,ncell);
+    dt_v=UNSflow.calcDt(opCond, soln, ncell)
+    dt_vv=dt_v
+    dt_v=dt
+    UNSflow.calcFluxes(fluxSplitPar, flux, ue, soln,ncell)
+    rhst =UNSflow.rhs(soln,fluxSplitPar,uet,uex,ue,ncell)
+    UNSflow.fluxSplittingSchema(flux,soln,rhst,dt_v,dx,ncell)
+
+    #soln.solt[1,1] =0.025
+    #soln.solt[2,1] =0.0354
+    soln.solt[1,1] = 2*soln.solt[1,2] - soln.solt[1,3]
+    soln.solt[2,1] = 2*soln.solt[2,2] - soln.solt[2,3]
+    soln.solt[1,ncell+2] = 2*soln.solt[1,ncell+1] - soln.solt[1,ncell]
+    soln.solt[2,ncell+2] = 2*soln.solt[2,ncell+1] - soln.solt[2,ncell]
+
+    UNSflow.correlateFunction(fluxSplitPar,soln.solt,ncell);
+    UNSflow.calcEigenValues(soln,fluxSplitPar,ue,ncell);
+    UNSflow.calcFluxes(fluxSplitPar,fluxt,ue,soln,ncell)
+    rhs =UNSflow.rhs(soln,fluxSplitPar,uet,uex,ue,ncell)
+    UNSflow.fluxSplittingSchema(flux,fluxt,soln,rhs,dt_v,dx,ncell)
+    UNSflow.correlateFunction(fluxSplitPar,soln.sol,ncell);
+
+
+    invis.ue_us_t0[:]=ue[:]
+    dt=dt_v
+
+    return soln, dt_v, dt_vv
 end
 
 
 function initiliaseData(ncell::Int64)
 
- invisicidPara = invisicidTransport(ncell)
- fluxSplittingPara = fluxSplittingParameters(ncell)
- soln =solutions(ncell, fluxSplittingPara)
- opCond= operationalConditions(0.3, 10000.0, ncell)
+    invisicidPara = InvisicidTransport(ncell)
+    fluxSplittingPara = FluxSplittingParameters(ncell)
+    soln =Solutions(ncell, fluxSplittingPara)
+    opCond= OperationalConditions(0.3, 10000.0, ncell)
 
- return invisicidPara, fluxSplittingPara, soln, opCond
+    return invisicidPara, fluxSplittingPara, soln, opCond
 
 end
 
 
-function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::fluxSplittingParameters,soln::solutions,ue::Array{Float64,1},x::Array{Float64,1},re::Float64, ncell::Int64)
+function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::FluxSplittingParameters,soln::Solutions,ue::Array{Float64,1},x::Array{Float64,1},re::Float64, ncell::Int64)
 
 
     for i = 2:ncell+1
@@ -351,7 +316,7 @@ function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::fluxSplittingParameter
 
 end
 
-function identifyFlowSeperationCirc(fluxSplit::fluxSplittingParameters,soln::solutions,ue::Array{Float64,1},x::Array{Float64,1})
+function identifyFlowSeperationCirc(fluxSplit::FluxSplittingParameters,soln::Solutions,ue::Array{Float64,1},x::Array{Float64,1})
 
 
     for i = 2:size(soln.sol,2)-1
@@ -366,7 +331,7 @@ end
 
 
 
- function viscousDt(invisicidPara::invisicidTransport, fluxSplittingPara::fluxSplittingParameters, soln::solutions, opCond::operationalConditions)
+function viscousDt(invisicidPara::InvisicidTransport, fluxSplittingPara::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions)
 
     correlateFunction(fluxSplittingPara,soln);
     calcEigenValues(soln,fluxSplittingPara,invisicidPara.ue_us);
@@ -376,45 +341,41 @@ end
  end
 
 
- function update(surf::TwoDSurf, invisidPara::invisicidTransport, curfield::TwoDFlowField, opCond::operationalConditions)
+function update(surf::TwoDSurf, invisidPara::InvisicidTransport, curfield::TwoDFlowField, opCond::OperationalConditions)
 
-  q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+    q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
-  ncell= length(q_u)
-  x = zeros(ncell+2)
-  dx= 1.0/(convert(Float64,ncell+2))
+    ncell= length(q_u)
+    x = zeros(ncell+2)
+    dx= 1.0/(convert(Float64,ncell+2))
 
-   for i=2:ncell+1
-   x[i] = (convert(Float64,i)-1.5)*dx
-   invisidPara.ue_us[i] = q_u[i-1]
-   invisidPara.ue_ls[i] = q_l[i-1]
-   end
+    for i=2:ncell+1
+        x[i] = (convert(Float64,i)-1.5)*dx
+        invisidPara.ue_us[i] = q_u[i-1]
+        invisidPara.ue_ls[i] = q_l[i-1]
+    end
 
-   x[1] =2*x[2]-x[3]
-   x[ncell+2] = 2*x[ncell+1]-x[ncell]
+    x[1] =2*x[2]-x[3]
+    x[ncell+2] = 2*x[ncell+1]-x[ncell]
 
-   #x[1] =0.
-   #x[ncell+2] = 1.
+    #x[1] =0.
+    #x[ncell+2] = 1.
+    #invisidPara.ue_us[1]= 2.0*invisidPara.ue_us[2]-invisidPara.ue_us[3]
+    #invisidPara.ue_us[ncell+2]= 2.0*invisidPara.ue_us[ncell+1]-invisidPara.ue_us[ncell+1]
+    #invisidPara.ue_us[1]= 0.09512534545251
+    #invisidPara.ue_us[2]= 0.009512534545251
+    #invisidPara.ue_us[ncell+2]= 0.9947793650842671
 
-   #invisidPara.ue_us[1]= 2.0*invisidPara.ue_us[2]-invisidPara.ue_us[3]
-   #invisidPara.ue_us[ncell+2]= 2.0*invisidPara.ue_us[ncell+1]-invisidPara.ue_us[ncell+1]
+    invisidPara.ue_ls[1]= 2.0*invisidPara.ue_ls[2]-invisidPara.ue_ls[3]
+    invisidPara.ue_ls[ncell+2]= 2.0*invisidPara.ue_ls[ncell+1]-invisidPara.ue_ls[ncell+1]
 
-   #invisidPara.ue_us[1]= 0.09512534545251
-   #invisidPara.ue_us[2]= 0.009512534545251
+    opCond.dx=dx
+    opCond.x[:]= x[:]
 
-   #invisidPara.ue_us[ncell+2]= 0.9947793650842671
-
-   invisidPara.ue_ls[1]= 2.0*invisidPara.ue_ls[2]-invisidPara.ue_ls[3]
-   invisidPara.ue_ls[ncell+2]= 2.0*invisidPara.ue_ls[ncell+1]-invisidPara.ue_ls[ncell+1]
-
-   opCond.dx=dx
-   opCond.x[:]= x[:]
-   #boundaryCorrection(invisidPara.ue_us)
-   #boundaryCorrection(invisidPara.ue_ls)
  end
 
 
- function updateCirc(ue::Array{Float64,1}, invisidPara::invisicidTransport)
+ function updateCirc(ue::Array{Float64,1}, invisidPara::InvisicidTransport)
 
   #q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
@@ -450,7 +411,7 @@ end
 
 
 
-function rhs(sol::solutions,fluxSp::fluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
+function rhs(sol::Solutions,fluxSp::FluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
 
 
  rhs =zeros(2,ncell+2)
@@ -465,11 +426,9 @@ boundaryCorrection(rhs[2,:])
 return rhs
 end
 
-function fluxSplittingSchema(flux::Array{Float64,3},sol::solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
+function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
 
- #println("Flux Splittting one")
- #n_elem = size(sol.sol,2)
- #println(n_elem)
+
 
     for i = 2:ncell
         sol.solt[1,i] = sol.sol[1,i] - (dt/dx)*(flux[1,1,i] - flux[1,1,i-1] + flux[2,1,i+1]
@@ -481,32 +440,17 @@ function fluxSplittingSchema(flux::Array{Float64,3},sol::solutions,rhs::Array{Fl
         sol.solt[1,i] = sol.sol[1,i] - (dt/dx)*(flux[1,1,i] - flux[1,1,i-1]) + dt*rhs[1,i]
         sol.solt[2,i] = sol.sol[2,i] - (dt/dx)*(flux[1,2,i] - flux[1,2,i-1]) + dt*rhs[2,i]
 
-        #sol.solt[1,1]= 2*sol.solt[1,2]-sol.solt[1,3]
-        #sol.solt[1,n_elem] = 2*sol.solt[1,n_elem-1]-sol.solt[1,n_elem-2]
-        #sol.solt[1,1] = 0.025
-        #sol.solt[2,1] = 0.0354
-        #sol.solt[1,n_elem] = 2*sol.solt[1,n_elem-1]-sol.solt[1,n_elem-2]
-        #sol.solt[2,n_elem] = 2*sol.solt[2,n_elem-1]-sol.solt[2,n_elem-2]
-
-        #boundaryCorrection(sol.solt)
-
-
 end
 
-function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
+function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
 
- #n_elem = size(sol.sol,2)
- #println(n_elem)
- #sol.sol[1,1] = 0.025
- #sol.sol[2,1] = 0.0354
-
-     i = 2
-     sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - flux[1,1,i-1]
-     - flux[2,1,i] + 2*flux[2,1,i+1] - flux[2,1,i+2] + fluxt[1,1,i] - fluxt[1,1,i-1]
-     + fluxt[2,1,i+1] - fluxt[2,1,i]) + 0.5*dt*rhs[1,i]
-     sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - flux[1,2,i-1]
-     - flux[2,2,i] + 2*flux[2,2,i+1]-flux[2,2,i+2]+fluxt[1,2,i] - fluxt[1,2,i-1]
-     + fluxt[2,2,i+1] - fluxt[2,2,i])+0.5*dt*rhs[2,i]
+    i = 2
+    sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - flux[1,1,i-1]
+    - flux[2,1,i] + 2*flux[2,1,i+1] - flux[2,1,i+2] + fluxt[1,1,i] - fluxt[1,1,i-1]
+    + fluxt[2,1,i+1] - fluxt[2,1,i]) + 0.5*dt*rhs[1,i]
+    sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - flux[1,2,i-1]
+    - flux[2,2,i] + 2*flux[2,2,i+1]-flux[2,2,i+2]+fluxt[1,2,i] - fluxt[1,2,i-1]
+    + fluxt[2,2,i+1] - fluxt[2,2,i])+0.5*dt*rhs[2,i]
 
     for i = 3:ncell
         sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - 2*flux[1,1,i-1] + flux[1,1,i-2]
@@ -522,69 +466,55 @@ function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol:
     sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - 2*flux[1,2,i-1] + flux[1,2,i-2]
     +fluxt[1,2,i] - fluxt[1,2,i-1]) + 0.5*dt*rhs[2,i]
 
-
-    #sol.sol[1,1] = 0.025
-    #sol.sol[2,1] = 0.0354
-    #sol.sol[1,n_elem] = 2*sol.sol[1,n_elem-1]-sol.sol[1,n_elem-2]
-    #sol.sol[2,n_elem] = 2*sol.sol[2,n_elem-1]-sol.sol[2,n_elem-2]
-
-     #boundaryCorrection(sol.sol)
-    # fix for the boundary element
-    #sol.sol[1,1]= 2*sol.sol[1,2]-sol.sol[1,3]
-    #sol.sol[1,n_elem] = 2*sol.sol[1,n_elem-1]-sol.sol[1,n_elem-2]
-
 end
 
 
 function derivatives(dA::Array{Float64,1}, dB::Array{Float64,1},ncell::Int64)
 
 #n_ele = length(dA)
-der =zeros(ncell+2)
-if ((ndims(dA)==1) && (ndims(dB)==1))
-    if (length(dA)==length(dB))
-        for i=2:ncell+1
-            der[i] = (dA[i]-dA[i-1])/(dB[i]-dB[i-1])
+    der =zeros(ncell+2)
+    if ((ndims(dA)==1) && (ndims(dB)==1))
+        if (length(dA)==length(dB))
+            for i=2:ncell+1
+                der[i] = (dA[i]-dA[i-1])/(dB[i]-dB[i-1])
+            end
+        else
+            error("Input arrays should have identical dimensions")
         end
     else
-            error("Input arrays should have identical dimensions")
-    end
- else
         error("Function only acccepts one-dimensional arrays")
- end
+    end
 
    der[1]=2*der[2]-der[3]
    der[ncell+2] = 2*der[ncell+1]-der[ncell]
-#boundaryCorrection(der)
-return der
+   return der
 end
 
 function derivatives(dA::Array{Float64,1},dA0::Array{Float64,1}, dt::Float64, ncell::Int64)
 
     #n_ele = length(dA)
     der =zeros(ncell+2)
-    if ((ndims(dA)==1) && (ndims(dA0)==1))
-        if (length(dA)==length(dA0))
-            for i=2:ncell+1
-                der[i] = (dA[i]-dA0[i])/(dt)
+        if ((ndims(dA)==1) && (ndims(dA0)==1))
+            if (length(dA)==length(dA0))
+                for i=2:ncell+1
+                    der[i] = (dA[i]-dA0[i])/(dt)
+                end
+            else
+                error("Input arrays should have identical dimensions")
             end
         else
-                error("Input arrays should have identical dimensions")
-        end
-    else
             error("Function only acccepts one-dimensional arrays")
-    end
+        end
 
     der[1]=2*der[2]-der[3]
     der[ncell+2] = 2*der[ncell+1]-der[ncell]
     return der
-
-
 end
 
-function correlateFunction(fluxSplitPara::fluxSplittingParameters, sol::Array{Float64,2},ncell::Int64)
+function correlateFunction(fluxSplitPara::FluxSplittingParameters, sol::Array{Float64,2},ncell::Int64)
 
 
-for i=1:ncell+2
+    for i=1:ncell+2
         fluxSplitPara.del[i] = sol[1,i]
         fluxSplitPara.E[i] = sol[2,i]/(fluxSplitPara.del[i]) - 1.0
         fluxSplitPara.F[i] = 4.8274*fluxSplitPara.E[i]^4 - 5.9816*fluxSplitPara.E[i]^3 + 4.0274*fluxSplitPara.E[i]^2 + 0.23247*fluxSplitPara.E[i] + 0.15174
@@ -605,53 +535,13 @@ for i=1:ncell+2
             fluxSplitPara.S[i] = 0.5*(451.55*fluxSplitPara.E[i]^3 + 2010*fluxSplitPara.E[i]^2 + 138.96*fluxSplitPara.E[i] + 11.296
             - 96.739*fluxSplitPara.E[i]^3 + 117.74*fluxSplitPara.E[i]^2 - 46.432*fluxSplitPara.E[i] + 6.8074)
         end
+
         fluxSplitPara.dfde[i] = 4*4.8274*fluxSplitPara.E[i]^3 - 3*5.9816*fluxSplitPara.E[i]^2 + 2*4.0274*fluxSplitPara.E[i] + 0.23247
     end
 
-    #fluxSplitPara.del[1] = fluxSplitPara.del[2]
-    #fluxSplitPara.del[ncell+2] = fluxSplitPara.del[ncell-1]
-
-    #fluxSplitPara.E[1] =fluxSplitPara.E[2]
-    #fluxSplitPara.E[ncell+2] =fluxSplitPara.E[ncell-1]
-
-
-
-
-end
-
-function calLiftComp(geometry::TwoDSurf)
-
-
-return ul
-end
-
-function calNonLiftComp(geometry::TwoDSurf)
-
-
-return uth
 end
 
 
-function generateEdgeVlocity(geometry::TwoDSurf, eta::Float64)
-
-if typeof(geometry.kinem.alpha)==ConstDef
-alpha = geometry.kinem.alpha
-else
-    error("function is not defined for non-constant \alpha")
-end
-# calculating the edge velocities on the aerofoil surfaces as defined by conference paper
-#fetching all the required parameters to calculate lifting and non-lifting components of the velocity
-U = geometry.
-hdot = geometry.
-uth=calLiftComp(geometry)
-ul=calNonLiftComp(geometry)
-
- ueupper = cos(eta).*(U.*cos(alpha)+ hdot.*sin(alpha) + ul+uth )
- uelower = cos(eta).*(U.*cos(alpha)+ hdot.*sin(alpha)+ul-uth)
-
-
- return ueupper, uelower
-end
 
 
 #The description according to Numerical Recipies in Fortrant 90 :

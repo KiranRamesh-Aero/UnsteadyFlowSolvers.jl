@@ -1,5 +1,6 @@
 tutorials
 /src/testfunctions
+src/resultsSummary
 # OS generated files #
 ######################
 .DS_Store

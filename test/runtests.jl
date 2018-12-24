@@ -1,6 +1,4 @@
 using UNSflow
-<<<<<<< HEAD
-
 using Test
 
 alphadef = UNSflow.ConstDef(5. *pi/180)
@@ -15,5 +13,3 @@ lespc = [10.15;]
 surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem, lespc, rho=0.016)
 
 @test typeof(surf)==TwoDSurf
-=======
->>>>>>> master

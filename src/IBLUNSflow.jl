@@ -243,7 +243,7 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     mat, surf, curfield, soln, fluxSplitPar, invis
 end
 
-function solveBL(invis::invisicidTransport, fluxSplitPar::fluxSplittingParameters, soln::solutions, opCond::operationalConditions, dt::Float64 ,t::Float64,ncell::Int64)
+function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions, dt::Float64 ,t::Float64,ncell::Int64)
 
 println("Enter solveBL")
 #n_elem = length(invis.ue_us)
@@ -328,17 +328,17 @@ end
 
 function initiliaseData(ncell::Int64)
 
- invisicidPara = invisicidTransport(ncell)
- fluxSplittingPara = fluxSplittingParameters(ncell)
- soln =solutions(ncell, fluxSplittingPara)
- opCond= operationalConditions(0.3, 10000.0, ncell)
+ invisicidPara = InvisicidTransport(ncell)
+ fluxSplittingPara = FluxSplittingParameters(ncell)
+ soln =Solutions(ncell, fluxSplittingPara)
+ opCond= OperationalConditions(0.3, 10000.0, ncell)
 
  return invisicidPara, fluxSplittingPara, soln, opCond
 
 end
 
 
-function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::fluxSplittingParameters,soln::solutions,ue::Array{Float64,1},x::Array{Float64,1},re::Float64, ncell::Int64)
+function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::FluxSplittingParameters,soln::Solutions,ue::Array{Float64,1},x::Array{Float64,1},re::Float64, ncell::Int64)
 
 
     for i = 2:ncell+1
@@ -351,7 +351,7 @@ function identifyFlowSeperation(surf::TwoDSurf,fluxSplit::fluxSplittingParameter
 
 end
 
-function identifyFlowSeperationCirc(fluxSplit::fluxSplittingParameters,soln::solutions,ue::Array{Float64,1},x::Array{Float64,1})
+function identifyFlowSeperationCirc(fluxSplit::FluxSplittingParameters,soln::Solutions,ue::Array{Float64,1},x::Array{Float64,1})
 
 
     for i = 2:size(soln.sol,2)-1
@@ -366,7 +366,7 @@ end
 
 
 
- function viscousDt(invisicidPara::invisicidTransport, fluxSplittingPara::fluxSplittingParameters, soln::solutions, opCond::operationalConditions)
+ function viscousDt(invisicidPara::InvisicidTransport, fluxSplittingPara::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions)
 
     correlateFunction(fluxSplittingPara,soln);
     calcEigenValues(soln,fluxSplittingPara,invisicidPara.ue_us);
@@ -376,7 +376,7 @@ end
  end
 
 
- function update(surf::TwoDSurf, invisidPara::invisicidTransport, curfield::TwoDFlowField, opCond::operationalConditions)
+ function update(surf::TwoDSurf, invisidPara::InvisicidTransport, curfield::TwoDFlowField, opCond::OperationalConditions)
 
   q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
@@ -414,7 +414,7 @@ end
  end
 
 
- function updateCirc(ue::Array{Float64,1}, invisidPara::invisicidTransport)
+ function updateCirc(ue::Array{Float64,1}, invisidPara::InvisicidTransport)
 
   #q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
@@ -450,7 +450,7 @@ end
 
 
 
-function rhs(sol::solutions,fluxSp::fluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
+function rhs(sol::Solutions,fluxSp::FluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
 
 
  rhs =zeros(2,ncell+2)
@@ -465,7 +465,7 @@ boundaryCorrection(rhs[2,:])
 return rhs
 end
 
-function fluxSplittingSchema(flux::Array{Float64,3},sol::solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
+function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
 
  #println("Flux Splittting one")
  #n_elem = size(sol.sol,2)
@@ -493,7 +493,7 @@ function fluxSplittingSchema(flux::Array{Float64,3},sol::solutions,rhs::Array{Fl
 
 end
 
-function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
+function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
 
  #n_elem = size(sol.sol,2)
  #println(n_elem)
@@ -581,7 +581,7 @@ function derivatives(dA::Array{Float64,1},dA0::Array{Float64,1}, dt::Float64, nc
 
 end
 
-function correlateFunction(fluxSplitPara::fluxSplittingParameters, sol::Array{Float64,2},ncell::Int64)
+function correlateFunction(fluxSplitPara::FluxSplittingParameters, sol::Array{Float64,2},ncell::Int64)
 
 
 for i=1:ncell+2

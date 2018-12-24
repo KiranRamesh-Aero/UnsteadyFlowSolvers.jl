@@ -1,4 +1,4 @@
-function calcEigenValues(soln::solutions, fluxsplit::fluxSplittingParameters, ue::Array{Float64},ncell::Int64)
+function calcEigenValues(soln::Solutions, fluxsplit::FluxSplittingParameters, ue::Array{Float64},ncell::Int64)
 
     #lamb1 = sol.lamb1; lamb2 = sol.lamb2 , E= fluxsplit.E, dfde= sol.dfde, F= sol.F
 
@@ -20,7 +20,7 @@ function calcEigenValues(soln::solutions, fluxsplit::fluxSplittingParameters, ue
 end
 
 
-function calcDt(opCond::operationalConditions, sol::solutions, ncell::Int64)
+function calcDt(opCond::OperationalConditions, sol::Solutions, ncell::Int64)
 
     dt = 10000.0
     for i = 1:ncell+2
@@ -36,7 +36,7 @@ function calcDt(opCond::operationalConditions, sol::solutions, ncell::Int64)
     return dt
 end
 
-function calcDtCirc(cfl::Float64, dx::Float64, sol::solutions)
+function calcDtCirc(cfl::Float64, dx::Float64, sol::Solutions)
 
     dt = 10000.0
     for i = 1:length(sol.lamb1)
@@ -49,7 +49,7 @@ function calcDtCirc(cfl::Float64, dx::Float64, sol::solutions)
 end
 
 
-function calcFluxes(fluxsplit::fluxSplittingParameters, flux::Array{Float64,3} ,ue::Array{Float64,1}, sol::solutions, ncell::Int64)
+function calcFluxes(fluxsplit::FluxSplittingParameters, flux::Array{Float64,3} ,ue::Array{Float64,1}, sol::Solutions, ncell::Int64)
 
   #n_ele = length(fluxsplit.E)
     Apos = zeros(2,2); Aneg = zeros(2,2)

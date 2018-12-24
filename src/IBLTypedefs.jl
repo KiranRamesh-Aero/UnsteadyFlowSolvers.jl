@@ -1,12 +1,12 @@
 
-mutable struct invisicidTransport
+mutable struct InvisicidTransport
   #invscid_Surf :: TwoDSurf
   ue_us    :: Array{Float64,1}
   ue_ls    :: Array{Float64,1}
   ue_us_t0 :: Array{Float64,1}
   ue_ls_t0 :: Array{Float64,1}
 
- function invisicidTransport(ncell::Int64)
+ function InvisicidTransport(ncell::Int64)
    #invscid_Surf = invSurf
    ue_us = zeros(ncell+2)
    ue_ls = zeros(ncell+2)
@@ -17,7 +17,7 @@ mutable struct invisicidTransport
 end
 
 
- mutable struct fluxSplittingParameters
+ mutable struct FluxSplittingParameters
 
    #n_blcell :: Int64
    E :: Array{Float64,1}
@@ -27,7 +27,7 @@ end
    dfde :: Array{Float64,1}
    del :: Array{Float64,1}
 
-   function fluxSplittingParameters(ncell::Int64)
+   function FluxSplittingParameters(ncell::Int64)
 
      E=ones(ncell+2)*0.4142
      #b0=131.9*0.4142^3-167.32*0.4142^2+76.642*0.4142-11.068
@@ -43,14 +43,14 @@ end
   end
 
 
- mutable struct aerofoilThickness
+ mutable struct AerofoilThickness
 
 xCoordinates :: Array{Float64,1}
 yCoordinates :: Array{Float64,1}
 
  end
 
- mutable struct solutions
+ mutable struct Solutions
 
  sol ::   Array{Float64,2}
  solt ::  Array{Float64,2}
@@ -60,7 +60,7 @@ yCoordinates :: Array{Float64,1}
  Csep  :: Array{Float64,1}
  cf :: Array{Float64,1}
 
- function solutions(ncell::Int64, fluxSplit::fluxSplittingParameters)
+ function Solutions(ncell::Int64, fluxSplit::FluxSplittingParameters)
 
     #sol[1,:] = fluxSplit.del[:]
     #sol[2,:] = fluxSplit.del[:].*(fluxSplit.E[:]+1)
@@ -86,14 +86,14 @@ yCoordinates :: Array{Float64,1}
  end
 
 
-mutable struct operationalConditions
+mutable struct OperationalConditions
 
 cfl::Float64
 Re::Float64
 dx::Float64
 x:: Array{Float64,1}
 
-function operationalConditions(cfl::Float64, Re::Float64,ncell::Int64)
+function OperationalConditions(cfl::Float64, Re::Float64,ncell::Int64)
   cfl=cfl
   Re = Re
   dx = 0.0

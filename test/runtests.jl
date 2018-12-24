@@ -1,4 +1,5 @@
 using UNSflow
+<<<<<<< HEAD
 
 using Test
 
@@ -14,3 +15,5 @@ lespc = [10.15;]
 surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem, lespc, rho=0.016)
 
 @test typeof(surf)==TwoDSurf
+=======
+>>>>>>> master

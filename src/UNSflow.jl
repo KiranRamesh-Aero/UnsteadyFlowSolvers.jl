@@ -161,4 +161,5 @@ include("IBL/fluxSplitting/StegerWarming.jl")
 include("IBL/IBLCalc.jl")
 include("IBL/initBLSolver.jl")
 include("IBL/IBLUtil.jl")
+include("IBL/closureModel/ProudmanJohnsons.jl")
 end

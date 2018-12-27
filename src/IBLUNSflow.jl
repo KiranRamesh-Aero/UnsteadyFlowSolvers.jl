@@ -435,68 +435,6 @@ function boundaryCorrection(u::Array{Float64,2})
     end
 end
 
-
-# setting tha parameters for the right-hand-side of the equations
-
-function rhs(sol::Solutions,fluxSp::FluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
-
-    rhs =zeros(2,ncell+2)
-    for i = 2:ncell+1
-        rhs[1,i] = fluxSp.B[i]/(2*fluxSp.del[i]) - (fluxSp.del[i]*uet[i])/ue[i] - (fluxSp.E[i]+1.0)*fluxSp.del[i]*uex[i]
-        rhs[2,i] = fluxSp.S[i]/fluxSp.del[i] - (2.0*fluxSp.E[i]*fluxSp.del[i]*uet[i])/ue[i] - (2.0*fluxSp.F[i]*fluxSp.del[i]*uex[i])
-    end
-# The boundary values do not need
-    boundaryCorrection(rhs[1,:])
-    boundaryCorrection(rhs[2,:])
-
-    return rhs
-end
-
-# First-order (intermediate) flux spliiting function
-
-function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
-
-    for i = 2:ncell
-        sol.solt[1,i] = sol.sol[1,i] - (dt/dx)*(flux[1,1,i] - flux[1,1,i-1] + flux[2,1,i+1]
-        -flux[2,1,i]) + dt*rhs[1,i]
-        sol.solt[2,i] = sol.sol[2,i] - (dt/dx)*(flux[1,2,i] - flux[1,2,i-1] + flux[2,2,i+1]
-        -flux[2,2,i]) + dt*rhs[2,i]
-     end
-    i = ncell+1
-        sol.solt[1,i] = sol.sol[1,i] - (dt/dx)*(flux[1,1,i] - flux[1,1,i-1]) + dt*rhs[1,i]
-        sol.solt[2,i] = sol.sol[2,i] - (dt/dx)*(flux[1,2,i] - flux[1,2,i-1]) + dt*rhs[2,i]
-
-end
-
-# Second-order (final) flux spliiting function
-
-function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
-
-    i = 2
-    sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - flux[1,1,i-1]
-    - flux[2,1,i] + 2*flux[2,1,i+1] - flux[2,1,i+2] + fluxt[1,1,i] - fluxt[1,1,i-1]
-    + fluxt[2,1,i+1] - fluxt[2,1,i]) + 0.5*dt*rhs[1,i]
-    sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - flux[1,2,i-1]
-    - flux[2,2,i] + 2*flux[2,2,i+1]-flux[2,2,i+2]+fluxt[1,2,i] - fluxt[1,2,i-1]
-    + fluxt[2,2,i+1] - fluxt[2,2,i])+0.5*dt*rhs[2,i]
-
-    for i = 3:ncell
-        sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - 2*flux[1,1,i-1] + flux[1,1,i-2]
-        - flux[2,1,i] + 2*flux[2,1,i+1] - flux[2,1,i+2] + fluxt[1,1,i] - fluxt[1,1,i-1]
-        + fluxt[2,1,i+1] - fluxt[2,1,i]) + 0.5*dt*rhs[1,i]
-        sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - 2*flux[1,2,i-1] + flux[1,2,i-2]
-        - flux[2,2,i] + 2*flux[2,2,i+1] - flux[2,2,i+2] + fluxt[1,2,i] - fluxt[1,2,i-1]
-        + fluxt[2,2,i+1] - fluxt[2,2,i]) + 0.5*dt*rhs[2,i]
-    end
-    i = ncell+1
-    sol.sol[1,i] = 0.5*(sol.sol[1,i] + sol.solt[1,i]) - (0.5*dt/dx)*(flux[1,1,i] - 2*flux[1,1,i-1] + flux[1,1,i-2]
-    +fluxt[1,1,i] - fluxt[1,1,i-1]) + 0.5*dt*rhs[1,i]
-    sol.sol[2,i] = 0.5*(sol.sol[2,i] + sol.solt[2,i]) - (0.5*dt/dx)*(flux[1,2,i] - 2*flux[1,2,i-1] + flux[1,2,i-2]
-    +fluxt[1,2,i] - fluxt[1,2,i-1]) + 0.5*dt*rhs[2,i]
-
-end
-
-
 function derivatives(dA::Array{Float64,1}, dB::Array{Float64,1},ncell::Int64)
 
     der =zeros(ncell+2)

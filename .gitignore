@@ -1,4 +1,5 @@
-tutorials
+#tutorials
+!tutorials/IBLSolver
 /src/IBL/testfunctions
 src/resultsSummary
 /src/IBL/sanitation.jl

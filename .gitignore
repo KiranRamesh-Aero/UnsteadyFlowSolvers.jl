@@ -1,6 +1,7 @@
 tutorials
 /src/IBL/testfunctions
 src/resultsSummary
+/src/IBL/sanitation.jl
 # OS generated files #
 ######################
 .DS_Store

@@ -158,4 +158,7 @@ include("plots/plots3D.jl")
 include("IBL/IBLTypedefs.jl")
 include("IBL/IBLUNSflow.jl")
 include("IBL/fluxSplitting/StegerWarming.jl")
+include("IBL/IBLCalc.jl")
+include("IBL/initBLSolver.jl")
+include("IBL/IBLUtil.jl")
 end

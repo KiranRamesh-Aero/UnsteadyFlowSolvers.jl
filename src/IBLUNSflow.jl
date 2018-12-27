@@ -152,7 +152,9 @@ function matchEdgeVelocity()
 
 end
 
-function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, ncell::Int64, nsteps::Int64 =5000, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
+function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, ncell::Int64, cfl::Float64, re::Float64 , nsteps::Int64 =5000, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, userdefinedDt=0.0)
+
+    isUserDefinedTime =false
 
     if startflag == 0
         mat = zeros(0, 8)
@@ -168,8 +170,13 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     end
     mat = mat'
 
-    #dt = dtstar*surf.c/surf.uref
-     dt=0.0002
+    if userdefinedDt==0.0
+        dt = dtstar*surf.c/surf.uref
+        isUserDefinedTime=false
+    else
+        dt=userdefinedDt
+        isUserDefinedTime =true
+    end
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -191,17 +198,26 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     T3 = zeros(surf.ndiv)
 
   # initiliase the viscous parameters
-    invis, fluxSplitPar, soln, opCond = initiliaseData(ncell)
+    invis, fluxSplitPar, soln, opCond = initiliaseViscousPara(ncell,cfl,re)
 
 
     for istep = 1:nsteps
         #Update current time
         t = t + dt
         surf, curfield, cl, cd, cm = UNSflow.ldvmLinIterative(surf, curfield, dt ,t, vcore, T1, T2,T3)
-        update(surf,invis,curfield,opCond)
-        soln, dt_v, dt_vv = solveBL(invis,fluxSplitPar,soln,opCond,dt,t,ncell)
+        coupleInviscidViscous(surf,invis,curfield,opCond)
+        soln, dt_vv = solveBL(invis,fluxSplitPar,soln,opCond,dt,t,ncell,isUserDefinedTime)
         UNSflow.identifyFlowSeperation(surf,fluxSplitPar,soln,invis.ue_us,opCond.x,opCond.Re,ncell)
 
+        if isUserDefinedTime
+            println("Step number:$(istep), Time: $(t), the step-size $(dt), the visocous time-step size= $(dt_vv) ")
+            if dt>dt_vv
+                error("User defined time-step is too large for the given CFL conditions.")
+            end
+        else
+            dt=dt_vv
+            println("Step number:$(istep), Time: $(t), the visocous time-step size= $(dt_vv) ")
+        end
 
         if writeflag == 1
             if istep in writeArray
@@ -225,7 +241,7 @@ function invisicViscousCoupledSolver(surf::TwoDSurf, curfield::TwoDFlowField, nc
     mat, surf, curfield, soln, fluxSplitPar, invis
 end
 
-function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions, dt::Float64 ,t::Float64,ncell::Int64)
+function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameters, soln::Solutions, opCond::OperationalConditions, dt::Float64 ,t::Float64,ncell::Int64, userDefinedDt::Bool)
 
     flux  = zeros(2,2,ncell+2)
     fluxt  = zeros(2,2,ncell+2)
@@ -236,25 +252,28 @@ function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameter
     ue= zeros(ncell+2)
     ue_t0 = zeros(ncell+2)
     xbl= zeros(ncell+2)
-
+    dt_vv=0.0
     ue[:] = invis.ue_us[:]
     ue_t0[:] = invis.ue_us_t0[:]
     xbl[:]= opCond.x[:]
     dx= opCond.dx
 
+    # correct the time derivative
     if ue_t0==zeros(ncell+2)
         uet = zeros(ncell+2)
     else
         UNSflow.derivatives(ue,ue_t0, dt, ncell)
     end
-    uex = UNSflow.derivatives(ue, xbl, ncell)  # correct the time derivative
 
+    uex = UNSflow.derivatives(ue, xbl, ncell)  # correct the spatial derivative
 
+    # defined left and right boundary conditions of the FD solver
     soln.sol[1,1] = 2*soln.sol[1,2] - soln.sol[1,3]
     soln.sol[1,ncell+2] = 2*soln.sol[1,ncell+1] - soln.sol[1,ncell]
     soln.sol[2,1] = 2*soln.sol[2,2] - soln.sol[2,3]
     soln.sol[2,ncell+2] = 2*soln.sol[2,ncell+1] - soln.sol[2,ncell]
 
+    # Alternative boundary conditions
     #soln.sol[:,1] = soln.sol[:,2]
     #soln.sol[1,1] =0.025
     #soln.sol[2,1] =0.0354
@@ -263,14 +282,24 @@ function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameter
     UNSflow.correlateFunction(fluxSplitPar,soln.sol,ncell)
     UNSflow.calcEigenValues(soln,fluxSplitPar,ue,ncell);
     dt_v=UNSflow.calcDt(opCond, soln, ncell)
-    dt_vv=dt_v
-    dt_v=dt
+
+    # choose the correct time steps
+    if (userDefinedDt)
+        dt_vv=dt_v
+        dt_v=dt
+    else
+        # reduction of time-step for extra stability
+        dt_v=dt_v
+        dt_vv=dt_v
+    end
+
     UNSflow.calcFluxes(fluxSplitPar, flux, ue, soln,ncell)
     rhst =UNSflow.rhs(soln,fluxSplitPar,uet,uex,ue,ncell)
     UNSflow.fluxSplittingSchema(flux,soln,rhst,dt_v,dx,ncell)
 
     #soln.solt[1,1] =0.025
     #soln.solt[2,1] =0.0354
+    # Boundary conditios for the first-order solutions
     soln.solt[1,1] = 2*soln.solt[1,2] - soln.solt[1,3]
     soln.solt[2,1] = 2*soln.solt[2,2] - soln.solt[2,3]
     soln.solt[1,ncell+2] = 2*soln.solt[1,ncell+1] - soln.solt[1,ncell]
@@ -285,18 +314,18 @@ function solveBL(invis::InvisicidTransport, fluxSplitPar::FluxSplittingParameter
 
 
     invis.ue_us_t0[:]=ue[:]
-    dt=dt_v
+    #dt=dt_v
 
-    return soln, dt_v, dt_vv
+    return soln, dt_vv
 end
 
 
-function initiliaseData(ncell::Int64)
+function initiliaseViscousPara(ncell::Int64, cfl::Float64, re:: Float64)
 
     invisicidPara = InvisicidTransport(ncell)
     fluxSplittingPara = FluxSplittingParameters(ncell)
     soln =Solutions(ncell, fluxSplittingPara)
-    opCond= OperationalConditions(0.3, 10000.0, ncell)
+    opCond= OperationalConditions(cfl, re, ncell)
 
     return invisicidPara, fluxSplittingPara, soln, opCond
 
@@ -341,7 +370,7 @@ function viscousDt(invisicidPara::InvisicidTransport, fluxSplittingPara::FluxSpl
  end
 
 
-function update(surf::TwoDSurf, invisidPara::InvisicidTransport, curfield::TwoDFlowField, opCond::OperationalConditions)
+function coupleInviscidViscous(surf::TwoDSurf, invisidPara::InvisicidTransport, curfield::TwoDFlowField, opCond::OperationalConditions)
 
     q_u,q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
@@ -391,21 +420,18 @@ function update(surf::TwoDSurf, invisidPara::InvisicidTransport, curfield::TwoDF
 
 function boundaryCorrection(u::Array{Float64,1})
 
-n_bl = length(u)
-#println(n_bl)
-u[1]= 2*u[2]-u[3]
-u[n_bl] = 2*u[n_bl-1]-u[n_bl-2]
-#println(u[n_bl])
+    n_bl = length(u)
+    u[1]= 2*u[2]-u[3]
+    u[n_bl] = 2*u[n_bl-1]-u[n_bl-2]
+
 end
 
 function boundaryCorrection(u::Array{Float64,2})
 
     for i =1:ndims(u)
         n_bl = length(u[i,:])
-        #println(n_bl)
         u[i,1]= 2*u[i,2]-u[i,3]
         u[i,n_bl] = 2*u[i,n_bl-1]-u[i,n_bl-2]
-        #println(u[n_bl])
     end
 end
 
@@ -427,8 +453,6 @@ return rhs
 end
 
 function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
-
-
 
     for i = 2:ncell
         sol.solt[1,i] = sol.sol[1,i] - (dt/dx)*(flux[1,1,i] - flux[1,1,i-1] + flux[2,1,i+1]
@@ -540,8 +564,6 @@ function correlateFunction(fluxSplitPara::FluxSplittingParameters, sol::Array{Fl
     end
 
 end
-
-
 
 
 #The description according to Numerical Recipies in Fortrant 90 :

@@ -1,4 +1,4 @@
-mutable struct InvisicidTran
+mutable struct InvisicidTransport
 
     ue_us    :: Array{Float64,1}
     ue_ls    :: Array{Float64,1}

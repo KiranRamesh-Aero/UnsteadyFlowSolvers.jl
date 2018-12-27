@@ -114,10 +114,14 @@ export
     makeVortPlots3D,
     makeInfoPlots3D,
 
-    invisicidTransport,
-    fluxSplittingParameters,
-    solutions,
-    operationalConditions
+    # IBL solver types
+    InvisicidTransport,
+    FluxSplittingParameters,
+    Solutions,
+    OperationalConditions,
+
+    # IBL methods
+    invisicViscousCoupledSolver
 
 ### source files
 
@@ -151,9 +155,9 @@ include("plots/plots3D.jl")
 
 
 # IBL solver functions
-include("IBLTypedefs.jl")
-include("IBLUNSflow.jl")
-include("fluxSplitting/StegerWarming.jl")
+include("IBL/IBLTypedefs.jl")
+include("IBL/IBLUNSflow.jl")
+include("IBL/fluxSplitting/StegerWarming.jl")
 #include("testscript.jl")
 #include("testingfile.jl")
 end

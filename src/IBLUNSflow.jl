@@ -436,21 +436,23 @@ function boundaryCorrection(u::Array{Float64,2})
 end
 
 
+# setting tha parameters for the right-hand-side of the equations
 
 function rhs(sol::Solutions,fluxSp::FluxSplittingParameters,uet::Array{Float64,1},uex::Array{Float64,1},ue::Array{Float64,1},ncell::Int64)
 
-
- rhs =zeros(2,ncell+2)
- for i = 2:ncell+1
-     rhs[1,i] = fluxSp.B[i]/(2*fluxSp.del[i]) - (fluxSp.del[i]*uet[i])/ue[i] - (fluxSp.E[i]+1.0)*fluxSp.del[i]*uex[i]
-     rhs[2,i] = fluxSp.S[i]/fluxSp.del[i] - (2.0*fluxSp.E[i]*fluxSp.del[i]*uet[i])/ue[i] - (2.0*fluxSp.F[i]*fluxSp.del[i]*uex[i])
- end
+    rhs =zeros(2,ncell+2)
+    for i = 2:ncell+1
+        rhs[1,i] = fluxSp.B[i]/(2*fluxSp.del[i]) - (fluxSp.del[i]*uet[i])/ue[i] - (fluxSp.E[i]+1.0)*fluxSp.del[i]*uex[i]
+        rhs[2,i] = fluxSp.S[i]/fluxSp.del[i] - (2.0*fluxSp.E[i]*fluxSp.del[i]*uet[i])/ue[i] - (2.0*fluxSp.F[i]*fluxSp.del[i]*uex[i])
+    end
 # The boundary values do not need
-boundaryCorrection(rhs[1,:])
-boundaryCorrection(rhs[2,:])
+    boundaryCorrection(rhs[1,:])
+    boundaryCorrection(rhs[2,:])
 
-return rhs
+    return rhs
 end
+
+# First-order (intermediate) flux spliiting function
 
 function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64,ncell::Int64)
 
@@ -465,6 +467,8 @@ function fluxSplittingSchema(flux::Array{Float64,3},sol::Solutions,rhs::Array{Fl
         sol.solt[2,i] = sol.sol[2,i] - (dt/dx)*(flux[1,2,i] - flux[1,2,i-1]) + dt*rhs[2,i]
 
 end
+
+# Second-order (final) flux spliiting function
 
 function fluxSplittingSchema(flux::Array{Float64,3},fluxt::Array{Float64,3},sol::Solutions,rhs::Array{Float64,2},dt::Float64,dx::Float64, ncell::Int64)
 
@@ -495,7 +499,6 @@ end
 
 function derivatives(dA::Array{Float64,1}, dB::Array{Float64,1},ncell::Int64)
 
-#n_ele = length(dA)
     der =zeros(ncell+2)
     if ((ndims(dA)==1) && (ndims(dB)==1))
         if (length(dA)==length(dB))

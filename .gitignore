@@ -1,0 +1,12 @@
+#tutorials
+!tutorials/IBLSolver
+/src/IBL/testfunctions
+src/resultsSummary
+/src/IBL/sanitation.jl
+src/IBL/closureModel/closureModel.jl
+src/IBL/fluxSplitting/fluxSplitting.jl
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*

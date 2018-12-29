@@ -1,0 +1,59 @@
+function calc_a03d(surf::ThreeDSurfSimple)
+
+    lhs = zeros(surf.nspan, surf.nspan)
+    rhs = zeros(surf.nspan)
+
+    for i = 1:surf.nspan
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            lhs[i,n] = sin(nn*surf.psi[i])*(sin(surf.psi[i]) + (nn*pi/(2*surf.AR)))
+        end
+        rhs[i] = pi*sin(surf.psi[i])*surf.bc[i]/(2*surf.AR)
+    end
+
+    surf.bcoeff[:] = lhs \ rhs
+
+    for i = 1:surf.nspan
+        surf.a03d[i] = 0
+   
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            surf.a03d[i] -= real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/sin(surf.psi[i])
+        end
+    end
+    return surf
+end
+
+function calc_a0a13d(surf::ThreeDSurfSimple)
+    
+    for i = 1:surf.nspan
+        surf.a03d[i] = 0
+        surf.aterm3d[1,i] = 0
+
+
+        # integ0 = simpleTrapz(surf.s2d[i].cam_slope, surf.s2d[i].theta)
+        # integ1 = simpleTrapz(surf.s2d[i].cam_slope.*cos.(surf.s2d[i].theta), surf.s2d[i].theta)
+
+        for n = 1:surf.nspan
+            nn = 2*n - 1
+            surf.a03d[i] = surf.a03d[i] - real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/sin(surf.psi[i])
+            # surf.a03d[i] -= real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/sin(surf.psi[i])*(cos(surf.s2d[i].kinem.alpha) + sin(surf.s2d[i].kinem.alpha)*integ0/pi)
+            # surf.aterm3d[1,i] += 2*real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/(sin(surf.psi[i])*pi)*sin(surf.s2d[i].kinem.alpha)*integ1
+        end
+    end
+    return surf
+end
+
+function calc_a2toan3d(surf::ThreeDSurfSimple)
+    for ia = 2:surf.naterm
+        for i = 1:surf.nspan
+            surf.aterm3d[ia,i] = 0
+            integ = simpleTrapz(surf.s2d[i].cam_slope.*cos.(ia*surf.s2d[i].theta), surf.s2d[i].theta)
+
+            for n = 1:surf.nspan
+                nn = 2*n - 1
+                surf.aterm3d[ia,i] += 2*real(nn)*surf.bcoeff[n]*sin(nn*surf.psi[i])/(sin(surf.psi[i])*pi)*sin(surf.s2d[i].kinem.alpha)*integ
+            end
+        end
+    end
+end

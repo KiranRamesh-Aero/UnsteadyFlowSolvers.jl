@@ -1,23 +1,24 @@
 push!(LOAD_PATH,"../../src/")
-using UNSflow
+import UNSflow
 
-alphadef = ConstDef(5.*pi/180)
 
-hdef = ConstDef(0.)
+alphadef = UNSflow.ConstDef(5.*pi/180)
 
-udef = ConstDef(1.)
+hdef = UNSflow.ConstDef(0.)
 
-full_kinem = KinemDef(alphadef, hdef, udef)
+udef = UNSflow.ConstDef(1.)
+
+full_kinem = UNSflow.KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
 geometry = "FlatPlate"
 
-surf = TwoDSurf(geometry, pvt, full_kinem)
+surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem)
 
-curfield = TwoDFlowField()
+curfield = UNSflow.TwoDFlowField()
 
-dtstar = find_tstep(alphadef)
+dtstar = UNSflow.find_tstep(alphadef)
 
 t_tot = 10.
 
@@ -30,12 +31,12 @@ writeflag = 1
 writeInterval = t_tot/10.
 
 #delvort = delSpalart(500, 12, 1e-5)
-delvort = delNone()
+delvort = UNSflow.delNone()
 
-mat, surf, curfield = lautatRoll(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = UNSflow.lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort, wakerollup=1)
 
-makeVortPlots2D()
+UNSflow.makeVortPlots2D()
 
-makeForcePlots()
+UNSflow.makeForcePlots2D()
 
-cleanWrite()
+UNSflow.cleanWrite()

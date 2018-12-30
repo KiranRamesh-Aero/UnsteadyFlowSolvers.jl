@@ -1,7 +1,7 @@
 # UNSflow
 
-[![Build Status](https://travis-ci.com/desanga/UNSflow.jl.svg?branch=master)](https://travis-ci.com/desanga/UNSflow.jl)
-[![Coverage Status](https://coveralls.io/repos/github/desanga/UNSflow.jl/badge.svg?branch=master)](https://coveralls.io/github/desanga/UNSflow.jl?branch=master)
+[![Build Status](https://travis-ci.com/KiranUofG/UNSflow.jl.svg?branch=master)](https://travis-ci.com/KiranUofG/UNSflow.jl)
+[![Coverage Status](https://coveralls.io/repos/github/KiranUofG/UNSflow.jl/badge.svg?branch=master)](https://coveralls.io/github/KiranUofG/UNSflow.jl?branch=master)
 
 UNSflow is a library of low-order solvers for unsteady aerodynamics
 and aeroelasticity managed by Dr. Kiran Ramesh at the University of Glasgow. The solvers.

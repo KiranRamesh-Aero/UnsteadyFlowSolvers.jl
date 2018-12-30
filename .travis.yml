@@ -12,5 +12,5 @@ notifications:
   email: false
 
 before_install:
-  
-- julia -e 'ENV["PYTHON"] = ""; Pkg.add("PyPlot"); Pkg.build("PyPlot")'
+
+- julia -e 'ENV["PYTHON"] = ""; using Pkg; Pkg.add("PyPlot"); Pkg.build("PyPlot")'

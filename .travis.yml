@@ -18,3 +18,5 @@ before_install:
 after_success:
 
 - julia -e 'import Pkg; cd(Pkg.dir("UNSflow")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+
+- julia -e 'cd(Pkg.dir("UNSflow")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'

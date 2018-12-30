@@ -2,7 +2,7 @@ push!(LOAD_PATH,"../../src/")
 import UNSflow
 
 
-alphadef = UNSflow.ConstDef(5. *pi/180)
+alphadef = UNSflow.ConstDef(10. *pi/180)
 
 hdef = UNSflow.ConstDef(0.)
 
@@ -10,20 +10,20 @@ udef = UNSflow.ConstDef(1.)
 
 full_kinem = UNSflow.KinemDef(alphadef, hdef, udef)
 
-pvt = 0.25
+pvt = 0.0
 
 geometry = "FlatPlate"
 
-lespc = [0.15;]
+lespc = [10.15;]
 
 #The value of leading-edge radius (rho) must be specified according to geometry
-surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem, lespc, rho=0.016)
+surf = UNSflow.TwoDSurf(geometry, pvt, full_kinem, lespc, rho=0.02085)
 
 curfield = UNSflow.TwoDFlowField()
 
-dtstar = UNSflow.find_tstep(alphadef)
+dtstar = 0.015 #UNSflow.find_tstep(alphadef)
 
-t_tot = 3.
+t_tot = 5.
 
 nsteps =Int(round(t_tot/dtstar))+1
 
@@ -38,15 +38,8 @@ delvort = UNSflow.delNone()
 
 mat, surf, curfield = UNSflow.ldvmLin(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-UNSflow.makeVortPlots2D()
+#UNSflow.makeVortPlots2D()
 
-UNSflow.makeForcePlots2D()
+#UNSflow.makeForcePlots2D()
 
-UNSflow.cleanWrite()
-
-#Edge velocity at end of simulation
-q_u, q_l = UNSflow.calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
-
-using PyPlot
-plot(surf.x, q_u)
-plot(surf.x, q_l)
+#UNSflow.cleanWrite()

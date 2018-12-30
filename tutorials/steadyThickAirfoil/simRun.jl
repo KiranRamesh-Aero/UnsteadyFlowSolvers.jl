@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 
-alphadef = UNSflow.ConstDef(10. *pi/180)
+alphadef = UNSflow.CosDef(0., 1. *pi/180, 0.05, 0.)
 
 hdef = UNSflow.ConstDef(0.)
 
@@ -11,15 +11,18 @@ full_kinem = UNSflow.KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "NACA0012"
+#geometry = "FlatPlate0821"
+geometry = "NACA0018"
 
-surf = UNSflow.TwoDSurfThick(geometry, pvt, full_kinem, ndiv=140, naterm=138)
+lespcrit = [0.1;]
+
+surf = UNSflow.TwoDSurfThick(geometry, pvt, full_kinem, lespcrit, ndiv=140, naterm=137)
 
 curfield = UNSflow.TwoDFlowField()
 
-dtstar = 0.015#UNSflow.find_tstep(alphadef)
+dtstar = UNSflow.find_tstep(alphadef)/5. 
 
-t_tot = 5.
+t_tot = 5*pi/0.1
 
 nsteps =Int(round(t_tot/dtstar))+1
 

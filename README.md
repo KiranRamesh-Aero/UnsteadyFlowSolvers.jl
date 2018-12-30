@@ -1,6 +1,6 @@
 # UNSflow
 
-[![Build Status](https://travis-ci.com/desanga/UNSflow.svg?branch=master)](https://travis-ci.com/desanga/UNSflow)
+[![Build Status](https://travis-ci.com/desanga/UNSflow.jl.svg?branch=master)](https://travis-ci.com/desanga/UNSflow.jl)
 
 
 UNSflow is a library of low-order solvers for unsteady aerodynamics

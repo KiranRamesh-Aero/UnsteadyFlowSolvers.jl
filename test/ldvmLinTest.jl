@@ -38,11 +38,11 @@ mat, surf, curfield = UNSflow.ldvmLin(surf, curfield, nsteps, dtstar,startflag, 
 
 q_u,q_l=UNSflow.calc_edgeVel(surf,[curfield.u[1],curfield.w[1]])
 
-#@test sum(q_u)>0
-#@test sum(q_l)>0 
+@test sum(q_u)>0
+@test sum(q_l)>0
 
-@test sum(q_u)==0
-@test sum(q_l)==0
+#@test sum(q_u)<0
+#@test sum(q_l)<0
 
 
 @test sum(q_u)!=NaN

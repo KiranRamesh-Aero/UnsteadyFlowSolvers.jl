@@ -191,8 +191,10 @@ function camber_thick_calc(x::Vector,coord_file::String)
         thick_slope[ndiv] = 2*thick_slope[ndiv-1] - thick_slope[ndiv-2]
 
         rho = r
-        cam[1:ndiv] = 0.
-        cam_slope[1:ndiv] = 0.
+        for i = 1:ndiv
+            cam[i] = 0.
+            cam_slope[i] = 0.
+        end
     else
         coord = readdlm(coord_file)
         ncoord = length(coord[:,1])

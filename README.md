@@ -1,10 +1,8 @@
-# UNSflow
-
 [![Build Status](https://travis-ci.com/KiranUofG/UNSflow.jl.svg?branch=master)](https://travis-ci.com/KiranUofG/UNSflow.jl)
 [![Coverage Status](https://coveralls.io/repos/github/KiranUofG/UNSflow.jl/badge.svg?branch=master)](https://coveralls.io/github/KiranUofG/UNSflow.jl?branch=master)
 
-UNSflow is a library of low-order solvers for unsteady aerodynamics
-and aeroelasticity managed by Dr. Kiran Ramesh at the University of Glasgow. The solvers.
+This package (abbreviated UNSflow) is a library of low-order solvers for unsteady aerodynamics
+and aeroelasticity managed by Dr. Kiran Ramesh at the University of Glasgow. The solvers
 are written in Julia, are based on the discrete-vortex method and cater to various
 applications.
 

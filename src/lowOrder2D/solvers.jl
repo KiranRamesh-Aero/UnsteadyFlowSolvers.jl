@@ -1,5 +1,5 @@
 """
-Lautat(surf, curfield, nsteps=500, dtstar=0.015, startflag=0,
+    lautat(surf, curfield, nsteps=500, dtstar=0.015, startflag=0,
 writeflag=0, writeInterval=1000., delvort=delNone(), maxwrite=100,
 nround=6)
 
@@ -38,8 +38,7 @@ Simulates potential flow for an airfoil undergoing unsteady motion
     validated against experiment and computation", Theor. Comput. Fluid
     Dyn. (2013) 27: 843. [Weblink](https://doi.org/10.1007/s00162-012-0292-8)
 
-    """
-
+"""
 function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
 
     # If a restart directory is provided, read in the simulation data
@@ -533,13 +532,13 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
 
         #Calc first 3 fourier coefficients and derivatives
         surf.a0[1] = J1 + J2*tevstr
-        for ia = 1:3
+        for ia = 1:surf.naterm
             surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Calculate adot
         surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
-        for ia = 1:3
+        for ia = 1:surf.naterm
             surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
         end
 
@@ -1172,7 +1171,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 13)
+        mat = zeros(0, 11)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
@@ -1203,8 +1202,131 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
 
     vcore = 0.02*surf.c
 
-    wa_x = zeros(surf.ndiv)
-    int_wax_prev = zeros(surf.ndiv)
+    int_wax = zeros(surf.ndiv)
+    int_c = zeros(surf.ndiv)
+    int_t = zeros(surf.ndiv)
+
+    for istep = 1:nsteps
+
+        #Udpate current time
+        t = t + dt
+
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update flow field parameters if any
+        update_externalvel(curfield, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+        #Update incduced velocities on airfoil
+        update_indbound(surf, curfield)
+
+        #Set up the matrix problem
+        surf, xloc_tev, zloc_tev = update_thickLHS(surf, curfield, dt, vcore)
+
+        #Construct RHS vector
+        update_thickRHS(surf, curfield)
+        
+        #Now solve the matrix problem
+        #soln = surf.LHS[[1:surf.ndiv*2-3;2*surf.ndiv-1], 1:surf.naterm*2+2] \ surf.RHS[[1:surf.ndiv*2-3; 2*surf.ndiv-1]]
+        soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
+        
+        #Assign the solution
+        surf.a0[1] = soln[1]
+        for i = 1:surf.naterm
+            surf.aterm[i] = soln[i+1]
+            surf.bterm[i] = soln[i+surf.naterm+1]
+        end
+        tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+        
+        #Calculate adot
+        update_atermdot(surf, dt)
+
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+
+        #Update induced velocities to include effect of last shed vortex
+        update_indbound(surf, curfield)
+
+        #Calculate bound vortex strengths
+        update_bv_src(surf)
+
+        #Wake rollup
+        wakeroll(surf, curfield, dt)
+
+        #Force calculation
+        cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
+
+        # write flow details if required
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(t,sigdigits=nround))"
+                writeStamp(dirname, t, surf, curfield)
+            end
+        end
+
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
+                        cl, cd, cnc, cnnc, cn, cs])
+
+    end
+
+    mat = mat'
+
+    f = open("resultsSummary", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (rad) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
+    close(f)
+
+    mat, surf, curfield
+end
+
+
+function ldvm(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
+                dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000.,
+                delvort = delNone(); maxwrite = 100, nround=6)
+
+    # If a restart directory is provided, read in the simulation data
+    if startflag == 0
+        mat = zeros(0, 11)
+        t = 0.
+    elseif startflag == 1
+        dirvec = readdir()
+        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        latestTime = maximum(dirresults)
+        mat = readdlm("resultsSummary")
+        t = mat[end,1]
+    else
+        throw("invalid start flag, should be 0 or 1")
+    end
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+    
+    # if writeflag is on, determine the timesteps to write at
+    if writeflag == 1
+        writeArray = Int64[]
+        tTot = nsteps*dt
+        for i = 1:maxwrite
+            tcur = writeInterval*real(i)
+            if t > tTot
+                break
+            else
+                push!(writeArray, Int(round(tcur/dt)))
+            end
+        end
+    end
+
+    vcore = 0.02*surf.c
+
+    int_wax = zeros(surf.ndiv)
+    int_c = zeros(surf.ndiv)
+    int_t = zeros(surf.ndiv)
 
     for istep = 1:nsteps
 
@@ -1231,15 +1353,13 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
         
         #Now solve the matrix problem
         soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
-
+        
         #Assign the solution
         surf.a0[1] = soln[1]
         for i = 1:surf.naterm
             surf.aterm[i] = soln[i+1]
             surf.bterm[i] = soln[i+surf.naterm+1]
         end
-        tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
-        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
 
         #Calculate adot
         surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
@@ -1247,6 +1367,43 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
             surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
         end
 
+        #Check if LEV shedding is true
+        lesp = sqrt(2. /surf.rho)*surf.a0[1]
+
+        if abs(lesp) > surf.lespcrit[1]
+
+            if surf.a0[1] >= 0.
+                surf.a0[1] = sqrt(surf.rho/2.)*surf.lespcrit[1]
+            else
+                surf.a0[1] = -sqrt(surf.rho/2.)*surf.lespcrit[1]
+            end
+            
+            #Set up the new matrix problem
+            surf, xloc_tev, zloc_tev, xloc_lev, zloc_lev = update_thickLHSLEV(surf, curfield, dt, vcore)
+            
+            #Construct RHS vector
+            update_thickRHSLEV(surf, curfield)
+            
+            #Now solve the matrix problem
+            soln = surf.LHS[2:surf.ndiv*2-2, 2:surf.naterm*2+3] \ (surf.RHS[2:surf.ndiv*2-2] - surf.LHS[2:surf.ndiv*2-2,1].*surf.a0[1])
+            
+            #Assign the solution
+            for i = 1:surf.naterm
+                surf.aterm[i] = soln[i]
+                surf.bterm[i] = soln[i+surf.naterm]
+            end
+            
+            tevstr = soln[2*surf.naterm+1]*surf.uref*surf.c
+            push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+            levstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+            push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
+            surf.levflag[1] = 1
+        else
+            tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+            push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+            surf.levflag[1] = 0
+        end
+        
         #Set previous values of aterm to be used for derivatives in next time step
         surf.a0prev[1] = surf.a0[1]
         for ia = 1:3
@@ -1263,16 +1420,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
         wakeroll(surf, curfield, dt)
 
         #Force calculation
-        cnc1, cnc2, cnc3, cnnc, cn, cs, cl, cd = calc_forces(surf, int_wax_prev, dt)
-
-        #Precalculation for apparent mass at next time step
-        for i = 1:surf.ndiv
-            wa_x[i] = 0.5*(surf.uind_u[i] - surf.uind_l[i])
-        end
-
-        for i = 1:surf.ndiv
-            int_wax_prev[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
-        end
+        cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
 
         # write flow details if required
         if writeflag == 1
@@ -1283,7 +1431,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
         end
 
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
-                        cl, cd, cnc1, cnc2, cnc3, cnnc, cn, cs])
+                        cl, cd, cnc, cnnc, cn, cs])
 
     end
 

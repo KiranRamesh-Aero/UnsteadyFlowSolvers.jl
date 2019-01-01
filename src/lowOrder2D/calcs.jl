@@ -23,6 +23,15 @@ function update_atermdot(surf::TwoDSurf,dt)
     return surf
 end
 
+function update_atermdot(surf::TwoDSurfThick,dt)
+    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
+    for ia = 1:surf.naterm
+        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
+    end
+    return surf
+end
+
+
 function update_adot(surf::TwoDSurf,dt)
     surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
     for ia = 1:3
@@ -866,6 +875,10 @@ function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float
         
     end
     
+    #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
+    #uu[1]*sin(surf.kinem.alpha)
+
+    
     return surf, xloc_tev, zloc_tev
 end
 
@@ -885,14 +898,25 @@ function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Fl
 
     if surf.levflag[1] == 0
 
-        le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
-        le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind[1]
-
-        xloc = surf.bnd_x[1] + 0.5*le_vel_x*dt
-        zloc = surf.bnd_z[1] + 0.5*le_vel_z*dt
+        if surf.a0[1] >= 0. 
+            le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind_u[1]
+            le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind_u[1]
+            xloc_lev = surf.bnd_x_u[1] + 0.5*le_vel_x*dt
+            zloc_lev = surf.bnd_z_u[1] + 0.5*le_vel_z*dt
+        else
+            le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind_l[1]
+            le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind_l[1]
+            xloc_lev = surf.bnd_x_l[1] + 0.5*le_vel_x*dt
+            zloc_lev = surf.bnd_z_l[1] + 0.5*le_vel_z*dt
+        end
     else
-        xloc = surf.bnd_x[1]+(1. /3.)*(curfield.lev[nlev].x - surf.bnd_x[1])
-        zloc = surf.bnd_z[1]+(1. /3.)*(curfield.lev[nlev].z - surf.bnd_z[1])
+        if surf.a0[1] >= 0.
+            xloc_lev = surf.bnd_x_u[1]+(1. /3.)*(curfield.lev[nlev].x - surf.bnd_x_u[1])
+            zloc_lev = surf.bnd_z_u[1]+(1. /3.)*(curfield.lev[nlev].z - surf.bnd_z_u[1])
+        else
+            xloc_lev = surf.bnd_x_l[1]+(1. /3.)*(curfield.lev[nlev].x - surf.bnd_x_l[1])
+            zloc_lev = surf.bnd_z_l[1]+(1. /3.)*(curfield.lev[nlev].z - surf.bnd_z_l[1])
+        end
     end
 
     dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
@@ -923,6 +947,9 @@ function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Fl
 
     dummyvort = TwoDVort(xloc_lev, zloc_lev, 1., vcore, 0., 0.)
 
+    uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+    ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
     for i = 2:surf.ndiv-1
         wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
                    wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
@@ -942,11 +969,7 @@ function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Fl
         surf.LHS[surf.ndiv+i-3,3+2*surf.naterm] = -surf.cam_slope[i]*wlx -
             surf.thick_slope[i]*wtx + wtz
     end
-
-    LHS[2*ndiv-3,2*naterm+3] = 1.
-
-    LHS[2*ndiv-2,1] = 1.
-
+    
     return surf, xloc_tev, zloc_tev, xloc_lev, zloc_lev
 end
 
@@ -979,14 +1002,20 @@ function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
                                  (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
                                  surf.kinem.alphadot*surf.cam[i]) - wtz
     end
-
+    
     #RHS for Kelvin condition (negative strength of all previously shed vortices)
-    #surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
-    surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
+    surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    #surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
 
-    surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+        #RHS for LE velocity condition
+    #surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
+    #surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
+    #   (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref 
 
-    surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+    
+   # surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+    
+    #surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
 
 end
 
@@ -1021,13 +1050,20 @@ function update_thickRHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField)
     end
 
     #RHS for Kelvin condition (negative strength of all previously shed vortices)
-    surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
 
+    #RHS for LE Kutta condition
     if surf.a0[1] > 0.
-        surf.RHS[2*surf.ndiv-2] = surf.lespcrit[1]
+        surf.RHS[2*surf.ndiv-2] = 1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
     else
-        surf.RHS[2*surf.ndiv-2] = -surf.lespcrit[1]
+        surf.RHS[2*surf.ndiv-2] = -1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
     end
+
+    #RHS for LE velocity condition
+    surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
+        surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
+        (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref 
+    
 end
 
 

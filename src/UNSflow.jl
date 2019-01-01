@@ -17,7 +17,7 @@ import Statistics: mean
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout
-    
+
 
 import Plots: @layout
 
@@ -86,7 +86,7 @@ export
     controlVortCount,
     update_kinem,
     update_kinem2DOF,
-    
+
     #2D low-order solver methods
     lautat,
     #lautatRoll,
@@ -96,7 +96,7 @@ export
     #3D low-order solver methods
     QSLLT_lautat,
     QSLLT_ldvm,
-    
+
     # Postprocessing functions
     calc_forces,
     writeStamp,
@@ -108,13 +108,25 @@ export
     # 2D plot output functions
     makeForcePlots2D,
     makeVortPlots2D,
-    
+
     # 3D plot output functions
     makeForcePlots3D,
     makeVortPlots3D,
-    makeInfoPlots3D
+    makeInfoPlots3D,
+
+    # IBL solver types
+    InvisicidTransport,
+    FluxSplittingParameters,
+    Solutions,
+    OperationalConditions,
+
+    # IBL methods
+    invisicViscousCoupledSolver
 
 ### source files
+
+
+
 
 # kinematic types
 include("kinem.jl")
@@ -141,4 +153,13 @@ include("lowOrder3D/postprocess.jl")         # postprocessing functions
 include("plots/plots2D.jl")
 include("plots/plots3D.jl")
 
+
+# IBL solver functions
+include("IBL/IBLTypedefs.jl")
+include("IBL/IBLUNSflow.jl")
+include("IBL/fluxSplitting/StegerWarming.jl")
+include("IBL/IBLCalc.jl")
+include("IBL/initBLSolver.jl")
+include("IBL/IBLUtil.jl")
+include("IBL/closureModel/ProudmanJohnsons.jl")
 end

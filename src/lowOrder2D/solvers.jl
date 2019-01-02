@@ -1363,7 +1363,7 @@ function ldvm(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         #Calculate adot
         surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
-        for ia = 1:3
+        for ia = 1:surf.naterm
             surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
         end
 
@@ -1372,31 +1372,44 @@ function ldvm(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
 
         if abs(lesp) > surf.lespcrit[1]
 
-            if surf.a0[1] >= 0.
-                surf.a0[1] = sqrt(surf.rho/2.)*surf.lespcrit[1]
+            qu, ql = UNSflow.calc_edgeVel(surf, [0.; 0.])
+            qshed = maximum(qu)
+            levstr = dt*surf.uref^2*qshed^2/15
+
+            if surf.levflag[1] == 0
+                le_vel_x = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*sin(surf.kinem.alpha)
+                le_vel_z = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*cos(surf.kinem.alpha)
+                xloc_lev = surf.bnd_x_u[1] + 0.5*le_vel_x*dt
+                zloc_lev = surf.bnd_z_u[1] + 0.5*le_vel_z*dt
             else
-                surf.a0[1] = -sqrt(surf.rho/2.)*surf.lespcrit[1]
+                xloc_lev = surf.bnd_x_u[1]+(1. /3.)*(curfield.lev[end].x - surf.bnd_x_u[1])
+                zloc_lev = surf.bnd_z_u[1]+(1. /3.)*(curfield.lev[end].z - surf.bnd_z_u[1])
             end
+
+            push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
+
+            #Update incduced velocities on airfoil
+            update_indbound(surf, curfield)
             
-            #Set up the new matrix problem
-            surf, xloc_tev, zloc_tev, xloc_lev, zloc_lev = update_thickLHSLEV(surf, curfield, dt, vcore)
+            #Set up the matrix problem
+            surf, xloc_tev, zloc_tev = update_thickLHS(surf, curfield, dt, vcore)
             
             #Construct RHS vector
-            update_thickRHSLEV(surf, curfield)
+            update_thickRHS(surf, curfield)
             
             #Now solve the matrix problem
-            soln = surf.LHS[2:surf.ndiv*2-2, 2:surf.naterm*2+3] \ (surf.RHS[2:surf.ndiv*2-2] - surf.LHS[2:surf.ndiv*2-2,1].*surf.a0[1])
-            
+            soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
+
             #Assign the solution
+            surf.a0[1] = soln[1]
             for i = 1:surf.naterm
-                surf.aterm[i] = soln[i]
-                surf.bterm[i] = soln[i+surf.naterm]
+                surf.aterm[i] = soln[i+1]
+                surf.bterm[i] = soln[i+surf.naterm+1]
             end
             
-            tevstr = soln[2*surf.naterm+1]*surf.uref*surf.c
+            tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
             push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
-            levstr = soln[2*surf.naterm+2]*surf.uref*surf.c
-            push!(curfield.lev, TwoDVort(xloc_lev, zloc_lev, levstr, vcore, 0., 0.))
+               
             surf.levflag[1] = 1
         else
             tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
@@ -1406,7 +1419,7 @@ function ldvm(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 500,
         
         #Set previous values of aterm to be used for derivatives in next time step
         surf.a0prev[1] = surf.a0[1]
-        for ia = 1:3
+        for ia = 1:surf.naterm
             surf.aprev[ia] = surf.aterm[ia]
         end
 

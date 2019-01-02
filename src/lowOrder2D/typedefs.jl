@@ -548,8 +548,8 @@ struct TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(2*ndiv-1,naterm*2+2)
-        RHS = zeros(2*ndiv-1)
+        LHS = zeros(2*ndiv-3,naterm*2+3)
+        RHS = zeros(2*ndiv-3)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
@@ -567,7 +567,7 @@ struct TwoDSurfThick
             for n = 1:naterm
                 LHS[i-1,n+naterm+1] = cam_slope[i]*cos(n*theta[i])
             end
-
+            
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
             LHS[ndiv+i-3,1]  = -cam_slope[i]*cot(theta[i]/2)
@@ -583,9 +583,10 @@ struct TwoDSurfThick
 LHS[2*ndiv-3,1] = pi
 LHS[2*ndiv-3,2] = pi/2
 LHS[2*ndiv-3,2*naterm+2] = 1.
+LHS[2*ndiv-3,2*naterm+3] = 1.
 
 # #LE Kutta condition
-# LHS[2*ndiv-3,2*naterm+3] = 1.
+
 # LHS[2*ndiv-2,1] = 1000.
 
 # #LE velocity condition

@@ -899,13 +899,13 @@ function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Fl
     if surf.levflag[1] == 0
 
         if surf.a0[1] >= 0. 
-            le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind_u[1]
-            le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind_u[1]
+            le_vel_x = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*sin(surf.kinem.alpha)
+            le_vel_z = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*cos(surf.kinem.alpha)
             xloc_lev = surf.bnd_x_u[1] + 0.5*le_vel_x*dt
             zloc_lev = surf.bnd_z_u[1] + 0.5*le_vel_z*dt
         else
-            le_vel_x = (surf.kinem.u + curfield.u[1]) - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind_l[1]
-            le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c - (surf.kinem.hdot - curfield.w[1]) + surf.wind_l[1]
+            le_vel_x = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*sin(surf.kinem.alpha)
+            le_vel_z = sqrt(2. /surf.rho)*surf.uref*surf.a0[1]*cos(surf.kinem.alpha)
             xloc_lev = surf.bnd_x_l[1] + 0.5*le_vel_x*dt
             zloc_lev = surf.bnd_z_l[1] + 0.5*le_vel_z*dt
         end
@@ -1052,17 +1052,17 @@ function update_thickRHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField)
     #RHS for Kelvin condition (negative strength of all previously shed vortices)
     surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
 
-    #RHS for LE Kutta condition
-    if surf.a0[1] > 0.
-        surf.RHS[2*surf.ndiv-2] = 1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
-    else
-        surf.RHS[2*surf.ndiv-2] = -1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
-    end
+    # #RHS for LE Kutta condition
+    # if surf.a0[1] > 0.
+    #     surf.RHS[2*surf.ndiv-2] = 1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
+    # else
+    #     surf.RHS[2*surf.ndiv-2] = -1000*sqrt(surf.rho/ 2. )*surf.lespcrit[1]
+    # end
 
-    #RHS for LE velocity condition
-    surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
-        surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
-        (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref 
+    # #RHS for LE velocity condition
+    # surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
+    #     surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
+    #     (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref 
     
 end
 

@@ -1,6 +1,6 @@
 #__precompile__(true)
 
-module UNSflow
+module UnsteadyFlowSolvers
 
 import Dierckx: Spline1D, derivative, evaluate
 
@@ -16,7 +16,7 @@ import Statistics: mean
 
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
-    close, tight_layout, line
+    close, tight_layout
 
 
 import Plots: @layout

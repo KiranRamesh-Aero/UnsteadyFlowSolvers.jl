@@ -21,7 +21,7 @@ function writeStamp(dirname::String, t::Float64, surf::ThreeDSurfSimple, curfiel
         Serialization.serialize(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
         matfour = zeros(surf.s2d[i].naterm+1, 2)
         matfour[:,1] = [surf.s2d[i].a0[1]; surf.s2d[i].aterm[:]]
-        matfour[1:4,2] = [surf.s2d[i].a0dot[1];surf.s2d[i].adot[:]]
+        matfour[:,2] = [surf.s2d[i].a0dot[1];surf.s2d[i].adot[:]]
         DelimitedFiles.writedlm(f, matfour)
         close(f)
 

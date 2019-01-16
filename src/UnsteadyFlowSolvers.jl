@@ -18,9 +18,7 @@ import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout
 
-
 import Plots: @layout
-
 
 import LaTeXStrings: @L_str
 
@@ -55,11 +53,6 @@ export
     delNone,
     delSpalart,
 
-    # 3D low-order solver types
-    ThreeDSurfSimple,
-    KinemDef3D,
-    ThreeDFieldSimple,
-
     # utility functions
     simpleTrapz,
     camber_calc,
@@ -67,66 +60,17 @@ export
     simpleInterp,
     cleanWrite,
 
-    # 2D low-order solver function
-    update_boundpos,
-    update_kinem,
-    update_indbound,
-    update_downwash,
-    update_a0anda1,
-    place_tev,
-    place_lev,
-    update_a2toan,
-    mutual_ind,
-    update_a2a3adot,
-    update_bv,
-    ind_vel,
-    wakeroll,
-    update_adot,
-    update_externalvel,
-    controlVortCount,
-    update_kinem,
-    update_kinem2DOF,
-
     #2D low-order solver methods
     lautat,
-    #lautatRoll,
     ldvm,
     ldvmLin,
-
-    #3D low-order solver methods
-    QSLLT_lautat,
-    QSLLT_ldvm,
-
-    # Postprocessing functions
-    calc_forces,
-    writeStamp,
-
-    # 2D plotting functions
-    viewVort2D,
-    viewVortConnect2D,
+    ldvm2DOF,
 
     # 2D plot output functions
     makeForcePlots2D,
-    makeVortPlots2D,
-
-    # 3D plot output functions
-    makeForcePlots3D,
-    makeVortPlots3D,
-    makeInfoPlots3D,
-
-    # IBL solver types
-    InvisicidTransport,
-    FluxSplittingParameters,
-    Solutions,
-    OperationalConditions,
-
-    # IBL methods
-    invisicViscousCoupledSolver
+    makeVortPlots2D
 
 ### source files
-
-
-
 
 # kinematic types
 include("kinem.jl")
@@ -143,23 +87,7 @@ include("lowOrder2D/calcs.jl")               # calculation functions
 include("lowOrder2D/solvers.jl")             # solver methods
 include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
-# low-order 3D solvers
-include("lowOrder3D/typedefs.jl")            # type definitions
-include("lowOrder3D/calcs.jl")               # calculation functions
-include("lowOrder3D/solvers.jl")             # solver methods
-include("lowOrder3D/postprocess.jl")         # postprocessing functions
-
 # 2D plotting functions
 include("plots/plots2D.jl")
-include("plots/plots3D.jl")
 
-
-# IBL solver functions
-include("IBL/IBLTypedefs.jl")
-include("IBL/IBLUNSflow.jl")
-include("IBL/fluxSplitting/StegerWarming.jl")
-include("IBL/IBLCalc.jl")
-include("IBL/initBLSolver.jl")
-include("IBL/IBLUtil.jl")
-include("IBL/closureModel/ProudmanJohnsons.jl")
 end

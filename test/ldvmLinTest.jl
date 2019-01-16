@@ -26,7 +26,7 @@ writeflag = 0
 
 writeInterval = t_tot/10.
 
-delvort = UNSflow.delNone()
+delvort = delNone()
 
 mat, surf, curfield = ldvmLin(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 

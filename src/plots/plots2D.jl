@@ -40,7 +40,7 @@ function makeVortPlots2D()
     if isfile("boundv-1") == true  #only 1 surface
         multsurfflag = 1
     end
-
+    
     if multsurfflag == 0 #single surface
 
         tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
@@ -370,3 +370,252 @@ function checkConverge(k::Float64)
     savefig("forcePlots/cm-convergence.png")
     close()
 end
+
+function makeKinemClVortPlots2D()
+
+    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+
+    t = mat[:,1]
+    len = length(t)
+    cl = mat[:,6]
+    alpha = mat[:,2]*180/pi
+    h = mat[:,3]
+    u = mat[:,4]
+
+    dirvec = readdir()
+    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
+    
+    #Determine axis limits
+    dirmax = maximum(dirresults)
+    
+    cd("$(dirmax)")
+    
+    multsurfflag = 0
+    if isfile("boundv-1") == true  #only 1 surface
+        error("this plot function is only written for single surface")
+    end
+    
+    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    lev =   try
+        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+    catch
+        zeros(0,3)
+    end
+    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    
+    xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
+    zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
+    xmaxv = maximum([tev[:,2];lev[:,2];])
+    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    
+    cd("..")
+        
+    if "infoPlots" in dirvec
+        rm("infoPlots", recursive=true)
+    end
+    mkdir("infoPlots")
+    
+    for i=1:length(dirresults)
+        if dirresults[i] != 0
+            dirstr="$(dirresults[i])"
+            cd(dirstr)
+
+            t_cur = dirresults[i]
+            
+            figure(figsize=(8,8))
+            
+            subplot2grid((6, 2), (0, 0))
+            plot(t, alpha)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(alpha[range]) - 0.1*abs(minimum(alpha[range]))
+            zmax = maximum(alpha[range]) + 0.1*abs(maximum(alpha[range]))
+            axis([xmin, xmax, zmin, zmax])
+            #xlabel(L"$t^*$")
+            xticks([])
+            ylabel(L"$\alpha (deg)$")
+
+            subplot2grid((6, 2), (1, 0))
+            plot(t, h)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(h[range]) - 0.1*abs(minimum(h[range]))
+            zmax = maximum(h[range]) + 0.1*abs(maximum(h[range]))
+            axis([xmin, xmax, zmin, zmax])
+            #xlabel(L"$t^*$")
+            xticks([])
+            ylabel(L"$h$")
+
+            subplot2grid((6, 2), (2, 0))
+            plot(t, u)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(u[range]) - 0.1*abs(minimum(u[range]))
+            zmax = maximum(u[range]) + 0.1*abs(maximum(u[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$u$")
+
+            subplot2grid((6, 2), (0, 1), rowspan=3)
+            plot(t, cl)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
+            zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$C_l$")
+
+            subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
+            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            lev =   try
+                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+            catch
+                zeros(0,3)
+            end
+            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            viewVort2D(tev, lev, bv)
+            axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
+            
+            tight_layout()
+
+            savefig("../infoPlots/$(dirresults[i]).png")
+            close()
+            cd("..")
+        end
+    end
+end
+
+function makeKinemVelVortPlots2D()
+
+    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+
+    t = mat[:,1]
+    len = length(t)
+    cl = mat[:,6]
+    alpha = mat[:,2]*180/pi
+    h = mat[:,3]
+    u = mat[:,4]
+
+    dirvec = readdir()
+    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
+    
+    #Determine axis limits
+    dirmax = maximum(dirresults)
+    
+    cd("$(dirmax)")
+    
+    multsurfflag = 0
+    if isfile("boundv-1") == true  #only 1 surface
+        error("this plot function is only written for single surface")
+    end
+    
+    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    lev =   try
+        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+    catch
+        zeros(0,3)
+    end
+    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    
+    xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
+    zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
+    xmaxv = maximum([tev[:,2];lev[:,2];])
+    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    
+    cd("..")
+        
+    if "infoPlots" in dirvec
+        rm("infoPlots", recursive=true)
+    end
+    mkdir("infoPlots")
+    
+    for i=1:length(dirresults)
+        if dirresults[i] != 0
+            dirstr="$(dirresults[i])"
+            cd(dirstr)
+
+            t_cur = dirresults[i]
+            
+            figure(figsize=(8,8))
+            
+            subplot2grid((6, 2), (0, 0))
+            plot(t, alpha)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(alpha[range]) - 0.1*abs(minimum(alpha[range]))
+            zmax = maximum(alpha[range]) + 0.1*abs(maximum(alpha[range]))
+            axis([xmin, xmax, zmin, zmax])
+            #xlabel(L"$t^*$")
+            xticks([])
+            ylabel(L"$\alpha (deg)$")
+
+            subplot2grid((6, 2), (1, 0))
+            plot(t, h)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(h[range]) - 0.1*abs(minimum(h[range]))
+            zmax = maximum(h[range]) + 0.1*abs(maximum(h[range]))
+            axis([xmin, xmax, zmin, zmax])
+            #xlabel(L"$t^*$")
+            xticks([])
+            ylabel(L"$h$")
+
+            subplot2grid((6, 2), (2, 0))
+            plot(t, u)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(u[range]) - 0.1*abs(minimum(u[range]))
+            zmax = maximum(u[range]) + 0.1*abs(maximum(u[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$u$")
+
+            subplot2grid((6, 2), (0, 1), rowspan=3)
+            plot(t, cl)
+            plot([t_cur; t_cur], [-10000; 10000], "k-")
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
+            zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$C_l$")
+
+            subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
+            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            lev =   try
+                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+            catch
+                zeros(0,3)
+            end
+            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            viewVort2D(tev, lev, bv)
+            axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
+            
+            tight_layout()
+
+            savefig("../infoPlots/$(dirresults[i]).png")
+            close()
+            cd("..")
+        end
+    end
+end
+
+
+            

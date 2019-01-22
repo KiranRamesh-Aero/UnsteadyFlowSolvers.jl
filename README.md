@@ -1,4 +1,5 @@
-# UNSflow
+[![Build Status](https://travis-ci.com/KiranUofG/UNSflow.jl.svg?branch=master)](https://travis-ci.com/KiranUofG/UnsteadyFlowSolvers.jl)
+[![Coverage Status](https://coveralls.io/repos/github/KiranUofG/UnsteadyFlowSolvers.jl/badge.svg?branch=master)](https://coveralls.io/github/KiranUofG/UnsteadyFlowSolvers.jl?branch=master)
 
 [![Build Status](https://travis-ci.com/desanga/UNSflow.jl.svg?branch=master)](https://travis-ci.com/desanga/UNSflow.jl)
 [![codecov](https://codecov.io/gh/desanga/UNSflow.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/desanga/UNSflow.jl)
@@ -19,12 +20,14 @@ best-of-breed open source C and Fortran libraries for various
 computing algorithms.
 
 ### Installing Julia and UNSflow
-[Download](http://julialang.org/downloads/) the latest stable version of Julia.
+[Download](http://julialang.org/downloads/) and install the latest stable version of Julia.
 
-Run the application, and at the prompt type, `Pkg.clone("https://github.com/KiranUofG/UNSflow")`
-
-This will install UNSflow and the packages it depends on.
+At the prompt type, 
+```julia
+]add UnsteadyFlowSolvers
+```
+This will install UnsteadyFlowSolvers and dependent packages.
 
 ### Getting started
-The tutorials provide some sample simulations that can be performed with the code. To run
-your own case, copy a tutorial directory and modify the input file "simRun.jl" as necessary.  
+Tutorials demonstrating the code with detailed READMEs are available in the [UNSflowTutorials](https://github.com/KiranUofG/UNSflowTutorials) repository. 
+

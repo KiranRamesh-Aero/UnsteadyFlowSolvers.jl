@@ -199,7 +199,7 @@ function calc_delcp(surf::TwoDSurf, vels::Vector{Float64})
                 gamint[i] += surf.adot[n]/2*(sin((n-1)*surf.theta[i])/(n-1) - sin((n+1)*surf.theta[i])/(n+1))
             end
         end
-        gam[i] = gam[i]*surf.uref
+        #gam[i] = gam[i]*surf.uref
         gammod[i] = gammod[i]*surf.uref
         gamint[i] = gamint[i]*surf.uref*surf.c
         

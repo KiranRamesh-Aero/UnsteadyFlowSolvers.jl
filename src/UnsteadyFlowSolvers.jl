@@ -47,6 +47,7 @@ export
     TwoDFlowField,
     KelvinCondition,
     KelvinKutta,
+    TwoDSurfThick,
 
     # vortex count control utility
     delVortDef,
@@ -59,16 +60,20 @@ export
     find_tstep,
     simpleInterp,
     cleanWrite,
+    getEndCycle,
 
-    #2D low-order solver methods
+    # 2D low-order solver methods
     lautat,
     ldvm,
     ldvmLin,
     ldvm2DOF,
-
+    
     # 2D plot output functions
     makeForcePlots2D,
-    makeVortPlots2D
+    makeVortPlots2D,
+
+    # 2D postprocessing functions
+    calc_edgeVel
 
 ### source files
 
@@ -81,11 +86,18 @@ include("utils.jl")
 # vortex count control utility
 include("delVort.jl")
 
-# low-order 2D solvers
-include("lowOrder2D/typedefs.jl")            # type definitions
-include("lowOrder2D/calcs.jl")               # calculation functions
-include("lowOrder2D/solvers.jl")             # solver methods
-include("lowOrder2D/postprocess.jl")         # postprocessing functions
+# low-order 2D thin solvers
+include("thin2D/typedefs.jl")            # type definitions
+include("thin2D/calcs.jl")               # calculation functions
+include("thin2D/solvers.jl")             # solver methods
+include("thin2D/postprocess.jl")         # postprocessing functions
+
+# low-order 2D thick solvers
+include("thick2D/typedefs.jl")            # type definitions
+include("thick2D/calcs.jl")               # calculation functions
+include("thick2D/solvers.jl")             # solver methods
+include("thick2D/postprocess.jl")         # postprocessing functions
+
 
 # 2D plotting functions
 include("plots/plots2D.jl")

@@ -145,7 +145,7 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == CosDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
-        surf.kinem.hdot =  ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == VAWThDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
@@ -157,9 +157,8 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == EldRampReturnDef)
-        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
-        surf.kinem.u = surf.kinem.u*surf.uref
-        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == ConstDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = 0.
@@ -443,7 +442,7 @@ function update_boundpos(surf::TwoDSurf, dt::Float64)
     return surf
 end
 
-# Function to calculate induced velocities by a set of votices at a target location
+# Function to calculate induced velocities by a set of vortices at a target location
 function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     #'s' stands for source and 't' for target
     uind = zeros(length(t_x))

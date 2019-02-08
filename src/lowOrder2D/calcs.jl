@@ -1,4 +1,4 @@
-#Function for estimating a problem's time step
+# Function for estimating a problem's time step
 function update_a2a3adot(surf::TwoDSurf,dt)
     for ia = 2:3
         surf.aterm[ia] = simpleTrapz(surf.downwash.*cos.(ia*surf.theta),surf.theta)
@@ -71,7 +71,7 @@ function update_a2toan(surf::TwoDSurf)
     return surf
 end
 
-#Function to update the external flowfield
+# Function to update the external flowfield
 function update_externalvel(curfield::TwoDFlowField, t)
     if (typeof(curfield.velX) == CosDef)
         curfield.u[1] = curfield.velX(t)
@@ -460,7 +460,7 @@ function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     return uind, wind
 end
 
-# Function determining the effects of interacting vorticies - velocities induced on each other - classical n-body problem
+# Function determining the effects of interacting vortices - velocities induced on each other - classical n-body problem
 function mutual_ind(vorts::Vector{TwoDVort})
     for i = 1:length(vorts)
         for j = i+1:length(vorts)
@@ -593,7 +593,7 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
     kinem.hddot_pr3 = kinem.hddot_pr2
     kinem.hddot_pr2 = kinem.hddot_pr
 
-    # Calculate hddot and alphaddot from forces based on 2DOF structural system
+    #Calculate hddot and alphaddot from forces based on 2DOF structural system
     m11 = 2. /surf.c
     m12 = -strpar.x_alpha*cos(kinem.alpha)
     m21 = -2. *strpar.x_alpha*cos(kinem.alpha)/surf.c

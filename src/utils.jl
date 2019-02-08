@@ -87,7 +87,7 @@ end
 # Numerical integration method: Trapezoidal
 function simpleTrapz(y::Vector{T}, x::Vector{T}) where {T<:Real}
     local len = length(y)
-    if (len != length(x))
+    if len != length(x)
         error("Vectors must be of same length")
     end
     r = 0.0

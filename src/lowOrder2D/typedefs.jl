@@ -76,7 +76,7 @@ struct TwoDSurf
 
         dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
-            theta[ib] = real(ib-1.)*dtheta
+            theta[ib] = (ib-1.)*dtheta
             x[ib] = c/2. *(1-cos(theta[ib]))
         end
         if (coord_file != "FlatPlate")

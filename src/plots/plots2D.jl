@@ -645,16 +645,20 @@ function makeVelContourPlots2D()
     for i = 1:length(slev)
         lev[i,:] = [slev[i].s slev[i].x slev[i].z]
     end
+    lev = zeros(length(slev), 3)
+    for i = 1:length(slev)
+        lev[i,:] = [slev[i].s slev[i].x slev[i].z]
+    end
     bv = zeros(length(sbv), 3)
     for i = 1:length(sbv)
         bv[i,:] = [sbv[i].s sbv[i].x sbv[i].z]
     end
 
 
-    xmin = maximum([minimum([tev[:,2];lev[:,2];bv[:,2];]); surf.bnd_x[1] - surf.c])
-    zmin = maximum([minimum([tev[:,3];lev[:,3];bv[:,3];]); surf.bnd_x[1] - 2*surf.c])
-    xmax = minimum([maximum([tev[:,2];lev[:,2];]); surf.bnd_x[surf.ndiv] + 5*surf.c])
-    zmax = minimum([maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];]); surf.bnd_x[1] + 2*surf.c])
+    xmin = maximum([minimum([tev[:,2];lev[:,2];bv[:,2];]) .- surf.c; surf.bnd_x[1] - surf.c])
+    zmin = maximum([minimum([tev[:,3];lev[:,3];bv[:,3];]) .- surf.c; surf.bnd_z[1] - 2*surf.c])
+    xmax = minimum([maximum([tev[:,2];lev[:,2];]) + surf.c; surf.bnd_x[surf.ndiv] + 5*surf.c])
+    zmax = minimum([maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];]) + surf.c; surf.bnd_z[1] + 2*surf.c])
 
     if "velContourPlots" in dirvec
         rm("velContourPlots", recursive=true)
@@ -671,9 +675,80 @@ function makeVelContourPlots2D()
                 read(file, "surf")
             end
 
-            tev = field.tev
-            lev = field.lev
-            bv = surf.bv
+            #Transform body to inertial axis
+            #Translation
+            xb = surf.bnd_x[:]
+            zb = surf.bnd_z[:]
+            pvt_ind = argmin(abs.(surf.x .- surf.pvt*surf.c))
+            dist = surf.pvt*surf.c - surf.bnd_x[pvt_ind]
+            xt1 = xb .+ dist
+            zt1 = zb
+
+            #Rotation
+            theta = surf.kinem.alpha
+            trans = [cos(theta) -sin(theta); sin(theta) cos(theta)]
+            xt = zeros(surf.ndiv)
+            zt = zeros(surf.ndiv)
+            for i = 1:surf.ndiv
+                xt[i], zt[i] = trans*[xt1[i]; zt1[i]]
+            end
+
+            #Create grid of points around body
+            #Below body
+            dx = surf.c/surf.ndiv
+            dz = dx
+            n = Int(ceil((zmax-zmin)/dz/2))
+            println(n)
+
+            xmint = xmin + dist
+            xmaxt = xmax + dist
+
+            x = [collect(xmint:dx:xt[1]); collect(xt[2:surf.ndiv-1]); collect(xt[surf.ndiv]:dx:xmaxt)];
+            l1 = length(collect(xmint:dx:xt[1]))
+            l2 = length(collect(xt[surf.ndiv]:dx:xmaxt))
+            zu = [ones(l1)*dz; collect(zt[2:surf.ndiv-1]).+dz; ones(l2)*dz]
+            zl = [-ones(l1)*dz; collect(zt[2:surf.ndiv-1]).-dz; -ones(l2)*dz]
+
+
+            xmat = repeat(x', 2*n, 1)
+            zmat = zeros(size(xmat))
+            zmat[n+1,:] = zu[:]
+            for i = 1:n-1
+                zmat[n+1+i,:] = zu[:] .+ i*dz
+            end
+            zmat[n,:] = zl[:]
+            for i = 1:n-1
+                zmat[n-i,:] = zu[:] .- i*dz
+            end
+
+            #Transform grid back to body frame
+            xtr = zeros(size(xmat))
+            ztr = zeros(size(xmat))
+            #Rotation
+            trans = [cos(theta) sin(theta); -sin(theta) cos(theta)]
+            for i = 1:size(xmat,1)
+                for j = 1:size(xmat,2)
+                    xr, zr = trans*[xmat[i,j]; zmat[i,j]]
+                    xtr[i,j] = xr - dist
+                    ztr[i,j] = zr
+                end
+            end
+
+            uvel_i = zeros(size(xmat))
+            wvel_i = zeros(size(xmat))
+            vel_i = zeros(size(xmat))
+            #Find velocity field over grid
+            for i = 1:size(xtr,1)
+                for j = 1:size(xtr,2)
+                    utemp, wtemp = UnsteadyFlowSolvers.ind_vel([field.tev; field.lev; surf.bv], xtr[i,j], ztr[i,j])
+                    uvel_i[i,j] += utemp[1]
+                    wvel_i[i,j] += wtemp[1]
+                    uvel_i[i,j] += field.u[1]
+                    wvel_i[i,j] += field.w[1]
+                    vel_i[i,j] = sqrt(uvel_i[i,j]^2 + wvel_i[i,j]^2)
+                end
+            end
+
 
             viewVort2D(tev, lev, bv)
             axis([xmin-1, xmax+1, zmin-1, zmax+1])

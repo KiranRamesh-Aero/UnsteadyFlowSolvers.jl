@@ -15,60 +15,63 @@ import NLsolve: nlsolve, not_in_place
 import Statistics: mean
 
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
-    xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
-    close, tight_layout
+xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
+close, tight_layout
 
 import Plots: @layout
 
 import LaTeXStrings: @L_str
 
+import JLD: jldopen, write
+
 #For use in development and debugging
 import Revise
 
 export
-    # kinematics types and funtions
-    MotionDef,
-    KinemPar,
-    KinemDef,
-    EldUpDef,
-    EldUptstartDef,
-    ConstDef,
-    EldRampReturnDef,
-    EldUpIntDef,
-    EldUpInttstartDef,
-    SinDef,
-    CosDef,
+# kinematics types and funtions
+MotionDef,
+KinemPar,
+KinemDef,
+EldUpDef,
+EldUptstartDef,
+ConstDef,
+EldRampReturnDef,
+EldUpIntDef,
+EldUpInttstartDef,
+SinDef,
+CosDef,
 
-    # 2D low-order solver types
-    TwoDSurf,
-    TwoDOFPar,
-    KinemPar2DOF,
-    TwoDVort,
-    TwoDFlowField,
-    KelvinCondition,
-    KelvinKutta,
+# 2D low-order solver types
+TwoDSurf,
+TwoDOFPar,
+KinemPar2DOF,
+TwoDVort,
+TwoDFlowField,
+KelvinCondition,
+KelvinKutta,
 
-    # vortex count control utility
-    delVortDef,
-    delNone,
-    delSpalart,
+# vortex count control utility
+delVortDef,
+delNone,
+delSpalart,
 
-    # utility functions
-    simpleTrapz,
-    camber_calc,
-    find_tstep,
-    simpleInterp,
-    cleanWrite,
+# utility functions
+simpleTrapz,
+camber_calc,
+find_tstep,
+simpleInterp,
+cleanWrite,
 
-    #2D low-order solver methods
-    lautat,
-    ldvm,
-    ldvmLin,
-    ldvm2DOF,
+#2D low-order solver methods
+lautat,
+ldvm,
+ldvmLin,
+ldvm2DOF,
 
-    # 2D plot output functions
-    makeForcePlots2D,
-    makeVortPlots2D
+# 2D plot output functions
+makeForcePlots2D,
+makeVortPlots2D,
+makeVelContourPlots2D
 
 ### source files
 

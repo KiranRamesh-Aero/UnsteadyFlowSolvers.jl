@@ -107,11 +107,10 @@ struct TwoDSurf
         if (typeof(kindef.h) == EldUpDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
-          elseif (typeof(kindef.h) == EldUpIntDef)
+        elseif (typeof(kindef.h) == EldUpIntDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == EldRampReturnDef)
-
             kinem.h= kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         elseif (typeof(kindef.h) == ConstDef)

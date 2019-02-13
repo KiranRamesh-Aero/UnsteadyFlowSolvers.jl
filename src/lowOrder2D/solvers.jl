@@ -205,7 +205,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         lesp = surf.a0[1]
 
         #Check for LESP condition
-        if (abs(lesp)>surf.lespcrit[1])
+        if abs(lesp)>surf.lespcrit[1]
             #2D iteration if LESP_crit is exceeded
 
             #Add a LEV with dummy strength

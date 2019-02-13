@@ -104,7 +104,6 @@ function camber_calc(x::Vector,airfoil::String)
     ndiv = length(x);
     c = x[ndiv];
 
-
     cam = zeros(ndiv)
     cam_slope = zeros(ndiv)
     in_air = DelimitedFiles.readdlm(airfoil, Float64);
@@ -113,7 +112,6 @@ function camber_calc(x::Vector,airfoil::String)
     ncoord = length(xcoord);
     xcoord_sum = zeros(ncoord);
 
-    xcoord_sum[1] = 0;
     for i = 1:ncoord-1
         xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
     end

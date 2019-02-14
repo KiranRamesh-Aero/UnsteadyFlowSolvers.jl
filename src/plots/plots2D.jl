@@ -292,6 +292,170 @@ function makeForcePlots2D()
 
 end
 
+function makeForcePlots2DFlap()
+    dirvec = readdir()
+    if "forcePlots" in dirvec
+        rm("forcePlots", recursive=true)
+    end
+    mkdir("forcePlots")
+
+    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+
+    if length(mat[1,:]) == 9 #only 1 surface
+        t = mat[:,1]
+        alpha = mat[:,2]*180/pi
+        beta = mat[:,3]*180/pi
+        h = mat[:,4]
+        cl = mat[:,7]
+        cd = mat[:,8]
+        cm = mat[:,9]
+
+        plot(t, alpha)
+        len = length(t)
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(alpha) - 0.1*abs(minimum(alpha))
+        zmax = maximum(alpha) + 0.1*abs(maximum(alpha))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$\alpha$ (deg)")
+        savefig("forcePlots/pitch.png")
+        close()
+
+        plot(t, beta)
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(beta) - 0.1*abs(minimum(beta))
+        zmax = maximum(beta) + 0.1*abs(maximum(beta))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$\beta$ (deg)")
+        savefig("forcePlots/flap.png")
+        close()
+
+        plot(t, h)
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(h) - 0.1*abs(minimum(h))
+        zmax = maximum(h) + 0.1*abs(maximum(h))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$h/c$")
+        savefig("forcePlots/plunge.png")
+        close()
+
+        plot(t, cl)
+        range = Int(round(0.05*len)):Int(round(0.95*len))
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
+        zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$C_l$")
+        savefig("forcePlots/cl.png")
+        close()
+
+        plot(t, cd)
+        range = Int(round(0.05*len)):Int(round(0.95*len))
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(cd[range]) - 0.1*abs(minimum(cd[range]))
+        zmax = maximum(cd[range]) + 0.1*abs(maximum(cd[range]))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$C_d$")
+        savefig("forcePlots/cd.png")
+        close()
+
+        plot(t, cm)
+        range = Int(round(0.05*len)):Int(round(0.95*len))
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(cm[range]) - 0.1*abs(minimum(cm[range]))
+        zmax = maximum(cm[range]) + 0.1*abs(maximum(cm[range]))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$C_m$")
+        savefig("forcePlots/cm.png")
+        close()
+
+    else #multiple surfaces
+
+        nsurf = (length(mat[1,:]) - 1)/7
+        t = mat[:,1]
+
+        for i = 1:nsurf
+            alpha = mat[:,Int((i-1)*7+2)]*180/pi
+            h = mat[:,Int((i-1)*7+3)]
+            cl = mat[:,Int((i-1)*7+6)]
+            cd = mat[:,Int((i-1)*7+7)]
+            cm = mat[:,Int((i-1)*7+8)]
+
+            plot(t, alpha)
+            len = length(t)
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(alpha) - 0.1*abs(minimum(alpha))
+            zmax = maximum(alpha) + 0.1*abs(maximum(alpha))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$\alpha$ (deg)")
+            savefig("forcePlots/pitch-$i.png")
+            close()
+
+            plot(t, h)
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(h) - 0.1*abs(minimum(h))
+            zmax = maximum(h) + 0.1*abs(maximum(h))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$h/c$")
+            savefig("forcePlots/plunge-$i.png")
+            close()
+
+            plot(t, cl)
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
+            zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$C_l$")
+            savefig("forcePlots/cl-$i.png")
+            close()
+
+            plot(t, cd)
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(cd[range]) - 0.1*abs(minimum(cd[range]))
+            zmax = maximum(cd[range]) + 0.1*abs(maximum(cd[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$C_d$")
+            savefig("forcePlots/cd-$i.png")
+            close()
+
+            plot(t, cm)
+            range = Int(round(0.05*len)):Int(round(0.95*len))
+            xmin = t[1]
+            xmax = t[end]
+            zmin = minimum(cm[range]) - 0.1*abs(minimum(cm[range]))
+            zmax = maximum(cm[range]) + 0.1*abs(maximum(cm[range]))
+            axis([xmin, xmax, zmin, zmax])
+            xlabel(L"$t^*$")
+            ylabel(L"$C_m$")
+            savefig("forcePlots/cm-$i.png")
+            close()
+        end
+
+    end
+
+end
+
 function checkConverge(k::Float64)
     
     mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)

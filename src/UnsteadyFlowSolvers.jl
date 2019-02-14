@@ -38,6 +38,8 @@ export
     EldUpInttstartDef,
     SinDef,
     CosDef,
+    KinemParFlap,
+    KinemDefFlap,
 
     # 2D low-order solver types
     TwoDSurf,
@@ -47,6 +49,9 @@ export
     TwoDFlowField,
     KelvinCondition,
     KelvinKutta,
+    TwoDSurfFlap,
+    KelvinConditionFlap,
+    KelvinKuttaFlap,
 
     # vortex count control utility
     delVortDef,
@@ -65,10 +70,12 @@ export
     ldvm,
     ldvmLin,
     ldvm2DOF,
+    ldvmFlap,
 
     # 2D plot output functions
     makeForcePlots2D,
-    makeVortPlots2D
+    makeVortPlots2D,
+    makeForcePlots2DFlap
 
 ### source files
 

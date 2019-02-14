@@ -25,6 +25,7 @@ struct TwoDFlowField
     tev :: Vector{TwoDVort}
     lev :: Vector{TwoDVort}
     extv :: Vector{TwoDVort}
+
     function TwoDFlowField(velX = ConstDef(0.), velZ = ConstDef(0.))
         u = [0;]
         w = [0;]
@@ -65,7 +66,7 @@ struct TwoDSurf
     initpos :: Vector{Float64}
     rho :: Float64
     
-    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
+    function TwoDSurf(coord_file, pvt, kindef, lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -76,9 +77,10 @@ struct TwoDSurf
 
         dtheta = pi/(ndiv-1)
         for ib = 1:ndiv
-            theta[ib] = (ib-1.)*dtheta
-            x[ib] = c/2. *(1-cos(theta[ib]))
+            theta[ib] = (ib-1)*dtheta
+            x[ib] = c/2 *(1-cos(theta[ib]))
         end
+
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
@@ -137,8 +139,8 @@ struct TwoDSurf
         end
 
         for i = 1:ndiv
-            bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha)) + initpos[1]
-            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha)) + initpos[2]
+            bnd_x[i] = -((pvt*c - x[i])*cos(kinem.alpha)) + (cam[i]*sin(kinem.alpha)) + initpos[1]
+            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha)) + (cam[i]*cos(kinem.alpha)) + initpos[2]
         end
         uind = zeros(ndiv)
         wind = zeros(ndiv)
@@ -155,6 +157,151 @@ struct TwoDSurf
         end
         levflag = [0]
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
+    end
+end
+
+struct TwoDSurfFlap
+    c :: Float64
+    uref :: Float64
+    coord_file :: String
+    pvt :: Float64
+    hinge :: Float64
+    ndiv :: Int16
+    naterm :: Int16
+    kindef :: KinemDef
+    cam :: Vector{Float64}
+    cam_slope :: Vector{Float64}
+    theta :: Vector{Float64}
+    x :: Vector{Float64}
+    kinem :: KinemPar
+    bnd_x :: Vector{Float64}
+    bnd_z :: Vector{Float64}
+    uind :: Vector{Float64}
+    wind :: Vector{Float64}
+    downwash :: Vector{Float64}
+    a0 :: Vector{Float64}
+    aterm :: Vector{Float64}
+    a0dot :: Vector{Float64}
+    adot :: Vector{Float64}
+    a0prev :: Vector{Float64}
+    aprev :: Vector{Float64}
+    bv :: Vector{TwoDVort}
+    lespcrit :: Vector{Float64}
+    levflag :: Vector{Int8}
+    initpos :: Vector{Float64}
+    rho :: Float64
+    
+    function TwoDSurfFlap(coord_file, pvt, hinge, kindef, lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
+      
+        theta = zeros(ndiv)
+        x = zeros(ndiv)
+        cam = zeros(ndiv)
+        cam_slope = zeros(ndiv)
+        kinem = KinemPar(0, 0, 0, 0, 0, 0)
+        bnd_x = zeros(ndiv)
+        bnd_z = zeros(ndiv)
+
+        #variable of transformation
+        dtheta = pi/(ndiv-1)
+        for ib = 1:ndiv
+            theta[ib] = (ib-1)*dtheta
+            x[ib] = c/2 *(1-cos(theta[ib]))
+        end
+
+        #camberline
+        if (coord_file != "FlatPlate")
+            cam, cam_slope = camber_calc(x, coord_file)
+        end
+        
+        #kinematics
+        if (typeof(kindef.alpha) == EldUpDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == EldRampReturnDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+
+        if (typeof(kindef.h) == EldUpDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldUpIntDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == EldRampReturnDef)
+            kinem.h= kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+        if (typeof(kindef.u) == EldUpDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
+        elseif (typeof(kindef.u) == EldRampReturnDef)
+            kinem.u, kinem.udot = kindef.u(0.)
+            kinem.u = kinem.u*uref
+            kinem.udot = kinem.udot*uref*uref/c
+        elseif (typeof(kindef.u) == ConstDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = 0.
+        end
+
+        if (typeof(kindef.beta) == EldUpDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        elseif (typeof(kindef.beta) == EldRampReturnDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        elseif (typeof(kindef.beta) == ConstDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = 0.
+        elseif (typeof(kindef.beta) == SinDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        elseif (typeof(kindef.beta) == CosDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        end
+
+        #bound vortices
+        uind = zeros(ndiv)
+        wind = zeros(ndiv)
+        downwash = zeros(ndiv)
+        a0 = zeros(1)
+        a0dot = zeros(1)
+        aterm = zeros(naterm)
+        adot = zeros(naterm)
+        a0prev = zeros(1)
+        aprev = zeros(naterm)
+
+        for i = 1:ndiv
+            bnd_x[i] = -((pvt*c - x[i])*cos(kinem.alpha)) + (cam[i]*sin(kinem.alpha)) + initpos[1]
+            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha)) + (cam[i]*cos(kinem.alpha)) + initpos[2]
+        end
+        bv = TwoDVort[]
+        for i = 1:ndiv-1
+            push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
+        end
+
+        levflag = [0]
+        new(c, uref, coord_file, pvt, hinge, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
     end
 end
 

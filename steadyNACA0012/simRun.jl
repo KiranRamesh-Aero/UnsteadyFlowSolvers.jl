@@ -21,7 +21,7 @@ curfield = TwoDFlowField()
 
 dtstar = 0.015
 
-t_tot = 7. 
+t_tot = 7.
 
 nsteps = Int(round(t_tot/dtstar))+1
 

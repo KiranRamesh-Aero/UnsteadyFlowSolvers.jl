@@ -67,7 +67,7 @@ export
     ldvm,
     ldvmLin,
     ldvm2DOF,
-    
+
     # 2D plot output functions
     makeForcePlots2D,
     makeVortPlots2D,
@@ -101,5 +101,10 @@ include("thick2D/postprocess.jl")         # postprocessing functions
 
 # 2D plotting functions
 include("plots/plots2D.jl")
+
+# IBL coupled functions
+include("sr2/IBLCoupled.jl")
+include("sr2/IBLFV.jl")
+include("sr2/correlate.jl")
 
 end

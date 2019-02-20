@@ -11,7 +11,7 @@ full_kinem = KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "NACA0012"
+geometry = "Cylinder"
 
 lespcrit = [10.25;]
 

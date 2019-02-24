@@ -4,6 +4,4 @@
 .DS_Store?
 ._*
 
-src/sr2/plottingTut\.jl
-
-steadyNACA0012/
+src/sr2/plottingTut.jl

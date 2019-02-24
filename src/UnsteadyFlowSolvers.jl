@@ -25,6 +25,7 @@ import LaTeXStrings: @L_str
 #For use in development and debugging
 import Revise
 
+using Printf
 export
     # kinematics types and funtions
     MotionDef,

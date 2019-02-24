@@ -37,11 +37,16 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
 
     # initial momentum and energy shape factors
 
+    vcore = 0.02*surf.c
+
+    int_wax = zeros(surf.ndiv)
+    int_c = zeros(surf.ndiv)
+    int_t = zeros(surf.ndiv)
+
     del, E, x, qu, ql, qu0, ql0 = initViscous(ncell)
     println("Determining Intitial step size ", dt)
 
     dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, del, E, mat, startflag, writeflag, writeInterval, delvort)
-
 
     figure()
     interactivePlot(del, E, x, true)
@@ -102,59 +107,68 @@ end
 function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Float64, istep::Int64, writeArray::Array{Int64}, mat, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
 
 
-        #Update kinematic parameters
-        update_kinem(surf, t)
+    #Update kinematic parameters
+    update_kinem(surf, t)
 
-        #Update bound vortex positions
-        update_boundpos(surf, dt)
+    #Update flow field parameters if any
+    update_externalvel(curfield, t)
 
-        #Add a TEV with dummy strength
-        place_tev(surf,curfield,dt)
+    #Update bound vortex positions
+    update_boundpos(surf, dt)
 
-        #Solve for TEV strength to satisfy Kelvin condition
-        kelv = KelvinCondition(surf,curfield)
-        soln = nlsolve(not_in_place(kelv), [-0.01])
-        curfield.tev[length(curfield.tev)].s = soln.zero[1]
+    #Update incduced velocities on airfoil
+    update_indbound(surf, curfield)
 
-        #Update adot
-        update_a2a3adot(surf,dt)
+    #Set up the matrix problem
+    surf, xloc_tev, zloc_tev = update_thickLHS(surf, curfield, dt, vcore)
 
-        #Set previous values of aterm to be used for derivatives in next time step
-        surf.a0prev[1] = surf.a0[1]
-        for ia = 1:3
-            surf.aprev[ia] = surf.aterm[ia]
+    #Construct RHS vector
+    update_thickRHS(surf, curfield)
+
+    #Now solve the matrix problem
+    #soln = surf.LHS[[1:surf.ndiv*2-3;2*surf.ndiv-1], 1:surf.naterm*2+2] \ surf.RHS[[1:surf.ndiv*2-3; 2*surf.ndiv-1]]
+    soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
+
+    #Assign the solution
+    surf.a0[1] = soln[1]
+    for i = 1:surf.naterm
+        surf.aterm[i] = soln[i+1]
+        surf.bterm[i] = soln[i+surf.naterm+1]
+    end
+    tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+    push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+
+    #Calculate adot
+    update_atermdot(surf, dt)
+
+    #Set previous values of aterm to be used for derivatives in next time step
+    surf.a0prev[1] = surf.a0[1]
+    for ia = 1:3
+        surf.aprev[ia] = surf.aterm[ia]
+    end
+
+    #Update induced velocities to include effect of last shed vortex
+    update_indbound(surf, curfield)
+
+    #Calculate bound vortex strengths
+    update_bv_src(surf)
+
+    #Wake rollup
+    wakeroll(surf, curfield, dt)
+
+    #Force calculation
+    cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
+
+    # write flow details if required
+    if writeflag == 1
+        if istep in writeArray
+            dirname = "$(round(t,sigdigits=nround))"
+            writeStamp(dirname, t, surf, curfield)
         end
+    end
 
-        #Update rest of Fourier terms
-        update_a2toan(surf)
-
-        #Calculate bound vortex strengths
-        update_bv(surf)
-
-        # Delete or merge vortices if required
-        controlVortCount(delvort, surf.bnd_x[Int(round(surf.ndiv/2))], surf.bnd_z[Int(round(surf.ndiv/2))], curfield)
-
-        #Wake rollup if flag on
-        if wakerollup == 1
-            wakeroll(surf, curfield, dt)
-        end
-
-        # Calculate force and moment coefficients
-        cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
-
-        # write flow details if required
-
-
-        if writeflag == 1
-            if istep in writeArray
-                dirname = "$(round(t, sigdigits=nround))"
-                writeStamp(dirname, t, surf, curfield)
-            end
-        end
-
-        # for writing in resultsSummary
-
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+    mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
+                    cl, cd, cnc, cnnc, cn, cs])
 
 
         return  mat, surf, curfield

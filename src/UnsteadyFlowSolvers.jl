@@ -74,7 +74,9 @@ export
     makeVortPlots2D,
 
     # 2D postprocessing functions
-    calc_edgeVel
+    calc_edgeVel,
+
+    IBLCoupled
 
 ### source files
 

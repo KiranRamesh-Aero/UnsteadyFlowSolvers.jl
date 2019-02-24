@@ -2,7 +2,7 @@ using PyPlot
 function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 8)
+        mat = zeros(0, 11)
         t = 0.
         tv = 0.
         del = zeros(ncell-1)
@@ -46,7 +46,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
     del, E, x, qu, ql, qu0, ql0 = initViscous(ncell)
     println("Determining Intitial step size ", dt)
 
-    dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, del, E, mat, startflag, writeflag, writeInterval, delvort)
+    dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
     interactivePlot(del, E, x, true)
@@ -54,7 +54,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
     for istep = 1:nsteps
         t = t + dt
         #@printf(" Main time loop %1.3f\n", t);
-        mat, surf, curfield = lautat(surf, curfield, t, dt, istep, writeArray, mat, startflag, writeflag, writeInterval, delvort)
+        mat, surf, curfield, int_wax, int_c, int_t = lautat(surf, curfield, t, dt, istep, writeArray, vcore, int_wax, int_c, int_t, mat, startflag, writeflag, writeInterval, delvort)
         qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
         if qu0 == zeros(ncell-1)
             println("Inside the validation check at", t )
@@ -104,8 +104,7 @@ mat, surf, curfield
 
 end
 
-function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Float64, istep::Int64, writeArray::Array{Int64}, mat, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
-
+function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Float64, istep::Int64, writeArray::Array{Int64}, vcore::Float64, int_wax::Array{Float64}, int_c::Array{Float64}, int_t::Array{Float64}, mat, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
 
     #Update kinematic parameters
     update_kinem(surf, t)
@@ -171,7 +170,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Fl
                     cl, cd, cnc, cnnc, cn, cs])
 
 
-        return  mat, surf, curfield
+        return  mat, surf, curfield, int_wax, int_c, int_t
 end
 
 
@@ -187,6 +186,8 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
 
     U00 = qu0[2:end]
 
+    U0[U0.<0.0] .= 1e-5
+    U00[U00.<0.0] .= 1e-5
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
@@ -243,9 +244,9 @@ return dt/(floor(dt/dtv))
 
 end
 
-function initStepSize(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Float64, istep::Int64, writeArray::Array{Int64}, del::Array{Float64,1}, E::Array{Float64,1}, mat, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
+function initStepSize(surf::TwoDSurfThick, curfield::TwoDFlowField, t::Float64, dt::Float64, istep::Int64, writeArray::Array{Int64}, vcore::Float64, int_wax::Array{Float64}, int_c::Array{Float64}, int_t::Array{Float64}, del::Array{Float64,1}, E::Array{Float64,1}, mat, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
 
-    mat, surf, curfield = lautat(surf, curfield, t, dt, istep, writeArray, mat, startflag, writeflag, writeInterval, delvort)
+    mat, surf, curfield, int_wax, int_c, int_t = lautat(surf, curfield, t, dt, istep, writeArray, vcore, int_wax, int_c, int_t, mat, startflag, writeflag, writeInterval, delvort)
     qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
     w0u, Uu,  Utu, Uxu = inviscidInterface(del, E, qu, qu, dt)
     dt = initDt(w0u, Uu)

@@ -1,0 +1,12 @@
+A simplified testing function for thick IBL solver...
+
+1) run the simRun.jl script once (this will return qu, ql to the workspace)
+2) Execute include("testFunction.jl") command to run the script
+3) Then call the function, del, E = startSim(qu, 140, 300, true), where 140 and
+    300 are number of cells and time-steps respectively
+4) Set the boolean switch to false to turn-off the interactive mode (no graphs)
+
+
+The coupled solver for thick cases
+
+1) Execute include("simRun1.jl"). (Currently there is no option to turn-off the interactive mode)  

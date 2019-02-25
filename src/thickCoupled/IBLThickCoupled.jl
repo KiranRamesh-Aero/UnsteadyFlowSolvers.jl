@@ -265,20 +265,20 @@ end
 
 function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
 
- if(disp)
+    if(disp)
 
-    PyPlot.clf()
-    subplot(211)
-    axis([0, 1, (minimum(del)), (maximum(del))])
-    plot(x[1:end-1],del)
+        PyPlot.clf()
+        subplot(211)
+        axis([0, 1, (minimum(del)), (maximum(del))])
+        plot(x[1:end-1],del)
 
-    subplot(212)
-    axis([0, 1, (minimum(E)), (minimum(E))])
-    plot(x[1:end-1],E)
-    show()
-    pause(0.01)
+        subplot(212)
+        axis([0, 1, (minimum(E)), (minimum(E))])
+        plot(x[1:end-1],E)
+        show()
+        pause(0.01)
 
-end
+    end
 
 end
 

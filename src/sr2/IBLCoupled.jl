@@ -49,7 +49,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
     dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
-    #interactivePlot(qu, x, true)
+    interactivePlot(del, E, x, true)
     # time loop
     for istep = 1:nsteps
         t = t + dt
@@ -81,7 +81,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
 
         #display(plot(sep, xticks = 0:10:200, legend = false))
             #sleep(0.05)
-        interactivePlot(qu, x, true)
+        interactivePlot(del, E, x, true)
         w0u = w;
 
         @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
@@ -203,14 +203,27 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     return w0, U0, Ut, Ux
 end
 
-function spatialDerivates(qu::Array{Float64,1})
+function spatialDerivates(q::Array{Float64,1})
 
-    n = length(qu)
-    dx = 1.0/n
+    #n = length(qu)
+    #dx = 1.0/n
 
-    dudx = (qu[2:end]-qu[1:end-1])./dx
+    #dudx = (qu[2:end]-qu[1:end-1])./dx
 
-    return dudx
+    #return dudx
+
+    n = length(q)
+    dx = 1/n
+
+    dqdx = ([q[2:end-1];q[end:end]]-[q[1:1];q[1:end-2]])./dx
+
+    dqdx[1] = 0.0
+    dqdx[end] = 0.0
+
+    return dqdx
+
+
+
 end
 
 function temporalDerivates(qu::Array{Float64,1}, qu0::Array{Float64}, dt::Float64)

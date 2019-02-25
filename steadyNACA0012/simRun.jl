@@ -13,7 +13,6 @@ pvt = 0.25
 
 geometry = "Cylinder"
 
-
 lespcrit = [10.25;]
 
 surf = TwoDSurfThick(geometry, pvt, full_kinem, ndiv=140, naterm=136)
@@ -37,9 +36,9 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, curfield = lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+#mat, surf, curfield = lautat(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 
-qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+#qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
 mat, surf, curfield = IBLThickCoupled(surf, curfield, 140, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 

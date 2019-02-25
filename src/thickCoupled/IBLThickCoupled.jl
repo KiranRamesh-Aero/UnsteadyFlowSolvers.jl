@@ -197,7 +197,7 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
 
     xx = collect(0:nn)*pi/(nn)
 
-    Ux =  spatialDerivates([q[1];U0])
+    Ux =  spatialDeriv([q[1];U0])
 
     w1 = del
     w2 = del.*(E.+1.0)
@@ -207,7 +207,7 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     return w0, U0, Ut, Ux
 end
 
-function spatialDerivates(q::Array{Float64,1})
+function spatialDeriv(q::Array{Float64,1})
 
     #n = length(qu)
     #dx = 1.0/n
@@ -219,18 +219,18 @@ function spatialDerivates(q::Array{Float64,1})
     n = length(q)
     dx = 1/n
 
-    dqdx = ([q[2:end-1];q[end:end]]-[q[1:1];q[1:end-2]])./dx
+    dqdx = ([q[2:end-1];q[end-1]]-[q[1];q[1:end-2]])
 
     dqdx[1] = 0.0
     dqdx[end] = 0.0
 
+    dqdx = dqdx./(2*dx)
     return dqdx
-
-
 
 end
 
-function temporalDerivates(qu::Array{Float64,1}, qu0::Array{Float64}, dt::Float64)
+
+function temporalDeriv(qu::Array{Float64,1}, qu0::Array{Float64}, dt::Float64)
 
  return (qu - qu0)./dt
 

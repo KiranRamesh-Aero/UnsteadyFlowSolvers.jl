@@ -49,7 +49,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
     dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
-    interactivePlot(del, E, x, true)
+    #interactivePlot(qu, x, true)
     # time loop
     for istep = 1:nsteps
         t = t + dt
@@ -81,7 +81,7 @@ function IBLCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, 
 
         #display(plot(sep, xticks = 0:10:200, legend = false))
             #sleep(0.05)
-        interactivePlot(del, E, x, true)
+        interactivePlot(qu, x, true)
         w0u = w;
 
         @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
@@ -261,7 +261,7 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
 
  if(disp)
 
-     PyPlot.clf()
+    PyPlot.clf()
 
     subplot(211)
     axis([0, 1, (minimum(del)-0.1), (maximum(del)+0.1)])
@@ -274,5 +274,27 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
     pause(0.01)
 
 end
+
+end
+
+function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
+
+    if(disp)
+
+
+        PyPlot.clf()
+
+       subplot(211)
+       axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
+       plot(x,qu)
+
+      # subplot(212)
+      # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
+      # plot(x[1:end-1],E)
+       show()
+       pause(0.01)
+
+    end
+
 
 end

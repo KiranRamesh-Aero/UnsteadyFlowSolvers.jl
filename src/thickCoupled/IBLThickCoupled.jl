@@ -186,14 +186,18 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
 
     U00 = qu0[2:end]
 
-    U0[U0.<0.0] .= 1e-8
-    U00[U00.<0.0] .= 1e-8
+    U0[U0.< 0.0] .= 1e-8
+    U00[U00.< 0.0] .= 1e-8
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
     Ut = zeros(length(U0)) #temporalDerivates(U0, U00, dt)
 
-    Ux = spatialDerivates([q[1];U0])
+    nn = length(U0)-1
+
+    xx = collect(0:nn)*pi/(nn)
+
+    Ux =  spatialDerivates([q[1];U0])
 
     w1 = del
     w2 = del.*(E.+1.0)
@@ -266,11 +270,11 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
     PyPlot.clf()
 
     subplot(211)
-    axis([0, 1, (minimum(del)-0.1), (maximum(del)+0.1)])
+    axis([0, 1, (minimum(del)), (maximum(del))])
     plot(x[1:end-1],del)
 
     subplot(212)
-    axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
+    axis([0, 1, (minimum(E)), (minimum(E))])
     plot(x[1:end-1],E)
     show()
     pause(0.01)

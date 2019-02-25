@@ -13,6 +13,7 @@ pvt = 0.25
 
 geometry = "Cylinder"
 
+
 lespcrit = [10.25;]
 
 surf = TwoDSurfThick(geometry, pvt, full_kinem, ndiv=140, naterm=136)
@@ -40,7 +41,7 @@ delvort = delNone()
 
 #qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
 
-mat, surf, curfield = IBLCoupled(surf, curfield, 140, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = IBLThickCoupled(surf, curfield, 140, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
 #UNSflow.makeVortPlots2D()
 

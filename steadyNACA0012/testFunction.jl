@@ -1,3 +1,32 @@
+using PyPlot
+using Printf
+
+function correlate(w)
+
+ # the model correlations for quantities F, B, S, dedf based on del and E
+
+  del = w[:,1]
+  E = w[:,2]./del .- 1
+
+  F = 4.8274*E.^4 - 5.9816*E.^3 + 4.0274*E.^2 + 0.23247.*E .+ 0.15174
+
+  B = 0.5*(-225.86.*E.^3 - 3016.6.*E.^2 - 208.68*E .- 17.915
+                + 131.9*E.^3 - 167.32*E.^2 + 76.642.*E .- 11.068)
+  B[E.<-0.0616] = -225.86.*E[E.<-0.0616].^3 - 3016.6.*E[E.<-0.0616].^2 - 208.68*E[E.<-0.0616] .- 17.915
+  B[E.>-0.0395] =  131.9*E[E.>-0.0395].^3 - 167.32*E[E.>-0.0395].^2 + 76.642.*E[E.>-0.0395] .- 11.068
+
+  S = 0.5*(451.55*E.^3 + 2010*E.^2 + 138.96*E .+ 11.296
+                        - 96.739*E.^3 + 117.74*E.^2 - 46.432*E .+ 6.8074)
+  S[E.<-0.0582] = 451.55*E[E.<-0.0582].^3 + 2010*E[E.< -0.0582].^2 + 138.96*E[E.< -0.0582] .+ 11.296
+  S[E.>-0.042]  = -96.739*E[E.>-0.042].^3 + 117.74*E[E.> -0.042].^2 - 46.432*E[E.> -0.042] .+ 6.8074
+
+  dfde = 4*4.8274*E.^3 - 3*5.9816*E.^2 + 2*4.0274*E .+ 0.23247
+
+  return del, E, F ,B, S, dfde
+
+end
+
+
 function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1})
 
     n = Int(length(w)/2)
@@ -154,6 +183,15 @@ end
 
 function RHSSource(U::Array{Float64,1} ,B::Array{Float64,1}, del::Array{Float64,1},Ut::Array{Float64,1}, Ux::Array{Float64,1}, FF::Array{Float64,1}, E::Array{Float64,1}, S::Array{Float64,1} )
 
+    # the source terms of the system of equations
+
+    #println(" size of B ", length(B))
+    #println(" size of del ", length(del))
+    #println(" size of E ", length(E))
+    #println(" size of B ", length(B))
+    #println(" size of Ux ", length(Ux))
+    #println(" size of Ut ", length(Ut))
+
     z1 = B./(2.0*del) .- del.* (Ut./U) .- (E.+ 1.0).*del.*Ux
     z2 = S./del .- 2.0*E.*del.* (Ut./U) .- 2.0*FF.*del.*Ux
     z = hcat(z1,z2)
@@ -232,4 +270,147 @@ function initDt(w::Array{Float64,2}, U::Array{Float64,1})
 
     return dt
 
+end
+
+
+function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{Float64,1}, qu0::Array{Float64,1}, dt::Float64)
+
+
+    #del, E, F ,B = init(n-1)
+
+    #m = length(q) -1
+    U0 = q[1:end]
+    #x =x[1:n]
+    #U0 = U0[1:n]
+
+    U00 = qu0[1:end]
+
+    U0[U0.<= 0.0] .= 1e-8
+    U00[U00.<= 0.0] .= 1e-8
+    #println("finding the length",length(U00))
+    #println("finding the m ", m)
+
+    Ut = zeros(length(U0)) #temporalDerivates(U0, U00, dt)
+
+    nn = length(U0)-1
+
+    xx = collect(0:nn)*pi/(nn)
+
+    Ux =  spatialDeriv([q[1];U0])
+
+    w1 = del
+    w2 = del.*(E.+1.0)
+    w0 = hcat(w1,w2)
+
+
+    return w0, U0, Ut, Ux
+end
+
+function spatialDeriv(q::Array{Float64,1})
+
+    n = length(q)
+    dx = 1/n
+
+    dqdx = ([q[2:end-1];q[end-1]]-[q[1];q[1:end-2]])
+
+    dqdx[1] = 0.0
+    dqdx[end] = 0.0
+
+    dqdx = dqdx./(2*dx)
+    return dqdx
+
+end
+
+
+function temporalDeriv(qu::Array{Float64,1}, qu0::Array{Float64}, dt::Float64)
+
+ return (qu - qu0)./dt
+
+end
+
+function initViscous(ncell::Int64)
+
+    m = ncell - 1
+    del, E, F ,B = init(m)
+    x = collect(0:m)./(m)
+    qu =  zeros(m)
+    ql =  zeros(m)
+    qu0 = zeros(m)
+    ql0 = zeros(m)
+
+    return del, E, x, qu, ql, qu0, ql0
+
+end
+
+function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
+
+    if(disp)
+
+        PyPlot.clf()
+        subplot(211)
+        #axis([0, 1, (minimum(del)), (maximum(del))])
+        plot(x[1:end-1],del)
+
+        subplot(212)
+        #axis([0, 1, (minimum(E)), (minimum(E))])
+        plot(x[1:end-1],E)
+        show()
+        pause(0.01)
+
+    end
+
+end
+
+function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
+
+    if(disp)
+
+       PyPlot.clf()
+
+       subplot(211)
+       axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
+       plot(x,qu)
+
+      # subplot(212)
+      # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
+      # plot(x[1:end-1],E)
+       show()
+       pause(0.01)
+
+    end
+end
+
+
+function startSim(q::Array{Float64}, ncell::Int64, nsteps::Int64, interact::Bool)
+
+    dt = 0.001
+    t = 0.0
+    del, E, x, qu, ql, qu0, ql0 = initViscous(ncell)
+
+    qu = q[2:end]
+    qu0 = zeros(length(q[2:end]))
+
+    for i=1:nsteps
+
+        t = t + dt
+        w0u, Uu,  Utu, Uxu = inviscidInterface(del, E, qu, qu0, dt)
+
+        #println("Length of U ", length(Uu))
+        #println("Length of Ux ", length(Uxu))
+        #println("Length of Ut ", length(Utu))
+        #println("Length of w ", length(w0u)/2)
+
+
+        w, dt, j1 ,j2 = FVMIBL(w0u, Uu, Utu, Uxu);
+        del = w[:,1]
+        E = (w[:,2]./w[:,1]) .- 1.0
+        interactivePlot(del, E, x, interact)
+        w0u = w;
+
+        @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
+        qu0 = qu;
+
+    end
+
+        return del, E
 end

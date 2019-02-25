@@ -1,5 +1,5 @@
 using PyPlot
-function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
+function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int64, nsteps::Int64 = 300, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
         mat = zeros(0, 11)
@@ -191,12 +191,7 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
-    Ut = zeros(length(U0)) #temporalDerivates(U0, U00, dt)
-
-    nn = length(U0)-1
-
-    xx = collect(0:nn)*pi/(nn)
-
+    Ut = temporalDeriv(U0, U00, dt)
     Ux =  spatialDeriv([q[1];U0])
 
     w1 = del
@@ -269,11 +264,11 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
 
         PyPlot.clf()
         subplot(211)
-        axis([0, 1, (minimum(del)), (maximum(del))])
+        #axis([0, 1, (minimum(del)), (maximum(del))])
         plot(x[1:end-1],del)
 
         subplot(212)
-        axis([0, 1, (minimum(E)), (minimum(E))])
+        #axis([0, 1, (minimum(E)), (minimum(E))])
         plot(x[1:end-1],E)
         show()
         pause(0.01)

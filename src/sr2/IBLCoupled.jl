@@ -191,7 +191,7 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
-    Ut = temporalDerivates(U0, U00, dt)
+    Ut = zeros(length(U0)) #temporalDerivates(U0, U00, dt)
 
     Ux = spatialDerivates([q[1];U0])
 
@@ -230,17 +230,6 @@ function initViscous(ncell::Int64)
     ql0 = zeros(m)
 
     return del, E, x, qu, ql, qu0, ql0
-
-end
-
-
-function adjustTimeStep(dt::Float64, dtv::Float64)
-
-
-
-return dt/(floor(dt/dtv))
-
-
 
 end
 

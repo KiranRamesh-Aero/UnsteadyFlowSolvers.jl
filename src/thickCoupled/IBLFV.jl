@@ -233,3 +233,10 @@ function initDt(w::Array{Float64,2}, U::Array{Float64,1})
     return dt
 
 end
+
+
+function startSim()
+
+
+
+end

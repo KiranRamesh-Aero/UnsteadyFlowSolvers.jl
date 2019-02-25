@@ -268,7 +268,6 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
  if(disp)
 
     PyPlot.clf()
-
     subplot(211)
     axis([0, 1, (minimum(del)), (maximum(del))])
     plot(x[1:end-1],del)

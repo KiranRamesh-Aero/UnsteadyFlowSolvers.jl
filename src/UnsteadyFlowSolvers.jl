@@ -25,6 +25,7 @@ import LaTeXStrings: @L_str
 #For use in development and debugging
 import Revise
 
+using Printf
 export
     # kinematics types and funtions
     MotionDef,
@@ -67,13 +68,16 @@ export
     ldvm,
     ldvmLin,
     ldvm2DOF,
-    
+
     # 2D plot output functions
     makeForcePlots2D,
     makeVortPlots2D,
 
     # 2D postprocessing functions
-    calc_edgeVel
+    calc_edgeVel,
+
+    IBLThickCoupled
+
 
 ### source files
 
@@ -101,5 +105,16 @@ include("thick2D/postprocess.jl")         # postprocessing functions
 
 # 2D plotting functions
 include("plots/plots2D.jl")
+
+# IBL thick-coupled functions
+include("thickCoupled/IBLThickCoupled.jl")
+include("thickCoupled/IBLFV.jl")
+include("thickCoupled/correlate.jl")
+
+# IBL thin-coupled functions
+#include("thinCoupled/IBLCoupled.jl")
+#include("thinCoupled/IBLFV.jl")
+#include("thinCoupled/correlate.jl")
+
 
 end

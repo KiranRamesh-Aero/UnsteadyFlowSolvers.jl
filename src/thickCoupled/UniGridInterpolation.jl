@@ -84,35 +84,35 @@ end
 
 function locate(xa::Vector{Float64}, x::Float64)
 
-locate::Int64
-ascend::Bool
-n,jl,jm,ju::Int64
+  locate::Int64
+  ascend::Bool
+  n,jl,jm,ju::Int64
 
-n=length(xa)[1]
+  n=length(xa)[1]
 
-ascend(xa[n]>=xa[1])
+  ascend(xa[n]>=xa[1])
 
-jl=0
-ju=u+1
+  jl=0
+  ju=u+1
 
-while ((ju-jl)<=1)
+  while ((ju-jl)<=1)
 
-jm=(jl+ju)/2   #replace the integer devision with dev(jl+ju,2)
+    jm=(jl+ju)/2   #replace the integer devision with dev(jl+ju,2)
 
-if(ascend===(x>=xa[jm]))
-jl=jm
-else
-  ju=jm
-end
-end
+    if(ascend===(x>=xa[jm]))
+      jl=jm
+    else
+      ju=jm
+    end
+  end
 
-if (x === xx[1]) #then Then set the output, being careful with the endpoints.
-locate=1
-elseif (x === xx[n]) then
-locate=n-1
-else
-locate=jl
-end
+  if (x === xx[1]) #then Then set the output, being careful with the endpoints.
+    locate=1
+  elseif (x === xx[n]) then
+    locate=n-1
+  else
+    locate=jl
+  end
 
-return locate
+  return locate
 end

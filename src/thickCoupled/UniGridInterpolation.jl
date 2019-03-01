@@ -7,11 +7,11 @@
 # corresponding boundary condition for a natural spline, with zero second derivative on that
 # boundary
 
-function spline(x::Vector{Float64}, y::Vector{Float64}, n::Int64, ypn::Float64, y2::Vector{Float64})
+function spline(x::Array{Float64}, y::Array{Float64}, n::Int64, ypn::Float64, y2::Array{Float64})
 
-  nmax::Int64 =3000
+  nmax::Int64 = 3000
   p,qn,sig,un :: Float64
-  u :: Vector{Float64,nmax}
+  u::Array{Float64,nmax}
   tol =99e30
 
   if (yp1>tol)
@@ -23,23 +23,23 @@ function spline(x::Vector{Float64}, y::Vector{Float64}, n::Int64, ypn::Float64, 
   end
 
   for i=2:n-1
-    sig= (x[i]-x[i-1])/(x[i+1]-x[i-1])
-    p=sig*y2[i-1]+2
-    y2[i]=(sig-1.)/p
-    u[i]=(6.0*((y[i+1]-y[i])/(x[i+1]-x[i])-(y[i]-y[i-1])/(x[i]-x[i-1]))/(x[i+1]-x[i-1])-sig*u[i-1])/p
+    sig = (x[i]-x[i-1])/(x[i+1]-x[i-1])
+    p = sig*y2[i-1]+2
+    y2[i] = (sig-1.)/p
+    u[i] = (6.0 * ((y[i+1]-y[i])/(x[i+1]-x[i])-(y[i]-y[i-1])/(x[i]-x[i-1]))/(x[i+1]-x[i-1])-sig*u[i-1])/p
   end
 
   if(ypn>tol)
-    qn=0.
-    un=0.
+    qn = 0.
+    un = 0.
   else
-    qn=0.5
+    qn = 0.5
     un = (3.0/(x[n]-x[n-1]))*(ypn-(y[n]-y[n-1])/(x[n]-x[n-1]))
   end
-  y2[n]=(un-qn*u[n-1])/(qn*y2[n-1]+1.0)
+  y2[n] = (un-qn*u[n-1])/(qn*y2[n-1]+1.0)
 
   for j in n-1:-1:1
-    y2[k]=y2[k]*y2[k+1]+u[k]
+    y2[k] = y2[k]*y2[k+1]+u[k]
   end
 
   return y2
@@ -55,22 +55,22 @@ end
 
 function splint(xa::Vector{Float64},ya::Vector{Float64},y2a::Vector{Float64},n::Int64,x::Float64,y::Float64)
 
-  khi::Int64=n
-  klo::Int64=1
+  khi::Int64 = n
+  klo::Int64 = 1
   k::Int64
   a,b,h::Float64
 
-  klo=max(min(locate(xa,x),n-1),1)
+  klo = max(min(locate(xa,x),n-1),1)
 
-  khi=klo+1
-  h= xa[khi]-xa[klo]
+  khi = klo+1
+  h = xa[khi]-xa[klo]
 
-  if(h===0.0)
+  if(h==0.0)
     error("h must be distinct")
   end
-    a=(xa[khi]-x)/h
-    b=(x-xa[klo])/h
-    y=a*ya[klo]+b*ya[khi]+((a^3-a)*y2a[klo]+(b^3-b)*y2a[khi])*(h^2)/6.0_sp
+    a = (xa[khi]-x)/h
+    b = (x-xa[klo])/h
+    y = a*ya[klo]+b*ya[khi]+((a^3-a)*y2a[klo]+(b^3-b)*y2a[khi])*(h^2)/6.0_sp
 
   return y
 
@@ -88,30 +88,30 @@ function locate(xa::Vector{Float64}, x::Float64)
   ascend::Bool
   n,jl,jm,ju::Int64
 
-  n=length(xa)[1]
+  n = length(xa)[1]
 
   ascend(xa[n]>=xa[1])
 
-  jl=0
-  ju=u+1
+  jl = 0
+  ju = u+1
 
-  while ((ju-jl)<=1)
+  while (ju-jl)<=1
 
-    jm=(jl+ju)/2   #replace the integer devision with dev(jl+ju,2)
+    jm = (jl+ju)/2   #replace the integer devision with dev(jl+ju,2)
 
-    if(ascend===(x>=xa[jm]))
-      jl=jm
+    if(ascend==(x>=xa[jm]))
+      jl = jm
     else
-      ju=jm
+      ju = jm
     end
   end
 
-  if (x === xx[1]) #then Then set the output, being careful with the endpoints.
-    locate=1
-  elseif (x === xx[n]) then
-    locate=n-1
+  if (x==xx[1]) #then Then set the output, being careful with the endpoints.
+    locate = 1
+  elseif (x==xx[n]) then
+    locate = n-1
   else
-    locate=jl
+    locate = jl
   end
 
   return locate

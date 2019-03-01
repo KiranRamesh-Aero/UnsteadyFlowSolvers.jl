@@ -36,6 +36,7 @@ function spline(x::Array{Float64}, y::Array{Float64}, n::Int64, ypn::Float64, y2
     qn = 0.5
     un = (3.0/(x[n]-x[n-1]))*(ypn-(y[n]-y[n-1])/(x[n]-x[n-1]))
   end
+  
   y2[n] = (un-qn*u[n-1])/(qn*y2[n-1]+1.0)
 
   for j in n-1:-1:1

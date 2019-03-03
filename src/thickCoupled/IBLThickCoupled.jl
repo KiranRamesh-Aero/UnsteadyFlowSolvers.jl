@@ -51,7 +51,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     dt = 0.001  #initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
-    interactivePlot(del, E, xfvm, true)
+    interactivePlot(del, E, zeros(length(E)-1), zeros(length(E)-1), xfvm, true)
     # time loop
     for istep = 1:nsteps
         t = t + dt
@@ -86,7 +86,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
 
         #display(plot(sep, xticks = 0:10:200, legend = false))
             #sleep(0.05)
-        interactivePlot(del, E, xfvm, true)
+        interactivePlot(del, E, j1, j2 ,xfvm, true)
         w0u = w;
 
         @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
@@ -295,11 +295,42 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
         #axis([0, 1, (minimum(E)), (minimum(E))])
         plot(x[1:end-1],E)
         show()
-        pause(0.01)
+        pause(0.005)
 
     end
 
 end
+
+function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, J1::Array{Float64,1}, J2::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
+
+    if(disp)
+
+        PyPlot.clf()
+        subplot(221)
+        #axis([0, 1, (minimum(del)), (maximum(del))])
+        plot(x[1:end-1],del)
+
+        subplot(222)
+        #axis([0, 1, (minimum(E)), (minimum(E))])
+        plot(x[1:end-1],E)
+
+        subplot(223)
+        #axis([0, 1, (minimum(E)), (minimum(E))])
+        plot(x[2:end-1],J1)
+
+        subplot(224)
+        #axis([0, 1, (minimum(E)), (minimum(E))])
+        plot(x[2:end-1],J2)
+
+        show()
+        pause(0.005)
+
+    end
+
+end
+
+
+
 
 function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
 
@@ -349,4 +380,11 @@ function createUniformFVM(ncell::Int64)
     x = collect(0:ncell)*pi/(ncell)
 
     return x
+end
+
+function vii()
+
+
+
+
 end

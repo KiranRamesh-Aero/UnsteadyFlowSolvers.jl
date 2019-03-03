@@ -26,6 +26,10 @@ import LaTeXStrings: @L_str
 import Revise
 
 using Printf
+
+using DataStructures
+using Interpolations
+
 export
     # kinematics types and funtions
     MotionDef,

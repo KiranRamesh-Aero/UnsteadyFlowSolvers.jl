@@ -14,3 +14,5 @@ steadyNACA0012/resultsSummary
 steadyNACA0012/
 
 src/thickCoupled/diffTest\.jl
+
+src/thickCoupled/UniGridInterpolation\.jl

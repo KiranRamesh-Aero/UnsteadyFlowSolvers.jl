@@ -15,7 +15,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
 
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
 
     # two step forward Euler methods for adding the source term to the right hand-side
     # of the transport equations.
@@ -38,7 +38,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 =1/2*(w1+w) .+ (dt).*z
+    w2 =w1 .+ (dt).*z
 
 
     return w2,dt, j1, j2
@@ -130,8 +130,8 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
 
     # specifying the boundary conditions using internal extrapolation from the calculated flux of the
     # neighbouring cell centers
-    #fL[1,:] = [F[1,1]; F[1,2]]
-    fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
+    fL[1,:] = [F[1,1]; F[1,2]]
+    #fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
     #fL[1,:] = [0; 0]
 
     fR[end,:] = [F[end,1];F[end,2]]
@@ -228,7 +228,7 @@ function initDt(w::Array{Float64,2}, U::Array{Float64,1})
     lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
     n = Int(length(w)/2)
     dx = Float64(1.0/n)
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    dt = calc_Dt(lamb1 ,lamb2, 0.3, dx)
 
     return dt
 

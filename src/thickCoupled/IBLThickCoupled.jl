@@ -43,24 +43,29 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
 
-    del, E, x, qu, ql, qu0, ql0 = initViscous(ncell)
+    del, E, xfvm, qu, ql, qu0, ql0 = initViscous(ncell)
+    xfvm = xfvm/pi
     println("Determining Intitial step size ", dt)
-
-    dt =  initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
+    quf = zeros(length(qu))
+    quf0 = zeros(length(qu))
+    dt = 0.001  #initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
-    interactivePlot(del, E, x, true)
+    interactivePlot(del, E, xfvm, true)
     # time loop
     for istep = 1:nsteps
         t = t + dt
         #@printf(" Main time loop %1.3f\n", t);
         mat, surf, curfield, int_wax, int_c, int_t = lautat(surf, curfield, t, dt, istep, writeArray, vcore, int_wax, int_c, int_t, mat, startflag, writeflag, writeInterval, delvort)
         qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
-        if qu0 == zeros(ncell-1)
+        quf = mappingAerofoilToFVGrid(qu, surf, xfvm)
+
+        if quf0 == zeros(ncell-1)
             println("Inside the validation check at", t )
-            qu0 = qu
+            quf0 = quf
         end
-        w0u, Uu,  Utu, Uxu = inviscidInterface(del, E, qu, qu0, dt, surf)
+
+        w0u, Uu,  Utu, Uxu = inviscidInterface(del, E, quf, quf0, dt, surf)
 
         w, dt, j1 ,j2 = FVMIBL(w0u, Uu, Utu, Uxu);
         del = w[:,1]
@@ -81,7 +86,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
 
         #display(plot(sep, xticks = 0:10:200, legend = false))
             #sleep(0.05)
-        interactivePlot(del, E, x, true)
+        interactivePlot(del, E, xfvm, true)
         w0u = w;
 
         @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
@@ -90,7 +95,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
             #tv = tv + dtv
 
             #sols = w
-        qu0 = qu;
+        quf0 = quf;
     end
 
     mat = mat'
@@ -191,8 +196,9 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
-    Ut = temporalDeriv(U0, U00, dt)
-    Ux =  spatialDeriv([q[1];U0], surf)
+    Ux =  spatialDeriv([q[1];U0])
+    Ut =  temporalDeriv(U0, U00, dt)
+
 
     w1 = del
     w2 = del.*(E.+1.0)
@@ -216,8 +222,8 @@ function spatialDeriv(q::Array{Float64,1})
 
     dqdx = ([q[2:end-1];q[end-1]]-[q[1];q[1:end-2]])
 
-    dqdx[1] = 0.0
-    dqdx[end] = 0.0
+    dqdx[1] = 2*dqdx[2]- dqdx[3]
+    dqdx[end] = 2*dqdx[end-1]- dqdx[end-2]
 
     dqdx = dqdx./(2*dx)
     return dqdx
@@ -233,6 +239,7 @@ theth = surf.theta
 
 dqdthe1 = ([qu[2:end-1];qu[end-1]] - [qu[1];qu[1:end-2]])./([theth[2:end-1];theth[end-1]] - [theth[1];theth[1:end-2]])
 
+ydx = ([yinterPi1[2:end-1];yinterPi1[end]]-[yinterPi1[1];yinterPi1[1:end-2]])./(2*n)
 dthedx1 = 2/(surf.c*sin.(theth))
 
 dthedx1 = dthedx1'
@@ -252,7 +259,7 @@ function initViscous(ncell::Int64)
 
     m = ncell - 1
     del, E, F ,B = init(m)
-    x = collect(0:m)./(m)
+    x = createUniformFVM(m)
     qu =  zeros(m)
     ql =  zeros(m)
     qu0 = zeros(m)
@@ -314,4 +321,32 @@ function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
     end
 
 
+end
+
+function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm::Array{Float64,1})
+
+
+    n = length(xfvm)
+    dx = pi/(n)
+    qinter = Spline1D(surf.x,qu)
+    qfine = evaluate(qinter, xfvm)
+
+    #dqfinedx = (qfine[2:end] - qfine[1:end-1])./(dx)
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = ([qfine[2:end-1];qfine[end-1]]-[qfine[1];qfine[1:end-2]])
+
+    #dqfinedx[1] = 2*dqfinedx[2]- dqfinedx[3]
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = dqfinedx./(2*dx)
+
+    return qfine #, dqfinedx
+end
+
+function createUniformFVM(ncell::Int64)
+
+    x = collect(0:ncell)*pi/(ncell)
+
+    return x
 end

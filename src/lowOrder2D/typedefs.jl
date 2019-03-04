@@ -25,6 +25,7 @@ struct TwoDFlowField
     tev :: Vector{TwoDVort}
     lev :: Vector{TwoDVort}
     extv :: Vector{TwoDVort}
+	
     function TwoDFlowField(velX = ConstDef(0.), velZ = ConstDef(0.))
         u = [0;]
         w = [0;]
@@ -65,7 +66,7 @@ struct TwoDSurf
     initpos :: Vector{Float64}
     rho :: Float64
     
-    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
+    function TwoDSurf(coord_file, pvt, kindef, lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -79,6 +80,7 @@ struct TwoDSurf
             theta[ib] = (ib-1.)*dtheta
             x[ib] = c/2. *(1-cos(theta[ib]))
         end
+		
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
@@ -137,8 +139,8 @@ struct TwoDSurf
         end
 
         for i = 1:ndiv
-            bnd_x[i] = -((c - pvt*c)+((pvt*c - x[i])*cos(kinem.alpha))) + (cam[i]*sin(kinem.alpha)) + initpos[1]
-            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha))+(cam[i]*cos(kinem.alpha)) + initpos[2]
+            bnd_x[i] = -((pvt*c - x[i])*cos(kinem.alpha)) + (cam[i]*sin(kinem.alpha)) + initpos[1]
+            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha)) + (cam[i]*cos(kinem.alpha)) + initpos[2]
         end
         uind = zeros(ndiv)
         wind = zeros(ndiv)
@@ -155,6 +157,153 @@ struct TwoDSurf
         end
         levflag = [0]
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
+    end
+end
+
+struct TwoDSurfFlap
+    c :: Float64
+    uref :: Float64
+    coord_file :: String
+    pvt :: Float64
+    hinge :: Float64
+    mdiv :: Int16
+    ndiv :: Int16
+    naterm :: Int16
+    kindef :: KinemDefFlap
+    cam :: Vector{Float64}
+    camdef :: Vector{Float64}
+    cam_slope :: Vector{Float64}
+    camdef_slope :: Vector{Float64}
+    camdot :: Vector{Float64}
+    theta :: Vector{Float64}
+    x :: Vector{Float64}
+    kinem :: KinemParFlap
+    bnd_x :: Vector{Float64}
+    bnd_z :: Vector{Float64}
+    uind :: Vector{Float64}
+    wind :: Vector{Float64}
+    downwash :: Vector{Float64}
+    a0 :: Vector{Float64}
+    aterm :: Vector{Float64}
+    a0dot :: Vector{Float64}
+    adot :: Vector{Float64}
+    a0prev :: Vector{Float64}
+    aprev :: Vector{Float64}
+    bv :: Vector{TwoDVort}
+    lespcrit :: Vector{Float64}
+    levflag :: Vector{Int8}
+    initpos :: Vector{Float64}
+    rho :: Float64
+    
+    function TwoDSurfFlap(coord_file, pvt, hinge, kindef, lespcrit=zeros(1); c=1., uref=1., mdiv=50, naterm=35, initpos = [0.; 0.], rho = 0.04)
+      
+        ndiv = mdiv #CHANGE TO PROPORTIONAL AFTER CHECKED IT WORKS WELL
+
+        theta = zeros(mdiv+ndiv)
+        x = zeros(mdiv+ndiv)
+        cam = zeros(mdiv+ndiv)
+        cam_slope = zeros(mdiv+ndiv)
+        camdef = zeros(mdiv+ndiv)
+        camdef_slope = zeros(mdiv+ndiv)
+        camdot = zeros(mdiv+ndiv)
+        kinem = KinemParFlap(0, 0, 0, 0, 0, 0, 0, 0)
+        bnd_x = zeros(mdiv+ndiv)
+        bnd_z = zeros(mdiv+ndiv)
+
+        #variable of transformation
+        for ia = 1:mdiv                                 #airfoil
+            dtheta = pi/(mdiv-1)
+            theta[ia] = (ia-1)*dtheta
+            x[ia] = hinge*c/2 *(1-cos(theta[ia]))
+        end
+        for ia = mdiv:mdiv+ndiv                         #flap
+            dtheta = pi/(ndiv)
+            theta[ia] = (ia-mdiv)*dtheta
+            x[ia] = hinge*c + (c-hinge*c)/2 *(1-cos(theta[ia]))
+        end
+
+        #kinematics
+        if (typeof(kindef.alpha) == ConstDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = 0.
+        elseif (typeof(kindef.alpha) == SinDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == CosDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        end
+
+        if (typeof(kindef.h) == ConstDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = 0.
+        elseif (typeof(kindef.h) == SinDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == CosDef)
+            kinem.h = kindef.h(0.)*c
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        end
+
+        if (typeof(kindef.u) == ConstDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = 0.
+        end
+
+        if (typeof(kindef.beta) == ConstDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = 0.
+        elseif (typeof(kindef.beta) == SinDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        elseif (typeof(kindef.beta) == CosDef)
+            kinem.beta = kindef.beta(0.)
+            kinem.betadot = ForwardDiff.derivative(kindef.beta,0.)*uref/c
+        end
+
+        #camberline and derivatives modification due to flap deflection
+        if (coord_file == "FlatPlate")
+            for i = mdiv:mdiv+ndiv
+                camdef[i] = - (x[i] - x[mdiv])*tan(kinem.beta)
+                camdef_slope[i] = -tan(kinem.beta)
+                camdot[i] = - (x[i] - x[mdiv])*(kinem.betadot)/(cos(kinem.beta)*cos(kinem.beta))
+            end
+        else
+            cam, cam_slope = camber_calcFlap(x, coord_file)
+            #for i = mdiv:mdiv+ndiv
+                #camdef[i] = 
+                #camdef_slope[i]=
+                #camdot[i] =
+            #end
+        end
+        for i = 1:mdiv+ndiv
+            cam[i] = cam[i] + camdef[i]
+            cam_slope[i] = cam_slope[i] + camdef_slope[i]
+        end
+
+        #bound vortices
+        uind = zeros(mdiv+ndiv)
+        wind = zeros(mdiv+ndiv)
+        downwash = zeros(mdiv+ndiv)
+        a0 = zeros(1)
+        a0dot = zeros(1)
+        aterm = zeros(naterm)
+        adot = zeros(naterm)
+        a0prev = zeros(1)
+        aprev = zeros(naterm)
+  
+        for i = 1:mdiv+ndiv
+            bnd_x[i] = kinem.u - ((pvt*c - x[i])*cos(kinem.alpha)) + (cam[i]*sin(kinem.alpha)) + initpos[1]
+            bnd_z[i] = kinem.h + ((pvt*c - x[i])*sin(kinem.alpha)) + (cam[i]*cos(kinem.alpha)) + initpos[2]
+        end
+        
+        bv = TwoDVort[]
+        for i = 1:mdiv+ndiv-1
+            push!(bv,TwoDVort(0,0,0,0.02*c,0,0))
+        end
+
+        levflag = [0]
+        new(c, uref, coord_file, pvt, hinge, mdiv, ndiv, naterm, kindef, cam, cam_slope, camdef, camdef_slope, camdot, theta, x, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
     end
 end
 
@@ -209,6 +358,39 @@ struct KelvinCondition
 end
 
 function (kelv::KelvinCondition)(tev_iter::Array{Float64})
+
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+
+    uprev, wprev = ind_vel([kelv.field.tev[ntev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
+    
+    #Update the TEV strength
+    kelv.field.tev[ntev].s = tev_iter[1]
+
+    unow, wnow = ind_vel([kelv.field.tev[ntev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
+
+    kelv.surf.uind[:] = kelv.surf.uind[:] .- uprev .+ unow
+    kelv.surf.wind[:] = kelv.surf.wind[:] .- wprev .+ wnow
+    
+    #Calculate downwash
+    update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    val = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.) -
+        kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0prev[1] + kelv.surf.aprev[1]/2.) +
+        kelv.field.tev[ntev].s
+
+    return val
+end
+
+struct KelvinConditionFlap
+    surf :: TwoDSurfFlap
+    field :: TwoDFlowField
+end
+
+function (kelv::KelvinConditionFlap)(tev_iter::Array{Float64})
 
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
@@ -294,6 +476,48 @@ struct KelvinKutta
 end
 
 function (kelv::KelvinKutta)(v_iter::Array{Float64})
+    val = zeros(2)
+    
+    nlev = length(kelv.field.lev)
+    ntev = length(kelv.field.tev)
+
+    uprev, wprev = ind_vel([kelv.field.tev[ntev]; kelv.field.lev[nlev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
+    
+    #Update the TEV and LEV strengths
+    kelv.field.tev[ntev].s = v_iter[1]
+    kelv.field.lev[nlev].s = v_iter[2]
+
+    unow, wnow = ind_vel([kelv.field.tev[ntev]; kelv.field.lev[nlev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
+
+    kelv.surf.uind[:] = kelv.surf.uind[:] .- uprev .+ unow
+    kelv.surf.wind[:] = kelv.surf.wind[:] .- wprev .+ wnow
+    
+    #Calculate downwash
+    update_downwash(kelv.surf ,[kelv.field.u[1],kelv.field.w[1]])
+
+    #Calculate first two fourier coefficients
+    update_a0anda1(kelv.surf)
+
+    val[1] = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.) - 
+        kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0prev[1] + kelv.surf.aprev[1]/2.) +
+        kelv.field.tev[ntev].s + kelv.field.lev[nlev].s
+    
+    if (kelv.surf.a0[1] > 0)
+        lesp_cond = kelv.surf.lespcrit[1]
+    else
+        lesp_cond = -kelv.surf.lespcrit[1]
+    end
+    val[2] = kelv.surf.a0[1]-lesp_cond
+
+    return val
+end
+
+struct KelvinKuttaFlap
+    surf :: TwoDSurfFlap
+    field :: TwoDFlowField
+end
+
+function (kelv::KelvinKuttaFlap)(v_iter::Array{Float64})
     val = zeros(2)
     
     nlev = length(kelv.field.lev)

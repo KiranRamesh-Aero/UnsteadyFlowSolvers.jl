@@ -9,10 +9,28 @@ mutable struct KinemPar
     udot :: Float64
 end
 
+mutable struct KinemParFlap
+    alpha :: Float64
+    h :: Float64
+    alphadot :: Float64
+    hdot :: Float64
+    u :: Float64
+    udot :: Float64
+    beta :: Float64
+	betadot :: Float64
+end
+
 mutable struct KinemDef
     alpha :: MotionDef
     h :: MotionDef
     u :: MotionDef
+end
+
+mutable struct KinemDefFlap
+    alpha :: MotionDef
+    h :: MotionDef
+    u :: MotionDef
+    beta :: MotionDef
 end
 
 struct EldUpDef <: MotionDef

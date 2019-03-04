@@ -2,6 +2,7 @@
     cleanWrite()
 
 Clears all timestamp directories in the current folder
+
 """
 function cleanWrite()
     dirvec = readdir()
@@ -24,6 +25,7 @@ function simpleInterp(x1 ::Float64, x2 :: Float64, y1 :: Float64, y2 :: Float64,
     y = y1 + (y2 - y1)*(x - x1)/(x2 - x1)
     return y
 end
+
 
 """
     find_tstep([kin])
@@ -101,11 +103,46 @@ end
 function camber_calc(x::Vector,airfoil::String)
     #Determine camber and camber slope on airfoil from airfoil input file
 
-    ndiv = length(x);
-    c = x[ndiv];
+    ndiv = length(x)
+    c = x[ndiv]
 
     cam = zeros(ndiv)
     cam_slope = zeros(ndiv)
+    in_air = DelimitedFiles.readdlm(airfoil, Float64)
+    xcoord = in_air[:,1]
+    ycoord = in_air[:,2]
+    ncoord = length(xcoord)
+	
+    xcoord_sum = zeros(ncoord)
+
+    for i = 1:ncoord-1
+        xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i])
+    end
+    y_spl = Spline1D(xcoord_sum,ycoord)
+
+    y_ans = zeros(2*ndiv)
+
+    for i=1:ndiv
+        y_ans[i] = evaluate(y_spl,x[i]/c)
+    end
+    for i=ndiv+1:2*ndiv
+        y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c))
+    end
+    cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1]
+    cam[1] = 0
+    cam_spl = Spline1D(x,cam)
+    cam_slope[1:ndiv] = Dierckx.derivative(cam_spl,x)
+    return cam, cam_slope
+end
+
+function camber_calcFlap(x::Vector, airfoil::String, mdiv::Int16=50)
+    #Determine camber and camber slope on airfoil from airfoil input file
+
+    ndiv = length(x)-mdiv;
+    c = x[mdiv+ndiv];
+
+    cam = zeros(mdiv+ndiv)
+    cam_slope = zeros(mdiv+ndiv)
     in_air = DelimitedFiles.readdlm(airfoil, Float64);
     xcoord = in_air[:,1];
     ycoord = in_air[:,2];
@@ -117,18 +154,18 @@ function camber_calc(x::Vector,airfoil::String)
     end
     y_spl = Spline1D(xcoord_sum,ycoord);
 
-    y_ans = zeros(2*ndiv);
+    y_ans = zeros(2*(mdiv+ndiv));
 
-    for i=1:ndiv
+    for i=1:mdiv+ndiv
         y_ans[i] = evaluate(y_spl,x[i]/c);
     end
-    for i=ndiv+1:2*ndiv
-        y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c));
+    for i=mdiv+ndiv+1:2*(mdiv+ndiv)
+        y_ans[i] = evaluate(y_spl,(x[mdiv+ndiv]/c) + (x[i-(mdiv+ndiv)]/c));
     end
-    cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1];
+    cam[1:mdiv+ndiv] = [(y_ans[i] + y_ans[2*(mdiv+ndiv) + 1 - i])*c/2 for i = mdiv+ndiv:-1:1];
     cam[1] = 0;
     cam_spl = Spline1D(x,cam);
-    cam_slope[1:ndiv] = derivative(cam_spl,x);
+    cam_slope[1:mdiv+ndiv] = derivative(cam_spl,x);
     return cam, cam_slope
 end
 
@@ -165,7 +202,7 @@ function camber_thick_calc(x::Vector,coord_file::String)
             thick[i] = 0.5*c*sin(theta)
         end
         thick_spl = Spline1D(x,thick)
-        thick_slope[1:ndiv] = derivative(thick_spl,x)
+        thick_slope[1:ndiv] = Dierckx.derivative(thick_spl,x)
         cam[1:ndiv] .= 0.
         cam_slope[1:ndiv] .= 0.
         rho = 0.5*c
@@ -220,8 +257,8 @@ function camber_thick_calc(x::Vector,coord_file::String)
         thick[1:ndiv] = [(zu[i] - zl[i])*c/2 for i = 1:ndiv]
         cam_spl = Spline1D(x,cam)
         thick_spl = Spline1D(x,thick)
-        cam_slope[1:ndiv] = derivative(cam_spl,x)
-        thick_slope[1:ndiv] = derivative(thick_spl,x)
+        cam_slope[1:ndiv] = Dierckx.derivative(cam_spl,x)
+        thick_slope[1:ndiv] = Dierckx.derivative(thick_spl,x)
         rho = readdlm("rho")[1]
     end
     return thick, thick_slope,rho, cam, cam_slope

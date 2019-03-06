@@ -7,6 +7,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
         tv = 0.
         del = zeros(ncell-1)
         E   = zeros(ncell-1)
+        thick_org = surf.thick
 
     elseif startflag == 1
         dirvec = readdir()
@@ -42,6 +43,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     int_wax = zeros(surf.ndiv)
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
+    thick_org = surf.thick
 
     del, E, xfvm, qu, ql, qu0, ql0 = initViscous(ncell)
     xfvm = xfvm/pi
@@ -85,9 +87,14 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
             #display(plot(p1, p2, p3, p4, xticks = 0:0.1:1, layout=(2,2), legend = false))
 
         #display(plot(sep, xticks = 0:10:200, legend = false))
-            #sleep(0.05)
+            #sleep(0.05
+
+        surf = viscousInviscid(surf, quf, del, thick_org, xfvm, 10000.0, true)
+
         interactivePlot(del, E, j1, j2 ,xfvm, true)
         w0u = w;
+        #interactivePlot(surf, true)
+
 
         @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
         #map(x -> @sprintf("Seperation occure at :%1.10f  \n",x), xtrunc[seperation]./pi);
@@ -354,6 +361,31 @@ function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
 
 end
 
+function interactivePlot(surf::TwoDSurfThick, disp::Bool)
+
+    if(disp)
+
+
+        #PyPlot.clf()
+
+       #subplot(211)
+       #axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
+       PyPlot.scatter(surf.x, surf.thick)
+
+      # subplot(212)
+      # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
+      # plot(x[1:end-1],E)
+       show()
+       pause(0.01)
+
+    end
+
+
+end
+
+
+
+
 function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm::Array{Float64,1})
 
 
@@ -375,6 +407,31 @@ function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm
     return qfine #, dqfinedx
 end
 
+
+function reverseMappingAerofoilToAeroGrid(Ue::Array{Float64,1}, surf::TwoDSurfThick, del::Array{Float64,1}, xfvm::Array{Float64,1})
+
+
+    #n = length(xfvm)
+    #dx = pi/(n)
+
+    qinter = Spline1D(xfvm,Ue)
+    delinter = Spline1D(xfvm[1:end-1],del)
+    qfine = evaluate(qinter, surf.x)
+    delfine = evaluate(delinter, surf.x)
+
+    #dqfinedx = (qfine[2:end] - qfine[1:end-1])./(dx)
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = ([qfine[2:end-1];qfine[end-1]]-[qfine[1];qfine[1:end-2]])
+
+    #dqfinedx[1] = 2*dqfinedx[2]- dqfinedx[3]
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = dqfinedx./(2*dx)
+
+    return qfine, delfine #, dqfinedx
+end
+
 function createUniformFVM(ncell::Int64)
 
     x = collect(0:ncell)*pi/(ncell)
@@ -382,9 +439,26 @@ function createUniformFVM(ncell::Int64)
     return x
 end
 
-function vii()
+# direct viscous-inviscid coupling
+
+function vII(surf::TwoDSurfThick, U::Array{Float64,1}, del::Array{Float64}, thick_orig::Array{Float64,1}, Re::Float64)
+
+    thickness = thick_orig + (U .* del)/ (sqrt(Re))
+
+    return thickness
+
+end
 
 
+function viscousInviscid(surf::TwoDSurfThick, U::Array{Float64,1}, del::Array{Float64}, thick_orig::Array{Float64,1},  xfvm::Array{Float64,1}, Re::Float64, mode::Bool)
 
+    if(mode)
+        qua, dela = UnsteadyFlowSolvers.reverseMappingAerofoilToAeroGrid(U, surf, del, xfvm)
+        surf.thick = UnsteadyFlowSolvers.vII(surf, qua, dela, thick_orig, Re)
+    else
+        surf.thick = thick_orig
+    end
+
+    return surf
 
 end

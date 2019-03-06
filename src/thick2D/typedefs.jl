@@ -147,7 +147,7 @@ struct TwoDSurfThick
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
-            
+
             #Sweep all rows (corresponding to ndiv) for lifting equation
             #A0 term
             LHS[i-1,1] = -(1. + thick_slope[i]*cot(theta[i]/2))
@@ -161,7 +161,7 @@ struct TwoDSurfThick
             for n = 1:naterm
                 LHS[i-1,n+naterm+1] = cam_slope[i]*cos(n*theta[i])
             end
-            
+
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
             LHS[ndiv+i-3,1]  = -cam_slope[i]*cot(theta[i]/2)

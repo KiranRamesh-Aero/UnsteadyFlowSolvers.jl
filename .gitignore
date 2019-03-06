@@ -16,3 +16,5 @@ steadyNACA0012/
 src/thickCoupled/diffTest\.jl
 
 src/thickCoupled/UniGridInterpolation\.jl
+
+src/thickCoupled/testInteractionScript\.jl

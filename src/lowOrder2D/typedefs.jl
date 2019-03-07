@@ -213,7 +213,7 @@ struct TwoDSurfFlap
         bnd_z = zeros(mdiv+ndiv)
 
         #variable of transformation
-        for ia = 1:mdiv                                 #airfoil
+        for ia = 1:mdiv                                 #fixed part
             dtheta = pi/(mdiv-1)
             theta[ia] = (ia-1)*dtheta
             x[ia] = hinge*c/2 *(1-cos(theta[ia]))
@@ -265,10 +265,10 @@ struct TwoDSurfFlap
 
         #camberline and derivatives modification due to flap deflection
         if (coord_file == "FlatPlate")
-            for i = 1:mdiv                  # fixed part
+            for i = 1:mdiv                          #fixed part
                 x_star[i] = x[i]
             end
-            for i = mdiv:mdiv+ndiv          # flap
+            for i = mdiv:mdiv+ndiv                  #flap
                 x_star[i] = x[mdiv] + (x[i] - x[mdiv])*cos(kinem.beta)
                 camdef[i] = - (x[i] - x[mdiv])*sin(kinem.beta)
                 camdef_slope[i] = -sin(kinem.beta)

@@ -17,7 +17,6 @@ function viewVort2D(tev::Vector{TwoDVort}, lev::Vector{TwoDVort}, bv::Vector{Two
     #plot(bv[:,2], bv[:,3], color = "black", linewidth=1.0)
 end
 
-
 function viewVortConnect2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matrix{Float64})
     scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
@@ -301,7 +300,7 @@ function makeForcePlots2DFlap()
 
     mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
 
-    if length(mat[1,:]) == 9 #only 1 surface
+    if length(mat[1,:]) == 10 #only 1 surface
         t = mat[:,1]
         alpha = mat[:,2]*180/pi
         beta = mat[:,3]*180/pi
@@ -309,6 +308,7 @@ function makeForcePlots2DFlap()
         cl = mat[:,7]
         cd = mat[:,8]
         cm = mat[:,9]
+        cnf = mat[:,10]
 
         plot(t, alpha)
         len = length(t)
@@ -378,6 +378,18 @@ function makeForcePlots2DFlap()
         xlabel(L"$t^*$")
         ylabel(L"$C_m$")
         savefig("forcePlots/cm.png")
+        close()
+
+        plot(t, cnf)
+        range = Int(round(0.05*len)):Int(round(0.95*len))
+        xmin = t[1]
+        xmax = t[end]
+        zmin = minimum(cnf[range]) - 0.1*abs(minimum(cnf[range]))
+        zmax = maximum(cnf[range]) + 0.1*abs(maximum(cnf[range]))
+        axis([xmin, xmax, zmin, zmax])
+        xlabel(L"$t^*$")
+        ylabel(L"$C_nf$")
+        savefig("forcePlots/cnf.png")
         close()
 
     else #multiple surfaces

@@ -7,7 +7,7 @@ Clears all timestamp directories in the current folder
 function cleanWrite()
     dirvec = readdir()
     dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
-    for i =1:length(dirresults)
+    for i = 1:length(dirresults)
         rm("$(dirresults[i])", force=true, recursive=true)
     end
     rm("*~", force=true)

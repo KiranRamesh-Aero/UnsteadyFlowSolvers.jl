@@ -271,7 +271,7 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 9)
+        mat = zeros(0, 10)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
@@ -367,7 +367,7 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
         wakeroll(surf, curfield, dt)
 
         # Calculate force and moment coefficients
-        cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
+        cl, cd, cm, cnf = calc_forces(surf, [curfield.u[1], curfield.w[1]])
 
         # write flow details if required
         if writeflag == 1
@@ -378,14 +378,14 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
         end
 
         # for writing in resultsSummary
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.beta, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.beta, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, cnf])
 
     end
 
     mat = mat'
 
     f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "beta (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "beta (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \t", "Cnf \n"])
     DelimitedFiles.writedlm(f, mat)
     close(f)
 

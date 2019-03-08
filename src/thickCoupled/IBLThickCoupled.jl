@@ -44,6 +44,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     int_wax = zeros(surf.ndiv)
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
+    thick_org = surf.thick
 
     del, E, xfvm, qu, ql, qu0, ql0 = initViscous(ncell)
     xfvm = xfvm/pi
@@ -396,6 +397,31 @@ function interactivePlot(surf::TwoDSurfThick, disp::Bool)
 
 
 end
+
+function interactivePlot(surf::TwoDSurfThick, disp::Bool)
+
+    if(disp)
+
+
+        #PyPlot.clf()
+
+       #subplot(211)
+       #axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
+       PyPlot.scatter(surf.x, surf.thick)
+
+      # subplot(212)
+      # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
+      # plot(x[1:end-1],E)
+       show()
+       pause(0.01)
+
+    end
+
+
+end
+
+
+
 
 function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm::Array{Float64,1})
 

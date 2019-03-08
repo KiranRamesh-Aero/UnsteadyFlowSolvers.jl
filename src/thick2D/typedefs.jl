@@ -5,7 +5,7 @@ mutable struct TwoDSource
     s :: Float64
 end
 
-struct TwoDSurfThick
+mutable struct TwoDSurfThick
     c :: Float64
     uref :: Float64
     coord_file :: String

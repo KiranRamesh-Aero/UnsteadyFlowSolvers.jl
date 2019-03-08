@@ -5,7 +5,7 @@ mutable struct TwoDSource
     s :: Float64
 end
 
-struct TwoDSurfThick
+mutable struct TwoDSurfThick
     c :: Float64
     uref :: Float64
     coord_file :: String
@@ -142,48 +142,51 @@ struct TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(2*ndiv-3,naterm*2+3)
-        RHS = zeros(2*ndiv-3)
+        LHS = zeros(2*ndiv-2,naterm*2+2)
+        RHS = zeros(2*ndiv-2)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
-
-            #Sweep all rows (corresponding to ndiv) for lifting equation
-            #A0 term
-            LHS[i-1,1] = -(1. + thick_slope[i]*cot(theta[i]/2))
-
+            
+             #Sweep all rows (corresponding to ndiv) for lifting equation
+            
             #Sweep columns for aterms
             for n = 1:naterm
-                LHS[i-1,n+1] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i])
+                LHS[i-1,n] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]) 
             end
 
             #Sweep columns for bterm
             for n = 1:naterm
-                LHS[i-1,n+naterm+1] = cam_slope[i]*cos(n*theta[i])
+                LHS[i-1,n+naterm] = cam_slope[i]*cos(n*theta[i]) 
             end
 
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
-            LHS[ndiv+i-3,1]  = -cam_slope[i]*cot(theta[i]/2)
+         
             for n = 1:naterm
-                LHS[ndiv+i-3,1+n]  = -cam_slope[i]*sin(n*theta[i])
+                LHS[ndiv+i-3,n]  = -cam_slope[i]*sin(n*theta[i])
             end
             for n = 1:naterm
-                LHS[ndiv+i-3,1+naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i])
+                LHS[ndiv+i-3,naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]) 
             end
         end
 
         #Terms for Kelvin condition
-        LHS[2*ndiv-3,1] = pi
-        LHS[2*ndiv-3,2] = pi/2
-        LHS[2*ndiv-3,2*naterm+2] = 1.
-        LHS[2*ndiv-3,2*naterm+3] = 1.
+LHS[2*ndiv-3,1] = 100*pi/2
+
+LHS[2*ndiv-3,2*naterm+1] = 100.
+#LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
+
+        # #Kutta
+for n = 1:naterm
+    LHS[2*ndiv-2,n] = ((-1)^n)*100.
+end
 
         # #LE Kutta condition
 
         # LHS[2*ndiv-2,1] = 1000.
 
-        # #LE velocity condition
+
         # LHS[2*ndiv-1,1] = sqrt(2. /rho) + 1.
         # for n = 1:naterm
         #     LHS[2*ndiv-1,n+1] = -1.

@@ -239,10 +239,10 @@ function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float
         wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
                    ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
         
-        surf.LHS[i-1,2+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+        surf.LHS[i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
             surf.thick_slope[i]*wlx + wlz
         
-        surf.LHS[surf.ndiv+i-3,2+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+        surf.LHS[surf.ndiv+i-3,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
             surf.thick_slope[i]*wtx + wtz
         
     end
@@ -376,7 +376,10 @@ function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
     end
     
     #RHS for Kelvin condition (negative strength of all previously shed vortices)
-    surf.RHS[2*surf.ndiv-3] = -(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    surf.RHS[2*surf.ndiv-3] = -100*(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+
+    #Kutta condition
+    surf.RHS[2*surf.ndiv-2] = 0. 
     #surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
 
         #RHS for LE velocity condition

@@ -1,7 +1,0 @@
-function update_atermdot(surf::TwoDSurfThick,dt)
-    surf.a0dot[1] = (surf.a0[1] - surf.a0prev[1])/dt
-    for ia = 1:surf.naterm
-        surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
-    end
-    return surf
-end

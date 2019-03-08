@@ -714,8 +714,8 @@ end
 
 function update_boundpos(surf::TwoDSurfFlap, dt::Float64)
     for i = 1:surf.mdiv+surf.ndiv
-        surf.bnd_x[i] = surf.bnd_x[i] + dt*((surf.pvt*surf.c - surf.x[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + surf.cam[i]*cos(surf.kinem.alpha)*surf.kinem.alphadot + surf.camdot[i]*sin(surf.kinem.alpha))
-        surf.bnd_z[i] = surf.bnd_z[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c - surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - surf.cam[i]*sin(surf.kinem.alpha)*surf.kinem.alphadot + surf.camdot[i]*cos(surf.kinem.alpha))
+        surf.bnd_x[i] = surf.bnd_x[i] + dt*(- surf.kinem.u - (surf.x_star[i]-surf.pvt*surf.c)*sin(surf.kinem.alpha)*surf.kinem.alphadot - (surf.x[i]-surf.hinge*surf.c)*sin(surf.kinem.beta)cos(surf.kinem.alpha)*surf.kinem.betadot + surf.cam[i]*cos(surf.kinem.alpha)*surf.kinem.alphadot + surf.camdot[i]*sin(surf.kinem.alpha))
+        surf.bnd_z[i] = surf.bnd_z[i] + dt*(surf.kinem.hdot - (surf.x_star[i]-surf.pvt*surf.c)*cos(surf.kinem.alpha)*surf.kinem.alphadot + (surf.x[i]-surf.hinge*surf.c)*sin(surf.kinem.beta)sin(surf.kinem.alpha)*surf.kinem.betadot - surf.cam[i]*sin(surf.kinem.alpha)*surf.kinem.alphadot + surf.camdot[i]*cos(surf.kinem.alpha))
     end
     return surf
 end

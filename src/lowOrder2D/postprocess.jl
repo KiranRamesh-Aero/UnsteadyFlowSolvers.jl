@@ -9,7 +9,7 @@ function calc_forces(surf::TwoDSurf, vels::Vector{Float64})
     # Suction force given in eqn (2.31) Ramesh et al.
     cs = 2*pi*surf.a0[1]*surf.a0[1]
 
-    #The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+    # The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
     nonl=0
     nonl_m=0
     for ib = 1:surf.ndiv-1
@@ -24,9 +24,9 @@ function calc_forces(surf::TwoDSurf, vels::Vector{Float64})
 
     # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
-    cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
+    cd = cn*sin(surf.kinem.alpha) - cs*cos(surf.kinem.alpha)
 
-    #Pitching moment is clockwise or nose up positive
+    # Pitching moment is clockwise or nose up positive
     cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 3. *surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
     return cl, cd, cm
 end
@@ -40,31 +40,68 @@ function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
     cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
 
     # The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+
     nonl=0
     nonl_m=0
     for ib = 1:surf.mdiv+surf.ndiv-1
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
     end
-    nonl = nonl*2. *sec(surf.kinem.beta)^2/(surf.uref*surf.uref*surf.c)
-    nonl_m = nonl_m*2. *sec(surf.kinem.beta)^2/(surf.uref*surf.uref*surf.c*surf.c)
 
-    # New term due to camber deformation (flap deflection)
-    #cnd = 
+    nonl = nonl*2. /(surf.uref*surf.uref*surf.c)
+    nonl_m = nonl_m*2. /(surf.uref*surf.uref*surf.c*surf.c)
+
+    # Non-circulatory term in normal force coefficient
+    cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
+    
+    #---------------------------------------------------------------------
+    # Terms in normal force and moment coefficients due to flap deflection
+    cnf_1 = 0
+    cnf_2 = 0
+    cnf_3 = 0
+    cnf_1m = 0
+    cnf_2m = 0
+    cnf_3m = 0
+
+    for ib = 1:surf.mdiv+surf.ndiv-1
+        #camber deformation term
+        cnf_1 = cnf_1 - (1 + surf.camdef_slope[ib]*surf.camdef_slope[ib])*surf.kinem.alphadot*surf.camdef[ib]*surf.bv[ib].s
+        cnf_1m = cnf_1m - (1 + surf.camdef_slope[ib]*surf.camdef_slope[ib])*surf.kinem.alphadot*surf.camdef[ib]*surf.x[ib]*surf.bv[ib].s
+        #kinematics term
+        cnf_2 = cnf_2 + (surf.camdef_slope[ib]*surf.camdef_slope[ib])*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha))*surf.bv[ib].s
+        cnf_2m = cnf_2m + (surf.camdef_slope[ib]*surf.camdef_slope[ib])*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
+        #induced velocities term
+        cnf_3 = cnf_3 + (surf.camdef_slope[ib]*surf.camdef_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
+        cnf_3m = cnf_3m + (surf.camdef_slope[ib]*surf.camdef_slope[ib])*(surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s    
+    end
+    cnf_1 = cnf_1*2. /(surf.uref*surf.uref*surf.c)
+    cnf_2 = cnf_2*2. /(surf.uref*surf.uref*surf.c)
+    cnf_3 = cnf_3*2. /(surf.uref*surf.uref*surf.c)
+    cnf_1m = cnf_1m*2. /(surf.uref*surf.uref*surf.c*surf.c)
+    cnf_2m = cnf_2m*2. /(surf.uref*surf.uref*surf.c*surf.c)
+    cnf_3m = cnf_3m*2. /(surf.uref*surf.uref*surf.c*surf.c)
+
+    cnf = cnf_1 + cnf_2 + cnf_3
+    cnf_m = cnf_1m + cnf_2m + cnf_3m
+    #---------------------------------------------------------------------
 
     # Normal force coefficient
-    cn = cnc + cnnc + nonl
+    cn = cnc + cnnc + nonl + cnf
 
-    # Suction force given in eqn (2.31) Ramesh et al.
+    # Suction force coefficient
+   
     cs = 2*pi*surf.a0[1]*surf.a0[1]
 
     # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
-    cd = cn*sin(surf.kinem.alpha)-cs*cos(surf.kinem.alpha)
+
+    cd = cn*sin(surf.kinem.alpha) - cs*cos(surf.kinem.alpha)
 
     # Pitching moment is clockwise or nose up positive
-    cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 3. *surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
-    return cl, cd, cm
+    cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 11. *surf.adot[1]/64. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m - cnf_m
+    return cl, cd, cm, cnf
+
+  
 end
 
 function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDFlowField)

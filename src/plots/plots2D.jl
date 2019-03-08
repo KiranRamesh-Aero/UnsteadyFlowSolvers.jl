@@ -300,7 +300,9 @@ function makeForcePlots2DFlap()
 
     mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
 
+
     if length(mat[1,:]) == 10 #only 1 surface
+
         t = mat[:,1]
         alpha = mat[:,2]*180/pi
         beta = mat[:,3]*180/pi
@@ -309,6 +311,7 @@ function makeForcePlots2DFlap()
         cd = mat[:,8]
         cm = mat[:,9]
         cnf = mat[:,10]
+
 
         plot(t, alpha)
         len = length(t)
@@ -379,6 +382,7 @@ function makeForcePlots2DFlap()
         ylabel(L"$C_m$")
         savefig("forcePlots/cm.png")
         close()
+
 
         plot(t, cnf)
         range = Int(round(0.05*len)):Int(round(0.95*len))

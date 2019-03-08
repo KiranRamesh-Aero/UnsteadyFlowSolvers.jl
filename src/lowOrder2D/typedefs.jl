@@ -203,6 +203,7 @@ struct TwoDSurfFlap
         theta = zeros(mdiv+ndiv)
         x = zeros(mdiv+ndiv)
         x_star = zeros(mdiv+ndiv)
+
         cam = zeros(mdiv+ndiv)
         cam_slope = zeros(mdiv+ndiv)
         camdef = zeros(mdiv+ndiv)
@@ -265,6 +266,7 @@ struct TwoDSurfFlap
 
         #camberline and derivatives modification due to flap deflection
         if (coord_file == "FlatPlate")
+
             for i = 1:mdiv                          #fixed part
                 x_star[i] = x[i]
             end
@@ -279,6 +281,8 @@ struct TwoDSurfFlap
                 #camdef[i] = ...
                 #camdef_slope[i]= ...
                 #camdot[i] = ...
+
+         
         end
         for i = 1:mdiv+ndiv
             cam[i] = cam[i] + camdef[i]
@@ -298,7 +302,7 @@ struct TwoDSurfFlap
   
         for i = 1:mdiv+ndiv
             bnd_x[i] = initpos[1] + (pvt*c + (x_star[i] - pvt*c)*cos(kinem.alpha)) + cam[i]*sin(kinem.alpha)
-            bnd_z[i] = initpos[2] + kinem.h - (x_star[i] - pvt*c)*sin(kinem.alpha) + cam[i]*cos(kinem.alpha)
+            bnd_z[i] = initpos[2] + kinem.h - (x_star[i] - pvt*c)*sin(kinem.alpha) + cam[i]*cos(kinem.alpha)    
         end
         
         bv = TwoDVort[]
@@ -307,7 +311,9 @@ struct TwoDSurfFlap
         end
 
         levflag = [0]
-        new(c, uref, coord_file, pvt, hinge, mdiv, ndiv, naterm, kindef, cam, cam_slope, camdef, camdef_slope, camdot, theta, x, x_star, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
+        
+    new(c, uref, coord_file, pvt, hinge, mdiv, ndiv, naterm, kindef, cam, cam_slope, camdef, camdef_slope, camdot, theta, x, x_star, kinem, bnd_x, bnd_z, uind, wind, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bv, lespcrit, levflag, initpos, rho)
+
     end
 end
 

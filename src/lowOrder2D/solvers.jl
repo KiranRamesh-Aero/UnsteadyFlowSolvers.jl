@@ -367,6 +367,7 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
         wakeroll(surf, curfield, dt)
 
         # Calculate force and moment coefficients
+
         cl, cd, cm, cnf = calc_forces(surf, [curfield.u[1], curfield.w[1]])
 
         # write flow details if required
@@ -378,6 +379,7 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
         end
 
         # for writing in resultsSummary
+
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.beta, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, cnf])
 
     end
@@ -385,6 +387,7 @@ function ldvmFlap(surf::TwoDSurfFlap, curfield::TwoDFlowField, nsteps::Int64 = 5
     mat = mat'
 
     f = open("resultsSummary", "w")
+
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "beta (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \t", "Cnf \n"])
     DelimitedFiles.writedlm(f, mat)
     close(f)

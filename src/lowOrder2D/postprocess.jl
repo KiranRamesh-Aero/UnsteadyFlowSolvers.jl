@@ -33,16 +33,21 @@ end
 
 function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
 
-    # First circulatory term in normal force coefficient
-    cnc = 2*pi*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
+    # First term in eqn (2.30) Ramesh et al. in coefficient form
+    cnc = 2*pi*sec(surf.kinem.beta)^2*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
 
-    # Second circulatory term in normal force coefficient
+    # Second term in eqn (2.30) Ramesh et al. in coefficient form
+    cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
+
+    # The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
+
     nonl=0
     nonl_m=0
     for ib = 1:surf.mdiv+surf.ndiv-1
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
     end
+
     nonl = nonl*2. /(surf.uref*surf.uref*surf.c)
     nonl_m = nonl_m*2. /(surf.uref*surf.uref*surf.c*surf.c)
 
@@ -84,15 +89,19 @@ function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
     cn = cnc + cnnc + nonl + cnf
 
     # Suction force coefficient
+   
     cs = 2*pi*surf.a0[1]*surf.a0[1]
 
     # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
+
     cd = cn*sin(surf.kinem.alpha) - cs*cos(surf.kinem.alpha)
 
     # Pitching moment is clockwise or nose up positive
     cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 11. *surf.adot[1]/64. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m - cnf_m
     return cl, cd, cm, cnf
+
+  
 end
 
 function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDFlowField)

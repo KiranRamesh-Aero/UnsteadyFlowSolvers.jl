@@ -27,22 +27,22 @@ function calc_forces(surf::TwoDSurf, vels::Vector{Float64})
     cd = cn*sin(surf.kinem.alpha) - cs*cos(surf.kinem.alpha)
 
     # Pitching moment is clockwise or nose up positive
-    cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 3. *surf.adot[1]/16. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
+    cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 11. *surf.adot[1]/64. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m
     return cl, cd, cm
 end
 
 function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
 
     # First term in eqn (2.30) Ramesh et al. in coefficient form
-    cnc = 2*pi*sec(surf.kinem.beta)^2*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
+    cnc = 2*pi*((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.)
 
     # Second term in eqn (2.30) Ramesh et al. in coefficient form
     cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
 
     # The components of normal force and moment from induced velocities are calulcated in dimensional units and nondimensionalized later
-
     nonl=0
     nonl_m=0
+
     for ib = 1:surf.mdiv+surf.ndiv-1
         nonl = nonl + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.bv[ib].s
         nonl_m = nonl_m + (surf.uind[ib]*cos(surf.kinem.alpha) - surf.wind[ib]*sin(surf.kinem.alpha))*surf.x[ib]*surf.bv[ib].s
@@ -51,9 +51,6 @@ function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
     nonl = nonl*2. /(surf.uref*surf.uref*surf.c)
     nonl_m = nonl_m*2. /(surf.uref*surf.uref*surf.c*surf.c)
 
-    # Non-circulatory term in normal force coefficient
-    cnnc = 2*pi*(3*surf.c*surf.a0dot[1]/(4*surf.uref) + surf.c*surf.adot[1]/(4*surf.uref) + surf.c*surf.adot[2]/(8*surf.uref))
-    
     #---------------------------------------------------------------------
     # Terms in normal force and moment coefficients due to flap deflection
     cnf_1 = 0
@@ -89,19 +86,17 @@ function calc_forces(surf::TwoDSurfFlap, vels::Vector{Float64})
     cn = cnc + cnnc + nonl + cnf
 
     # Suction force coefficient
-   
     cs = 2*pi*surf.a0[1]*surf.a0[1]
 
     # Lift and drag coefficients
     cl = cn*cos(surf.kinem.alpha) + cs*sin(surf.kinem.alpha)
-
     cd = cn*sin(surf.kinem.alpha) - cs*cos(surf.kinem.alpha)
 
     # Pitching moment is clockwise or nose up positive
     cm = cn*surf.pvt - 2*pi*(((surf.kinem.u + vels[1])*cos(surf.kinem.alpha)/surf.uref + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1]/4. + surf.aterm[1]/4. - surf.aterm[2]/8.) + (surf.c/surf.uref)*(7. *surf.a0dot[1]/16. + 11. *surf.adot[1]/64. + surf.adot[2]/16. - surf.adot[3]/64.)) - nonl_m - cnf_m
+
     return cl, cd, cm, cnf
 
-  
 end
 
 function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDFlowField)
@@ -113,7 +108,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     cd(dirname)
 
     f = open("timeKinem", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \n"])
     DelimitedFiles.writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
     close(f)
 
@@ -355,43 +350,43 @@ function calc_delcp(surf::TwoDSurf, vels::Vector{Float64})
     return p_com, p_in, p_out
 end
 
-function calc_delcp(surf::TwoDSurfFlap, vels::Vector{Float64})
+#function calc_delcp(surf::TwoDSurfFlap, vels::Vector{Float64})
 
-    p_in = zeros(surf.mdiv+surf.ndiv)
-    p_out = zeros(surf.mdiv+surf.ndiv)
-    gam = zeros(surf.mdiv+surf.ndiv)
-    gamint = zeros(surf.mdiv+surf.ndiv)
-    p_com = zeros(surf.mdiv+surf.ndiv)
-    gammod = zeros(surf.mdiv+surf.ndiv)
+    #p_in = zeros(surf.mdiv+surf.ndiv)
+    #p_out = zeros(surf.mdiv+surf.ndiv)
+    #gam = zeros(surf.mdiv+surf.ndiv)
+    #gamint = zeros(surf.mdiv+surf.ndiv)
+    #p_com = zeros(surf.mdiv+surf.ndiv)
+    #gammod = zeros(surf.mdiv+surf.ndiv)
       
-    for i = 1:surf.mdiv+surf.ndiv
-        udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
+    #for i = 1:surf.mdiv+surf.ndiv
+        #udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
         
-        p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
-    end
-    for i = 2:surf.mdiv+surf.ndiv
-        udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
-        gam[i] = surf.a0[1]*cot(surf.theta[i]/2)
-        gamint[i] = surf.a0dot[1]*(surf.theta[i] + sin(surf.theta[i]))  
-        for n = 1:surf.naterm
-            gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
-            gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
-            if n == 1
-                gamint[i] += surf.adot[1]*(surf.theta[i]/2 - sin(2*surf.theta[i])/4)
-            else
-                gamint[i] += surf.adot[n]/2*(sin((n-1)*surf.theta[i])/(n-1) - sin((n+1)*surf.theta[i])/(n+1))
-            end
-        end
-        gam[i] = gam[i]*surf.uref
-        gammod[i] = gammod[i]*surf.uref
-        gamint[i] = gamint[i]*surf.uref*surf.c
+        #p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
+    #end
+    #for i = 2:surf.mdiv+surf.ndiv
+        #udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
+        #gam[i] = surf.a0[1]*cot(surf.theta[i]/2)
+        #gamint[i] = surf.a0dot[1]*(surf.theta[i] + sin(surf.theta[i]))  
+        #for n = 1:surf.naterm
+            #gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
+            #gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
+            #if n == 1
+                #gamint[i] += surf.adot[1]*(surf.theta[i]/2 - sin(2*surf.theta[i])/4)
+            #else
+                #gamint[i] += surf.adot[n]/2*(sin((n-1)*surf.theta[i])/(n-1) - sin((n+1)*surf.theta[i])/(n+1))
+            #end
+        #end
+        #gam[i] = gam[i]*surf.uref
+        #gammod[i] = gammod[i]*surf.uref
+        #gamint[i] = gamint[i]*surf.uref*surf.c
         
-        p_out[i] = 2*udash*gam[i] + gamint[i] 
-        p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
-    end
+        #p_out[i] = 2*udash*gam[i] + gamint[i] 
+        #p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
+    #end
     
-    return p_com, p_in, p_out
-end
+    #return p_com, p_in, p_out
+#end
 
 function calc_edgeVel(surf::TwoDSurf, vels::Vector{Float64})
 
@@ -417,29 +412,29 @@ function calc_edgeVel(surf::TwoDSurf, vels::Vector{Float64})
     return q_com_u, q_com_l
 end
 
-function calc_edgeVel(surf::TwoDSurfFlap, vels::Vector{Float64})
+#function calc_edgeVel(surf::TwoDSurfFlap, vels::Vector{Float64})
 
-    gammod = zeros(surf.mdiv+surf.ndiv)
-    q_com_u = zeros(surf.mdiv+surf.ndiv)
-    q_com_l = zeros(surf.mdiv+surf.ndiv)
+    #gammod = zeros(surf.mdiv+surf.ndiv)
+    #q_com_u = zeros(surf.mdiv+surf.ndiv)
+    #q_com_l = zeros(surf.mdiv+surf.ndiv)
 
-    q_com_u[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
-    q_com_l[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
+    #q_com_u[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
+    #q_com_l[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
     
-    for i = 2:surf.mdiv+surf.ndiv
-        udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
+    #for i = 2:surf.mdiv+surf.ndiv
+        #udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
 
-        for n = 1:surf.naterm
-            gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
-        end
-        gammod[i] = gammod[i]*surf.uref
+        #for n = 1:surf.naterm
+            #gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
+        #end
+        #gammod[i] = gammod[i]*surf.uref
                 
-        q_com_u[i] = surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) + surf.uref*gammod[i] + (sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
-        q_com_l[i] = -surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) - surf.uref*gammod[i] + (-sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
-    end
+        #q_com_u[i] = surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) + surf.uref*gammod[i] + (sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
+        #q_com_l[i] = -surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) - surf.uref*gammod[i] + (-sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
+    #end
 
-    return q_com_u, q_com_l
-end
+    #return q_com_u, q_com_l
+#end
 
 function getEndCycle(mat, k)
 

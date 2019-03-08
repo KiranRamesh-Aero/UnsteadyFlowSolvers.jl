@@ -52,8 +52,8 @@ function makeVortPlots2D()
 
         xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
         zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
-        xmax = maximum([tev[:,2];lev[:,2];])
-        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+        xmax = maximum([tev[:,2];lev[:,2];bv[:,2];])
+        zmax = maximum([tev[:,3];lev[:,3];bv[:,3];])
 
         cd("..")
 
@@ -105,8 +105,8 @@ function makeVortPlots2D()
 
         xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
         zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
-        xmax = maximum([tev[:,2];lev[:,2];])
-        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+        xmax = maximum([tev[:,2];lev[:,2];bv[:,2];])
+        zmax = maximum([tev[:,3];lev[:,3];bv[:,3];])
 
         cd("..")
 
@@ -585,8 +585,8 @@ function makeKinemClVortPlots2D()
     
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
-    xmaxv = maximum([tev[:,2];lev[:,2];])
-    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    xmaxv = maximum([tev[:,2];lev[:,2];bv[:,2];])
+    zmaxv = maximum([tev[:,3];lev[:,3];bv[:,3];])
     
     cd("..")
         
@@ -708,8 +708,8 @@ function makeKinemVelVortPlots2D()
     
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
-    xmaxv = maximum([tev[:,2];lev[:,2];])
-    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    xmaxv = maximum([tev[:,2];lev[:,2];bv[:,2];])
+    zmaxv = maximum([tev[:,3];lev[:,3];bv[:,3];])
     
     cd("..")
         

@@ -1,3 +1,7 @@
+using Plots
+using Dierckx
+
+
 function calc_shapes(ncell::Int64, sol::Array{Float64})
 
     E = zeros(ncell+2); B = zeros(ncell+2); F = zeros(ncell+2); S = zeros(ncell+2)
@@ -110,9 +114,16 @@ function calc_fluxes(ncell::Int64, E::Array{Float64}, F::Array{Float64},
     return flux
 end
 
-function matuCyl(tTot::Float64, qu::Array{Float64,1}, qt::Array{Float64,1}, ncell::Int64 = 200, cfl::Float64 = 0.8, nstage::Int64 = 2)
+function matuCyl(tTot::Float64, qua::Array{Float64,1}, surf::TwoDSurfThick, ncell::Int64 = 200, cfl::Float64 = 0.8, nstage::Int64 = 2)
 
     dx = pi/ncell
+
+    xuni = createUniformFVM(ncell)
+
+    qu =  mappingAerofoilToFVGrid(qua, surf, xuni)
+    #qu[qu.< 0.0] .= 1e-8
+    #U00[U00.< 0.0] .= 1e-8
+    qt = spatialDeriv(qu)
 
     #Timestep determined dynamically
     dt = 0
@@ -274,3 +285,98 @@ end
 # write(f, ["#x \t", "#ue \t", "#uex \t", "#uet \t", "#del \t", "#E \t", "#cf \t", "#Csep \n"])
 # writedlm(f, mat)
 # close(f)
+
+
+function createUniformFVM(ncell::Int64)
+
+    #x = collect(0:ncell)*pi/(ncell)
+    xfvm = zeros(ncell)
+     x = range(0,stop=1.0,length=ncell)
+
+    for i=1:length(x)
+       xfvm[i] = x[i]
+    end
+
+    return xfvm
+end
+
+
+function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm::Array{Float64,1})
+
+
+    n = length(xfvm)
+    dx = pi/(n)
+    qinter = Spline1D(surf.x,qu)
+    qfine = evaluate(qinter, xfvm)
+
+    #dqfinedx = (qfine[2:end] - qfine[1:end-1])./(dx)
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = ([qfine[2:end-1];qfine[end-1]]-[qfine[1];qfine[1:end-2]])
+
+    #dqfinedx[1] = 2*dqfinedx[2]- dqfinedx[3]
+    #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
+
+    #dqfinedx = dqfinedx./(2*dx)
+
+    return qfine #, dqfinedx
+end
+
+
+function spatialDeriv(q::Array{Float64,1})
+
+    #n = length(qu)
+    #dx = 1.0/n
+
+    #dudx = (qu[2:end]-qu[1:end-1])./dx
+
+    #return dudx
+
+    n = length(q)
+    dx = 1/n
+
+    #dqdx = ([q[2:end-1];q[end-1]]-[q[1];q[1:end-2]])
+
+    #dqdx[1] = 2*dqdx[2]- dqdx[3]
+    #dqdx[end] = 2*dqdx[end-1]- dqdx[end-2]
+
+    #dqdx = ([q[2:end]; q[1]] - [q[end];q[1:end-1]])
+    #dqdx[1] = 2*dqdx[2]- dqdx[3]
+    #dqdx[end] = 2*dqdx[end-1]- dqdx[end-2]
+    #dqdx = dqdx./(2*dx)
+
+    dqdx = ([q[2:end];q[1]] - [q[1:end-1];q[end]])/(dx);
+    dqdx[end] = 2*dqdx[end-1]- dqdx[end-2]
+
+    return dqdx
+
+end
+
+
+function diff1(x::Array{Float64,1}, f::Array{Float64,1})
+
+    fp = zeros(length(x))
+    fpp = zeros(length(x))
+    dx = x[2:end] - x[1:end-1]
+    df = f[2:end] - f[1:end-1]
+
+    fpp[1:end-1] = atan.(df,dx)
+
+    dx1 = x[2:end-1] - x[1:end-2]
+    dx2 = x[3:end] - x[2:end-1]
+
+    println(length(dx1))
+    println(length(dx2))
+    println(length(fpp[1:end-2]))
+    println(length(fpp[2:end-1]))
+
+    ang = (dx2.*fpp[1:end-2] + dx1.*fpp[2:end-1])./(dx1 .+ dx2)
+    fp[2:end-1] = tan.(ang)
+
+    fp[1] = 2.0*tan.(fpp[1])- fp[2]
+    fp[end] = 2.0*tan.(fpp[end-1])- fp[end-1]
+
+    return fp
+
+
+end

@@ -1,14 +1,17 @@
-function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1})
+function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1})
 
+    dx = zeros(length(x))
     n = Int(length(w)/2)
-    dx = Float64(1.0/n)
+    dx = (x[2:end]- x[1:end-1])
+
 
     # correlate the unknown values from the del and E values
-    del , E, FF ,B, S, dfde = correlate(w)
-    #del , E, FF ,B, S, dfde  = calc_shapes(n,w)
+    wcell = w #(w[2:end,:]+ w[1:end-1,:])/2
+    #del , E, FF ,B, S, dfde = correlate(wcell)
+    del , E, FF ,B, S, dfde  = calc_shapes(n,w)
 
 
-    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
+    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(wcell , U, FF, dfde, del, E)
 
     #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
     #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
@@ -22,7 +25,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
 
     # step 1 : assuming this as a homogeneous equation and advanced half a step
-    w1 = w .+ ((fL - fR) .* ((dt)/(dx)))
+    w1 = wcell .+ ((fL - fR) .* ((dt)./(dx)))
 
 
     del , E, FF ,B, S, dfde = correlate(w1)
@@ -67,7 +70,7 @@ function eigenlamb(U::Array{Float64,1}, dfde::Array{Float64,1}, FF::Array{Float6
     return lamb1, lamb2
 end
 
-function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Float64 )
+function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Array{Float64,1} )
 
     # calculate time step values based on eigenvalues
 
@@ -164,7 +167,7 @@ end
 function RHSSource(U::Array{Float64,1} ,B::Array{Float64,1}, del::Array{Float64,1},Ut::Array{Float64,1}, Ux::Array{Float64,1}, FF::Array{Float64,1}, E::Array{Float64,1}, S::Array{Float64,1} )
 
     z1 = B./(2.0*del) .- del.* (Ut./U) .- (E.+ 1.0).*del.*Ux
-    z2 = S./del .- 2.0*E.*del.* (Ut./U) .- 2.0*FF.*del.*Ux
+    z2 = S./del .- 2.0*E.*del.* (Ut./U) .- 2.0*FF.*del .*Ux
     z = hcat(z1,z2)
 
     return z
@@ -204,7 +207,7 @@ function calc_shapes(ncell::Int64, sol::Array{Float64})
 end
 
 
-function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Float64)
+function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Array{Float64,1})
 
     N1 = length(lamb1)
     lambj1 = sum(lamb1)/N1
@@ -212,7 +215,7 @@ function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
 
     for i=2:N1-1
     if lamb1[i].<0.0
-    J1Sep[i] =  (dt)/(dx) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
+    J1Sep[i] =  (dt)/(dx[i]) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
     end
     end
 
@@ -222,7 +225,7 @@ function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
 
     for i=2:N2-1
     if lamb2[i].<0.0
-    J2Sep[i] =  (dt)/(dx) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
+    J2Sep[i] =  (dt)/(dx[i]) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
     end
     end
 

@@ -4,7 +4,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 11)
+        mat = zeros(0, 12)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
@@ -64,15 +64,14 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
         
         #Now solve the matrix problem
         #soln = surf.LHS[[1:surf.ndiv*2-3;2*surf.ndiv-1], 1:surf.naterm*2+2] \ surf.RHS[[1:surf.ndiv*2-3; 2*surf.ndiv-1]]
-        soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+2] \ surf.RHS[1:surf.ndiv*2-3]
+        soln = surf.LHS[1:surf.ndiv*2-2, 1:surf.naterm*2+1] \ surf.RHS[1:surf.ndiv*2-2]
         
         #Assign the solution
-        surf.a0[1] = soln[1]
         for i = 1:surf.naterm
-            surf.aterm[i] = soln[i+1]
-            surf.bterm[i] = soln[i+surf.naterm+1]
+            surf.aterm[i] = soln[i]
+            surf.bterm[i] = soln[i+surf.naterm]
         end
-        tevstr = soln[2*surf.naterm+2]*surf.uref*surf.c
+        tevstr = soln[2*surf.naterm+1]*surf.uref*surf.c
         push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
         
         #Calculate adot
@@ -104,8 +103,31 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
             end
         end
 
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1],
-                        cl, cd, cnc, cnnc, cn, cs])
+        #LE velocity and stagnation point location
+        #vle = (surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha) + (curfield.w[1] - surf.kinem.hdot)*cos(surf.kinem.alpha) - surf.kinem.alphadot*surf.pvt*surf.c + sum(surf.aterm) + surf.wind_u[1]  
+
+        qu, ql = calc_edgeVel(surf, [curfield.u[1]; curfield.w[1]])
+
+        vle = qu[1]
+
+        if vle > 0.
+            qspl = Spline1D(surf.x, ql)
+            stag = try
+                roots(qspl, maxn=1)[1]
+            catch
+                0.
+            end
+        else
+            qspl = Spline1D(surf.x, qu)
+            stag = try
+                roots(qspl, maxn=1)[1]
+            catch
+                0.
+            end
+        end
+
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, vle,
+                        cl, cd, cnc, cnnc, cn, cs, stag])
 
     end
     

@@ -2,7 +2,7 @@
 
 module UnsteadyFlowSolvers
 
-import Dierckx: Spline1D, derivative, evaluate
+import Dierckx: Spline1D, derivative, evaluate, roots
 
 import ForwardDiff
 

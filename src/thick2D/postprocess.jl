@@ -211,36 +211,39 @@ end
 
 function calc_edgeVel(surf::TwoDSurfThick, vels::Vector{Float64})
 
-    gammod = zeros(surf.ndiv)
-    q_com_u = zeros(surf.ndiv)
-    q_com_l = zeros(surf.ndiv)
-    srcval = zeros(surf.ndiv)
+    q_u = zeros(surf.ndiv)
+    q_l = zeros(surf.ndiv)
 
-    for n = 1:surf.naterm
-        srcval[1] -= surf.bterm[n]*cos(n*surf.theta[1])/surf.uref
-    end
-    q_com_u[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
-    q_com_l[1] = surf.uref*surf.a0[1]/sqrt(0.5*surf.rho)
-    
-    for i = 2:surf.ndiv
+    for i = 1:surf.ndiv
 
-        wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
-                   surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
-
+        l_x = 0; l_z = 0; t_x = 0; t_z = 0;
         for n = 1:surf.naterm
-            gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
-            srcval[i] -= surf.bterm[n]*cos(n*surf.theta[i])
+            l_x += surf.aterm[n]*sin(n*surf.theta[i])
+            l_z += surf.aterm[n]*cos(n*surf.theta[i])
+            t_x -= surf.bterm[n]*cos(n*surf.theta[i])
+            t_z += surf.bterm[n]*sin(n*surf.theta[i])
         end
-        gammod[i] = gammod[i]*surf.uref
-        srcval[i] = srcval[i]*surf.uref
+        l_x *= surf.uref
+        l_z *= surf.uref
+        t_x *= surf.uref
+        t_z *= surf.uref
+
+        w_x_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+        w_z_u = surf.uind_u[i]*sin(surf.kinem.alpha) + surf.wind_u[i]*cos(surf.kinem.alpha)
+        w_x_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+        w_z_l = surf.uind_l[i]*sin(surf.kinem.alpha) + surf.wind_l[i]*cos(surf.kinem.alpha)
+
+        utot_u = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i]) + w_x_u + l_x + t_x
+        wtot_u = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_u + l_z + t_z
+        utot_l = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i]) + w_x_l - l_x + t_x
+        wtot_l = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_l + l_z - t_z
         
-        udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + wtx + srcval[i]
-             
-        q_com_u[i] = surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) + surf.uref*gammod[i] + (sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
-        q_com_l[i] = -surf.uref*surf.a0[1]*(cos(surf.theta[i]/2) - 1)/sin(surf.theta[i]/2) - surf.uref*gammod[i] + (-sqrt(surf.c)*surf.uref*surf.a0[1] + sqrt(surf.x[i])*udash)/sqrt(surf.x[i] + surf.rho*surf.c/2)
+        q_u[i] = (1. /sqrt(1. + (surf.cam_slope[i] + surf.thick_slope[i])^2))*(utot_u + (surf.cam_slope[i] + surf.thick_slope[i])*wtot_u)
+        q_l[i] = (1. /sqrt(1. + (surf.cam_slope[i] - surf.thick_slope[i])^2))*(utot_l + (surf.cam_slope[i] - surf.thick_slope[i])*wtot_l)
+        
     end
 
-    return q_com_u, q_com_l
+    return q_u, q_l
 end
 
 

@@ -15,7 +15,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
     lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
-    dt = calc_Dt(lamb1 ,lamb2, 0.2, dx)
+    dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
 
     # two step forward Euler methods for adding the source term to the right hand-side
     # of the transport equations.
@@ -34,12 +34,12 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
     #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
 
-    #dt = max(dtL,dtR)
+    #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
 
     j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 = w1 .+ (dt).*z
+    w2 = (w+w1)/2 .+ (dt).*z
 
 
     return w2,dt, lamb1, lamb2
@@ -74,7 +74,7 @@ function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64,
     dti = cfl.*(dx./(max.(lamb1,lamb2)))
     dt = minimum(abs.(dti))
 
-    @printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
+    #@printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
 
     if dt< 0.00001
         println("dt modified for max dt :$dt")
@@ -130,7 +130,8 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     wsL = maxWaveSpeed(UipL, wipL, dfdeipL, FFipL)
     wsR = maxWaveSpeed(UipR, wipR, dfdeipR, FFipR)
     # selecting the maximum wave speed
-    ws = max.(wsL+wsR)
+    ws = max.(wsL,wsR)
+    #ws = max.(wsL+wsR)
     ww = hcat(ws,ws)
 
     # flux reconstruction of left and right side of the i+1/2 interface
@@ -139,10 +140,11 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
 
     # specifying the boundary conditions using internal extrapolation from the calculated flux of the
     # neighbouring cell centers
-    fL[1,:] = [F[1,1]; F[1,2]]
-    #fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
+    #fL[1,:] = [F[1,1]; F[1,2]]
+    fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
     #fL[1,:] = [0; 0]
 
+    #fR[end,:] = ((F[end,:]) - wsR[end,:].* (wipR[end,:]))
     fR[end,:] = [F[end,1];F[end,2]]
 
     #fR[end,:] = [0.0;0.0]

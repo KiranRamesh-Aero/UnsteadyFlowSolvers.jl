@@ -8,7 +8,9 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
         del = zeros(ncell-1)
         E   = zeros(ncell-1)
         thick_orig = zeros(length(surf.thick))
+        thick_orig_slope = zeros(length(surf.thick_slope))
         thick_orig[1:end] = surf.thick[1:end]
+        thick_orig_slope[1:end] = surf.thick_slope[1:end]
 
     elseif startflag == 1
         dirvec = readdir()
@@ -54,16 +56,16 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     dt = 0.0005  #initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, int_c, int_t, del, E, mat, startflag, writeflag, writeInterval, delvort)
 
     figure()
-    interactivePlot(del, E, zeros(length(E)), zeros(length(E)), xfvm, false)
-    #interactivePlot(qu, surf.x, true)
+    interactivePlot(del, E, zeros(length(E)), zeros(length(E)), xfvm, true)
+    #interactivePlot(surf, true)
     # time loop
     for istep = 1:nsteps
         t = t + dt
         #@printf(" Main time loop %1.3f\n", t);
         mat, surf, curfield, int_wax, int_c, int_t = lautat(surf, curfield, t, dt, istep, writeArray, vcore, int_wax, int_c, int_t, mat, startflag, writeflag, writeInterval, delvort)
         qu, ql = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
-        quf = mappingAerofoilToFVGrid(qu, surf, xfvm)
-
+        quf, thetafine = mappingAerofoilToFVGrid(qu, surf, xfvm)
+        xfvm = thetafine
         if quf0 == zeros(ncell-1)
             println("Inside the validation check at", t )
             quf0 = quf
@@ -108,11 +110,12 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
         #        end
         #    end
 
-        viscousInviscid2!(surf, qu, del, thick_orig,  xfvm, 10000.0, false)
+        viscousInviscid3!(surf, quf, xfvm, del, thick_orig, 10000.0, true)
 
         #viscousInviscid!(surf, quf, del, thick_orig, xfvm, 10000.0, true)
 
         interactivePlot(del, E, j1, j2 ,xfvm, true)
+        #interactivePlot(surf, true)
         #w0u[1:end] = w[1:end];
         #interactivePlot(qu, Uxu, surf.x, xfvm, true)
 
@@ -135,7 +138,7 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
-mat, surf, curfield, del
+mat, surf, curfield, del, xfvm, qu, thick_orig
 
 end
 
@@ -247,8 +250,9 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     #println("finding the length",length(U00))
     #println("finding the m ", m)
 
-    Ux =  diff1(xfvm, U0)
-    Ut =  zeros(length(U0))#temporalDeriv(U0, U00, dt)
+    UxInter = Spline1D(xfvm, U0)
+    Ux = derivative(UxInter, xfvm)  #diff1(xfvm, U0)
+    Ut =  temporalDeriv(U0, U00, dt)
 
     w1 = zeros(length(del))
     w2 = zeros(length(del))
@@ -399,11 +403,11 @@ function interactivePlot(qu::Array{Float64,1}, qut::Array{Float64,1}, x::Array{F
 
        subplot(211)
        #axis([0, 1.2, (minimum(qu)-0.1), (maximum(qu)+0.1)])
-       plot(x,qu)
+       scatter(x,qu)
 
        subplot(212)
       # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
-       plot(xfvm, qut)
+       scatter(xfvm, qut)
        show()
        pause(0.01)
 
@@ -417,13 +421,13 @@ function interactivePlot(surf::TwoDSurfThick, disp::Bool)
     if(disp)
         #PyPlot.clf()
 
-       #subplot(211)
+       subplot(211)
        #axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
-       PyPlot.scatter(surf.x, surf.thick)
+       PyPlot.plot(surf.x, surf.thick)
 
-      # subplot(212)
+       subplot(212)
       # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
-      # plot(x[1:end-1],E)
+       PyPlot.plot(surf.x, surf.thick_slope)
        show()
        pause(0.01)
 
@@ -462,8 +466,7 @@ function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm
 
     n = length(xfvm)
     dx = pi/(n)
-    qinter = Spline1D(surf.x,qu)
-    qfine = evaluate(qinter, xfvm)
+    quFine = smoothEdgeVelocity(qu, surf, n, 50)
 
     #dqfinedx = (qfine[2:end] - qfine[1:end-1])./(dx)
     #dqfinedx[end] = 2*dqfinedx[end-1]- dqfinedx[end-2]
@@ -475,7 +478,7 @@ function mappingAerofoilToFVGrid(qu::Array{Float64,1}, surf::TwoDSurfThick, xfvm
 
     #dqfinedx = dqfinedx./(2*dx)
 
-    return qfine #, dqfinedx
+    return quFine #, dqfinedx
 end
 
 
@@ -557,7 +560,7 @@ function reverseMappingAerofoilToAeroGrid(surf::TwoDSurfThick, del::Array{Float6
     #dx = pi/(n)
 
     #qinter = Spline1D(xfvm,Ue)
-    delinter = Spline1D(xfvm,del)
+    delinter = Spline1D(xfvm/pi, del)
     #thickinter =  Spline1D(xfvm,thick)
     #dtdxinter =  derivative(thickinter, surf.x)
 
@@ -578,7 +581,7 @@ function reverseMappingAerofoilToAeroGrid(Ue::Array{Float64,1}, surf::TwoDSurfTh
     #dx = pi/(n)
 
     qinter = Spline1D(xfvm,Ue)
-    delinter = Spline1D(xfvm[1:end-1],del)
+    delinter = Spline1D(xfvm,del)
     thickinter =  Spline1D(xfvm,thick)
     dtdxinter =  Spline1D(xfvm[1:end-1], thick_slope)
 
@@ -603,8 +606,9 @@ function viscousInviscid2!(surf::TwoDSurfThick, qu::Array{Float64,1}, del::Array
 
         delaero = reverseMappingAerofoilToAeroGrid(surf, del, xfvm)
         newThickness = thick_orig + (qu .* delaero)./(sqrt(Re))
-        newThicknessInter = Spline1D(surf.x, newThickness)
-        newThickness_slope =  derivative(newThicknessInter, surf.x)
+        newThickness_slope = diff1(surf.theta, newThickness)
+        #newThicknessInter = Spline1D(surf.x, newThickness)
+        #newThickness_slope =  derivative(newThicknessInter, surf.x)
 
         surf.thick[1:end] = newThickness[1:end]
         surf.thick_slope[1:end] = newThickness_slope[1:end]
@@ -633,5 +637,44 @@ function diff1(x::Array{Float64,1}, f::Array{Float64,1})
 
     return fp
 
+
+end
+
+
+function smoothEdgeVelocity(qu::Array{Float64,1}, surf::TwoDSurfThick, ncell::Int64, xCoarse::Int64)
+
+
+    thetacoarse = collect(range(0, stop= pi, length=70))
+    thetafine = collect(range(0, stop= pi, length=ncell))
+    quCoarseInter = Spline1D(surf.theta, qu)
+    quCoarse = evaluate(quCoarseInter, thetacoarse)
+    quFineInt = Spline1D(thetacoarse, quCoarse)
+    quFine = evaluate(quFineInt, thetafine)
+
+    return quFine, thetafine
+
+end
+
+function viscousInviscid3!(surf::TwoDSurfThick, quf::Array{Float64,1}, xfvm::Array{Float64}, del::Array{Float64,1}, thick_orig::Array{Float64}, Re::Float64, mode::Bool)
+
+    if (mode)
+        qufInter = Spline1D(xfvm, quf)
+        qufAero = evaluate(qufInter, surf.theta)
+
+        delInter = Spline1D(xfvm, del)
+        delAero = evaluate(delInter, surf.theta)
+
+
+
+    #delaero = UnsteadyFlowSolvers.reverseMappingAerofoilToAeroGrid(quf, surf, del, thick_orig, xfvm)
+        newThickness = thick_orig + (qufAero .* delAero)/ (sqrt(Re))
+        newThickness[newThickness.<0.0] .= 0.0
+        newThickness_slopeInter = Spline1D(surf.x, newThickness)
+        newThickness_slope = derivative(newThickness_slopeInter, surf.x)
+
+
+        surf.thick[:] = newThickness[:]
+        surf.thick_slope[:] = newThickness_slope[:]
+    end
 
 end

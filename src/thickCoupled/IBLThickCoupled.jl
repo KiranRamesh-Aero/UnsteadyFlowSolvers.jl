@@ -644,7 +644,7 @@ end
 function smoothEdgeVelocity(qu::Array{Float64,1}, surf::TwoDSurfThick, ncell::Int64, xCoarse::Int64)
 
 
-    thetacoarse = collect(range(0, stop= pi, length=70))
+    thetacoarse = collect(range(0, stop= pi, length=50))
     thetafine = collect(range(0, stop= pi, length=ncell))
     quCoarseInter = Spline1D(surf.theta, qu)
     quCoarse = evaluate(quCoarseInter, thetacoarse)

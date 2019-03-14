@@ -39,7 +39,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 = (w+w1)/2 .+ (dt).*z
+    w2 = (w1+w)/2 .+ (dt).*z
 
 
     return w2,dt, lamb1, lamb2
@@ -96,8 +96,14 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     # 1) approximation of edge velocity
     UR = U
     UL = U
+
+    UR = limiter(UR, U, [U[2:end]; U[1]])
+    UL = limiter(UL, U, [U[end]; U[1:end-1]])
+
     UipL = UR
     UipR = [UL[2:end]; UL[1]]
+
+
 
     # 2) approximation of FF
     FFR = FF
@@ -268,4 +274,16 @@ function calc_eigen(E::Array{Float64}, F::Array{Float64},
     end
 
     return lamb1, lamb2
+end
+
+function limiter(wExtrapolated::Array{Float64,1}, wCell::Array{Float64,1}, wNeighbor::Array{Float64,1})
+
+    w = wExtrapolated;
+    wMax = max.(wCell, wNeighbor);
+    wMin = min.(wCell, wNeighbor);
+    w[w.>wMax] = wMax[w.>wMax];
+    w[w.<wMin] = wMin[w.<wMin];
+
+    return w
+
 end

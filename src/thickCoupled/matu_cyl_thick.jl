@@ -380,3 +380,17 @@ function diff1(x::Array{Float64,1}, f::Array{Float64,1})
 
 
 end
+
+
+
+newthickInter = Spline1D(surf.x, newThickness)
+newthickCoarse = collect(range(0,stop=1.0, length=500));
+newthicktheta = collect(range(0,stop=pi, length=500));
+
+xtheta = 0.5(1 .- cos.(newthicktheta))
+newthickCoarseTemp = evaluate(newthickInter, xtheta);
+newthickCoarseTempInter = Spline1D(xtheta, newthickCoarseTemp)
+thickfine =evaluate(newthickCoarseTempInter, surf.x);
+
+newThickness_slopeInter = Spline1D(surf.x, thickfine)
+newThickness_slope = derivative(newthickCoarseTempInter, surf.x)

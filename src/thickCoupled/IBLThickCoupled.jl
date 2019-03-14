@@ -668,7 +668,7 @@ function viscousInviscid3!(surf::TwoDSurfThick, quf::Array{Float64,1}, xfvm::Arr
 
     #delaero = UnsteadyFlowSolvers.reverseMappingAerofoilToAeroGrid(quf, surf, del, thick_orig, xfvm)
         newThickness = thick_orig + (qufAero .* delAero)/ (sqrt(Re))
-        newThickness[newThickness.<0.0] .= 0.0
+        newThickness[newThickness.<0.0] .= 0.0        
         newThickness_slopeInter = Spline1D(surf.x, newThickness)
         newThickness_slope = derivative(newThickness_slopeInter, surf.x)
 

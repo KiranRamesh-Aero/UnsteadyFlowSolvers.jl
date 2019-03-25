@@ -22,3 +22,7 @@ src/thickCoupled/testInteractionScript\.jl
 src/thickCoupled/IBLThickCoupled1\.jl
 
 src/thickCoupled/EdgeVelocityTest\.jl
+
+src/thickCoupled/IBLThickCoupledIterative\.jl
+
+src/thickCoupled/IBLThickCoupledDecoupledMethod\.jl

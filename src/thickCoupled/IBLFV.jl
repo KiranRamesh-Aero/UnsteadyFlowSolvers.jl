@@ -40,7 +40,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
 
-    #j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
+    j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
     w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z

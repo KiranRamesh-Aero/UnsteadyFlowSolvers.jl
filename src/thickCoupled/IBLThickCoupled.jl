@@ -115,12 +115,22 @@ function IBLThickCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::In
 
 
         #viscousInviscid!(surf, quf, del, thick_orig, xfvm, 10000.0, true)
-        interactivePlot(del, E, xfvm, interactiveMode)
+        #interactivePlot(del, E, xfvm, interactiveMode)
+        interactivePlot(del, E, j1, j2, xfvm, true)
         #interactivePlot(surf, true)
         #w0u[1:end] = w[1:end];
         #interactivePlot(qu, Uxu, surf.x, xfvm, true)
 
-        if(istep ==100)
+        #for i=1:length(j1)
+            #if (j1[i]>0.0002)
+                #println("Seperation detected at ", xfvm[i]/pi, " time ", t)
+                #return
+                #j1max = findallmax(j1)
+                #println("J1 max ", j1[j1max], "J1 max position ",xfvm[findallmax(j1)]/pi)
+            #end
+        #end
+
+        if(istep == 260)
             println("Break")
         end
 
@@ -356,13 +366,13 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Fl
         subplot(211)
         #axis([0, 1, (minimum(del)), (maximum(del))])
         plot(x/pi,del)
-
+        grid()
         subplot(212)
         #axis([0, 1, (minimum(E)), (minimum(E))])
         plot(x/pi,E)
         show()
         pause(0.005)
-
+        grid()
     end
 
 end
@@ -371,22 +381,31 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, J1::Array{F
 
     if(disp)
 
+        #p1 = plot(x/pi, del, xlabel = "δ",xlims = (0,1.0),xticks = 0:0.1:1.0)
+        #p2 = plot(x/pi, E, xlabel = "E",xlims = (0,1.0),xticks = 0:0.1:1.0)
         PyPlot.clf()
         subplot(221)
-        #axis([0, 1, (minimum(del)), (maximum(del))])
-        plot(x, del)
+        #ax =gca()
+        #ax[: set_xlim]([0,2])
+        #p1 = plot(x/pi, del)
+        xticks([0.61])
+        plot(x/pi, del)
+
 
         subplot(222)
         #axis([0, 1, (minimum(E)), (minimum(E))])
-        plot(x, E)
+        xticks([0.61])
+        plot(x/pi, E)
 
         subplot(223)
         #axis([0, 1, (minimum(E)), (minimum(E))])
-        plot(x,J1)
+        xticks([0.61])
+        plot(x[1:end]/pi, J1)
 
         subplot(224)
         #axis([0, 1, (minimum(E)), (minimum(E))])
-        plot(x,J2)
+        xticks([0.61])
+        plot(x[1:end]/pi,J2)
 
         show()
         pause(0.005)
@@ -394,8 +413,6 @@ function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, J1::Array{F
     end
 
 end
-
-
 
 
 function interactivePlot(qu::Array{Float64,1}, qut::Array{Float64,1}, x::Array{Float64,1}, xfvm::Array{Float64}, disp::Bool)
@@ -697,7 +714,7 @@ function viscousInviscid3!(surf::TwoDSurfThick, quf::Array{Float64,1}, xfvm::Arr
 
 
     #delaero = UnsteadyFlowSolvers.reverseMappingAerofoilToAeroGrid(quf, surf, del, thick_orig, xfvm)
-        newThickness = thick_orig + (qufAero .* delAerosmooth)/ (sqrt(Re))
+        newThickness = thick_orig + (qufAero .* delAero)/ (sqrt(Re))
         newThickness[newThickness.<0.0] .= 0.0
         #newThickness_slopeInter = Spline1D(surf.x, newThickness)
 
@@ -709,7 +726,7 @@ function viscousInviscid3!(surf::TwoDSurfThick, quf::Array{Float64,1}, xfvm::Arr
         #newThickfineInter = Spline1D(xcoarse, newThickCoarse)
         #newThickfine = evaluate(newThickfineInter, surf.x)
         #newthickInter = Spline1D(surf.x, newThickfine)
-        newThickness_slope = derivative(newthickInter, surf.x) #
+        newThickness_slope = diff1(surf.x, newThickness)#derivative(newthickInter, surf.x) #
 
 
         surf.thick[:] = newThickness[:]
@@ -729,4 +746,19 @@ function gridGen(ncell::Int64)
     end
 
     return xcoarse
+end
+
+function findallmax(arr)
+    max_positions = Vector{Int}()
+    min_val = typemin(eltype(arr))
+    for i in eachindex(arr)
+        if arr[i] > min_val
+            min_val = arr[i]
+            empty!(max_positions)
+            push!(max_positions, i)
+        elseif arr[i] == min_val
+            push!(max_positions, i)
+        end
+    end
+    max_positions
 end

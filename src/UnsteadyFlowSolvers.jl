@@ -80,7 +80,9 @@ export
     # 2D postprocessing functions
     calc_edgeVel,
 
-    IBLThickCoupled
+IBLThickCoupled,
+transpCoupled,
+iterIBLsolve
 
 
 ### source files
@@ -114,6 +116,7 @@ include("plots/plots2D.jl")
 include("thickCoupled/IBLThickCoupled.jl")
 include("thickCoupled/IBLFV.jl")
 include("thickCoupled/correlate.jl")
+include("thickCoupled/transpCoupled.jl")
 
 # IBL thin-coupled functions
 #include("thinCoupled/IBLCoupled.jl")

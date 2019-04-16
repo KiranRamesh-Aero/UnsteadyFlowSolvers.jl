@@ -4,6 +4,8 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     n = Int(length(w)/2)
     dx = (x[2:end]- x[1:end-1])
 
+    # add your code 
+
 
     # correlate the unknown values from the del and E values
     wcell = w #(w[2:end,:]+ w[1:end-1,:])/2

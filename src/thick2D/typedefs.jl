@@ -5,7 +5,7 @@ mutable struct TwoDSource
     s :: Float64
 end
 
-struct TwoDSurfThick
+mutable struct TwoDSurfThick
     c :: Float64
     uref :: Float64
     coord_file :: String
@@ -159,7 +159,7 @@ struct TwoDSurfThick
             for n = 1:naterm
                 LHS[i-1,n+naterm] = cam_slope[i]*cos(n*theta[i]) 
             end
-            
+
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
          

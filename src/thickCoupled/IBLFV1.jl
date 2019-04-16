@@ -1,61 +1,38 @@
-using PyPlot
-using Printf
+function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1})
 
-function correlate(w)
-
- # the model correlations for quantities F, B, S, dedf based on del and E
-
-  del = w[:,1]
-  E = w[:,2]./del .- 1
-
-  F = 4.8274*E.^4 - 5.9816*E.^3 + 4.0274*E.^2 + 0.23247.*E .+ 0.15174
-
-  B = 0.5*(-225.86.*E.^3 - 3016.6.*E.^2 - 208.68*E .- 17.915
-                + 131.9*E.^3 - 167.32*E.^2 + 76.642.*E .- 11.068)
-  B[E.<-0.0616] = -225.86.*E[E.<-0.0616].^3 - 3016.6.*E[E.<-0.0616].^2 - 208.68*E[E.<-0.0616] .- 17.915
-  B[E.>-0.0395] =  131.9*E[E.>-0.0395].^3 - 167.32*E[E.>-0.0395].^2 + 76.642.*E[E.>-0.0395] .- 11.068
-
-  S = 0.5*(451.55*E.^3 + 2010*E.^2 + 138.96*E .+ 11.296
-                        - 96.739*E.^3 + 117.74*E.^2 - 46.432*E .+ 6.8074)
-  S[E.<-0.0582] = 451.55*E[E.<-0.0582].^3 + 2010*E[E.< -0.0582].^2 + 138.96*E[E.< -0.0582] .+ 11.296
-  S[E.>-0.042]  = -96.739*E[E.>-0.042].^3 + 117.74*E[E.> -0.042].^2 - 46.432*E[E.> -0.042] .+ 6.8074
-
-  dfde = 4*4.8274*E.^3 - 3*5.9816*E.^2 + 2*4.0274*E .+ 0.23247
-
-  return del, E, F ,B, S, dfde
-
-end
-
-
-function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1})
-
+    dx = zeros(length(x))
     n = Int(length(w)/2)
-    dx = Float64(1.0/n)
+    dx = (x[2:end]- x[1:end-1])
+
+    # add your code 
+
 
     # correlate the unknown values from the del and E values
-    del , E, FF ,B, S, dfde = correlate(w)
-    #del , E, FF ,B, S, dfde  = calc_shapes(n,w)
+    wcell = w #(w[2:end,:]+ w[1:end-1,:])/2
+    #del , E, FF ,B, S, dfde = correlate(wcell)
+    del , E, FF ,B, S, dfde  = calc_shapes(n,w)
 
 
-    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
+    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(wcell , U, FF, dfde, del, E)
 
-    lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
-    lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
+    #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
+    #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
 
-    lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
+    lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
+    dt = calc_Dt(lamb1 ,lamb2, 0.2, dx)
 
     # two step forward Euler methods for adding the source term to the right hand-side
     # of the transport equations.
+    #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
 
     # step 1 : assuming this as a homogeneous equation and advanced half a step
-    w1 = w .+ ((fL - fR) .* ((dt)/(dx)))
+    w1 = wcell .+ ((fL - fR) .* ((dt)./(dx)))
 
 
     del , E, FF ,B, S, dfde = correlate(w1)
 
-    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
+    #fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
 
     z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
 
@@ -67,10 +44,10 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 =1/2*(w1+w) .+ (dt).*z
+    w2 = w1 .+ (dt).*z
 
 
-    return w2,dt, j1, j2
+    return w2,dt, lamb1, lamb2
 end
 
 function init(n)
@@ -95,12 +72,20 @@ function eigenlamb(U::Array{Float64,1}, dfde::Array{Float64,1}, FF::Array{Float6
     return lamb1, lamb2
 end
 
-function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Float64 )
+function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Array{Float64,1} )
 
     # calculate time step values based on eigenvalues
 
     dti = cfl.*(dx./(max.(lamb1,lamb2)))
-    dt = minimum(dti)
+    dt = minimum(abs.(dti))
+
+    @printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
+
+    if dt< 0.00001
+        println("dt modified for max dt :$dt")
+        dt =0.0005
+    end
+
     return dt
 end
 
@@ -159,8 +144,8 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
 
     # specifying the boundary conditions using internal extrapolation from the calculated flux of the
     # neighbouring cell centers
-    #fL[1,:] = [F[1,1]; F[1,2]]
-    fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
+    fL[1,:] = [F[1,1]; F[1,2]]
+    #fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
     #fL[1,:] = [0; 0]
 
     fR[end,:] = [F[end,1];F[end,2]]
@@ -183,17 +168,8 @@ end
 
 function RHSSource(U::Array{Float64,1} ,B::Array{Float64,1}, del::Array{Float64,1},Ut::Array{Float64,1}, Ux::Array{Float64,1}, FF::Array{Float64,1}, E::Array{Float64,1}, S::Array{Float64,1} )
 
-    # the source terms of the system of equations
-
-    #println(" size of B ", length(B))
-    #println(" size of del ", length(del))
-    #println(" size of E ", length(E))
-    #println(" size of B ", length(B))
-    #println(" size of Ux ", length(Ux))
-    #println(" size of Ut ", length(Ut))
-
     z1 = B./(2.0*del) .- del.* (Ut./U) .- (E.+ 1.0).*del.*Ux
-    z2 = S./del .- 2.0*E.*del.* (Ut./U) .- 2.0*FF.*del.*Ux
+    z2 = S./del .- 2.0*E.*del.* (Ut./U) .- 2.0*FF.*del .*Ux
     z = hcat(z1,z2)
 
     return z
@@ -233,7 +209,7 @@ function calc_shapes(ncell::Int64, sol::Array{Float64})
 end
 
 
-function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Float64)
+function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Array{Float64,1})
 
     N1 = length(lamb1)
     lambj1 = sum(lamb1)/N1
@@ -241,7 +217,7 @@ function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
 
     for i=2:N1-1
     if lamb1[i].<0.0
-    J1Sep[i] =  (dt)/(dx) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
+    J1Sep[i] =  (dt)/(dx[i]) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
     end
     end
 
@@ -251,7 +227,7 @@ function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
 
     for i=2:N2-1
     if lamb2[i].<0.0
-    J2Sep[i] =  (dt)/(dx) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
+    J2Sep[i] =  (dt)/(dx[i]) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
     end
     end
 
@@ -266,151 +242,33 @@ function initDt(w::Array{Float64,2}, U::Array{Float64,1})
     lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
     n = Int(length(w)/2)
     dx = Float64(1.0/n)
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    dt = calc_Dt(lamb1 ,lamb2, 0.3, dx)
 
     return dt
 
 end
 
 
-function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{Float64,1}, qu0::Array{Float64,1}, dt::Float64)
+function calc_eigen(E::Array{Float64}, F::Array{Float64},
+                    dfde::Array{Float64}, ue::Array{Float64})
 
+    ncell = length(E)
+    lamb1 = zeros(ncell); lamb2 = zeros(ncell)
 
-    #del, E, F ,B = init(n-1)
+    for i = 1:ncell
+        a_q = 1.
+        b_q = -ue[i] * (dfde[i] - 1)
+        c_q = ue[i] * ue[i] * (E[i]*dfde[i] - F[i])
+        lamb1[i] = (-b_q + sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
+        lamb2[i] = (-b_q  -sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
 
-    #m = length(q) -1
-    U0 = q[1:end]
-    #x =x[1:n]
-    #U0 = U0[1:n]
-
-    U00 = qu0[1:end]
-
-    U0[U0.<= 0.0] .= 1e-8
-    U00[U00.<= 0.0] .= 1e-8
-    #println("finding the length",length(U00))
-    #println("finding the m ", m)
-
-    Ut = zeros(length(U0)) #temporalDerivates(U0, U00, dt)
-
-    nn = length(U0)-1
-
-    xx = collect(0:nn)*pi/(nn)
-
-    Ux =  spatialDeriv([q[1];U0])
-
-    w1 = del
-    w2 = del.*(E.+1.0)
-    w0 = hcat(w1,w2)
-
-
-    return w0, U0, Ut, Ux
-end
-
-function spatialDeriv(q::Array{Float64,1})
-
-    n = length(q)
-    dx = 1/n
-
-    dqdx = ([q[2:end-1];q[end-1]]-[q[1];q[1:end-2]])
-
-    dqdx[1] = 0.0
-    dqdx[end] = 0.0
-
-    dqdx = dqdx./(2*dx)
-    return dqdx
-
-end
-
-
-function temporalDeriv(qu::Array{Float64,1}, qu0::Array{Float64}, dt::Float64)
-
- return (qu - qu0)./dt
-
-end
-
-function initViscous(ncell::Int64)
-
-    m = ncell - 1
-    del, E, F ,B = init(m)
-    x = collect(0:m)./(m)
-    qu =  zeros(m)
-    ql =  zeros(m)
-    qu0 = zeros(m)
-    ql0 = zeros(m)
-
-    return del, E, x, qu, ql, qu0, ql0
-
-end
-
-function interactivePlot(del::Array{Float64,1}, E::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
-
-    if(disp)
-
-        PyPlot.clf()
-        subplot(211)
-        #axis([0, 1, (minimum(del)), (maximum(del))])
-        plot(x[1:end-1],del)
-
-        subplot(212)
-        #axis([0, 1, (minimum(E)), (minimum(E))])
-        plot(x[1:end-1],E)
-        show()
-        pause(0.01)
-
+        #Always have lamb1 > lamb2
+        if lamb2[i]>lamb1[i]
+            temp  = lamb2[i]
+            lamb2[i] = lamb1[i]
+            lamb1[i] = temp
+        end
     end
 
-end
-
-function interactivePlot(qu::Array{Float64,1}, x::Array{Float64,1}, disp::Bool)
-
-    if(disp)
-
-       PyPlot.clf()
-
-       subplot(211)
-       axis([0, 1, (minimum(qu)-0.1), (maximum(qu)+0.1)])
-       plot(x,qu)
-
-      # subplot(212)
-      # axis([0, 1, (minimum(E)-0.1), (minimum(E)+0.1)])
-      # plot(x[1:end-1],E)
-       show()
-       pause(0.01)
-
-    end
-end
-
-
-function startSim(q::Array{Float64}, ncell::Int64, nsteps::Int64, interact::Bool)
-
-    dt = 0.001
-    t = 0.0
-    del, E, x, qu, ql, qu0, ql0 = initViscous(ncell)
-
-    qu = q[2:end]
-    qu0 = zeros(length(q[2:end]))
-
-    for i=1:nsteps
-
-        t = t + dt
-        w0u, Uu,  Utu, Uxu = inviscidInterface(del, E, qu, qu0, dt)
-
-        #println("Length of U ", length(Uu))
-        #println("Length of Ux ", length(Uxu))
-        #println("Length of Ut ", length(Utu))
-        #println("Length of w ", length(w0u)/2)
-
-
-        w, dt, j1 ,j2 = FVMIBL(w0u, Uu, Utu, Uxu);
-        del = w[:,1]
-        E = (w[:,2]./w[:,1]) .- 1.0
-        interactivePlot(del, E, x, interact)
-        w0u = w;
-
-        @printf("viscous Time :%1.10f , viscous Time step size %1.10f \n", t, dt);
-        qu0 = qu;
-
-    end
-
-        return del, E
+    return lamb1, lamb2
 end

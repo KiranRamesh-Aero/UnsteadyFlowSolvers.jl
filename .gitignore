@@ -10,3 +10,19 @@ src/sr2/plottingTut.jl
 src/thickCoupled/testFunction\.jl
 
 steadyNACA0012/resultsSummary
+
+steadyNACA0012/
+
+src/thickCoupled/diffTest\.jl
+
+src/thickCoupled/UniGridInterpolation\.jl
+
+src/thickCoupled/testInteractionScript\.jl
+
+src/thickCoupled/IBLThickCoupled1\.jl
+
+src/thickCoupled/EdgeVelocityTest\.jl
+
+src/thickCoupled/IBLThickCoupledIterative\.jl
+
+src/thickCoupled/IBLThickCoupledDecoupledMethod\.jl

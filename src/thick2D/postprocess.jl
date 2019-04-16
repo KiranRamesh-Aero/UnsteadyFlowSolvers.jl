@@ -1,5 +1,5 @@
 function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_prev::Vector{Float64}, int_t_prev::Vector{Float64}, dt :: Float64)
-    
+
     l_x = zeros(surf.ndiv)
     t_z = zeros(surf.ndiv)
     l_z = zeros(surf.ndiv)
@@ -14,7 +14,7 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
     for i = 2:surf.ndiv
         l_x[i] = surf.a0[1]*(1+cos(surf.theta[i]))/sin(surf.theta[i])
         l_z[i] = -surf.a0[1]
-        
+
         ws_x[i] = 0.5*(surf.uind_u[i] + surf.uind_l[i])
         wa_x[i] = 0.5*(surf.uind_u[i] - surf.uind_l[i])
 
@@ -43,7 +43,7 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
     cnc_nonl = (nonl1 + nonl2 + nonl3 + nonl4)/(0.5*surf.uref^2*surf.c)
 
     cnc = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref + surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + 0.5*surf.aterm[1]) + pi*surf.bterm[1]*(surf.kinem.u*sin(surf.kinem.alpha)/surf.uref - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref + surf.kinem.alphadot*surf.c*(0.5-surf.pvt)/surf.uref) - pi*surf.bterm[2]*surf.kinem.alphadot*surf.c/(4*surf.uref) + cnc_nonl
-    
+
 
     int_wax = zeros(surf.ndiv)
     d_int_wax = zeros(surf.ndiv)
@@ -51,26 +51,26 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
     d_int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
     d_int_t = zeros(surf.ndiv)
-    
+
     for i = 1:surf.ndiv
         int_wax[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
         int_c[i] = simpleTrapz(surf.cam_slope[1:i].*(ws_z[1:i] + t_z[1:i]), surf.x[1:i])
         int_t[i] = simpleTrapz(surf.thick_slope[1:i].*(surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha) .+ surf.kinem.alphadot.*(surf.x[1:i] .- surf.pvt*surf.c) .+ wa_x[1:i] .+ l_z[1:i]), surf.x[1:i])
-        
+
         d_int_wax[i] = (int_wax[i] - int_wax_prev[i])/dt
         d_int_c[i] = (int_c[i] = int_c_prev[i])/dt
         d_int_t[i] = (int_t[i] = int_t_prev[i])/dt
     end
 
     cnnc = (2. *pi*surf.c/surf.uref)*(3. *surf.a0dot[1]/4. + surf.adot[1]/4. + surf.adot[2]/8.) +
-        (4. /(surf.uref*surf.uref*surf.c))*simpleTrapz(d_int_wax, surf.x) + 
+        (4. /(surf.uref*surf.uref*surf.c))*simpleTrapz(d_int_wax, surf.x) +
         (4. /(surf.uref*surf.uref*surf.c))*simpleTrapz(d_int_c, surf.x) +
         (4. /(surf.uref*surf.uref*surf.c))*simpleTrapz(d_int_t, surf.x)
-    
+
     # Suction force given in eqn (2.31) Ramesh et al.
     #cs = 2*pi*surf.a0[1]*surf.a0[1]
     cs = 4*pi*surf.a0[1]*surf.a0[1]/surf.rho[1]
-    
+
     # Normal force coefficient
     cn = cnc + cnnc
 
@@ -80,7 +80,7 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
 
     #Pitching moment is clockwise or nose up positive
 
-    
+
     # int_lxtx = simpleTrapz(l_x.*t_x, surf.theta)
     # int_lxwsx = simpleTrapz(l_x.*ws_x, surf.theta)
     # int_txwax = simpleTrapz(t_x.*wa_x, surf.x)
@@ -94,44 +94,44 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
 
 
 
-    
+
     # cnc1 = (4. /(surf.uref*surf.uref*surf.c))*(int_lxtx + int_lxwsx + int_txwax +
     #                                            int_wsxwax + int_lztz + int_lzwsz + int_tzwaz + int_wszwaz)
-    
+
     # int_wax_kinem = simpleTrapz(wa_x.*(surf.kinem.u*cos(surf.kinem.alpha) +
     #                                    surf.kinem.hdot*sin(surf.kinem.alpha) .- surf.kinem.alphadot*surf.cam), surf.x)
     # int_lx_etac = simpleTrapz(l_x*surf.kinem.alphadot.*surf.cam, surf.theta)
-    
+
     # cnc2 = 2*pi*(surf.kinem.u*cos(surf.kinem.alpha)/surf.uref +
     #              surf.kinem.hdot*sin(surf.kinem.alpha)/surf.uref)*(surf.a0[1] + surf.aterm[1]/2.) +
     # (4. /(surf.uref*surf.uref*surf.c))*(int_wax_kinem - int_lx_etac)
-    
+
     # int_tx_etat = simpleTrapz((t_x + wa_x)*surf.kinem.alphadot.*surf.thick, surf.x)
-    
+
     # int_wsz_kinem = simpleTrapz(ws_z.*(surf.kinem.u*sin(surf.kinem.alpha)/surf.uref -
     #                                    surf.kinem.hdot*cos(surf.kinem.alpha) .+ surf.kinem.alphadot*(surf.x .- surf.pvt*surf.c)), surf.x)
-    
+
     # cnc3 = pi*surf.bterm[1]*(surf.kinem.u*sin(surf.kinem.alpha)/surf.uref -
     #                          surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
     #                          surf.kinem.alphadot*surf.c*(0.5 - surf.pvt)/surf.uref) -
     #                          surf.kinem.alphadot*surf.c*pi*surf.bterm[2]/(4*surf.uref) +
     # (4. /(surf.uref*surf.uref*surf.c))*(int_wsz_kinem - int_tx_etat)
-    
+
     # int_wax = zeros(surf.ndiv)
     # d_int_wax = zeros(surf.ndiv)
-    
+
     # for i = 1:surf.ndiv
     #     int_wax[i] = simpleTrapz(wa_x[1:i], surf.x[1:i])
-        
+
     #     d_int_wax[i] = (int_wax[i] - int_wax_prev[i])/dt
     # end
-    
+
     # cnnc = (2. *pi*surf.c/surf.uref)*(3. *surf.a0dot[1]/4. + surf.adot[1]/4. + surf.adot[2]/8.) +
     # (4. /(surf.uref*surf.uref*surf.c))*simpleTrapz(d_int_wax, surf.x)
-    
+
     # # Suction force given in eqn (2.31) Ramesh et al.
     # cs = 2*pi*surf.a0[1]*surf.a0[1]
-    
+
     # # Normal force coefficient
     # cn = cnc1 + cnc2 + cnc3 + cnnc
 
@@ -155,23 +155,23 @@ function calc_delcp(surf::TwoDSurfThick, vels::Vector{Float64})
 
     srcval = zeros(surf.ndiv)
     src_z = zeros(surf.ndiv)
-    
+
     for i = 2:surf.ndiv
 
         wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
-        
+
         for n = 1:surf.naterm
             srcval[i] -= surf.bterm[n]*cos(n*surf.theta[i])
             src_z[i] += surf.bterm[n]*sin(n*surf.theta[i])
         end
         srcval[i] = srcval[i]*surf.uref
         src_z[i] = src_z[i]*surf.uref
-        
+
         udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + wtx + srcval[i]
-        
+
         p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
-        
+
         for n = 1:surf.naterm
             gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
             gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
@@ -184,13 +184,13 @@ function calc_delcp(surf::TwoDSurfThick, vels::Vector{Float64})
         gam[i] = gam[i]*surf.uref
         gammod[i] = gammod[i]*surf.uref
         gamint[i] = gamint[i]*surf.uref*surf.c
-        
+
         wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
                    surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
-        
+
         wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
                    surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
-        
+
         wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
 
@@ -198,14 +198,14 @@ function calc_delcp(surf::TwoDSurfThick, vels::Vector{Float64})
                    surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
 
         t1 = 2*wlx*udash
-        t2 = 2*((surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + wlz + gam[i])*(src_z[i] + wtz) 
-        
+        t2 = 2*((surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + wlz + gam[i])*(src_z[i] + wtz)
+
         #Omit additional app mass terms
         p_out[i] = 2*udash*gam[i] + gamint[i] + t1 + t2
 
         p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + t1 + t2 + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
     end
-    
+
     return p_com, p_in, p_out
 end
 
@@ -314,9 +314,9 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     bvmat = zeros(length(surf.src), 3)
     for i = 1:length(surf.src)
         bvmat[i,:] = [surf.src[i].s surf.src[i].x surf.src[i].z]
-    end 
+    end
    DelimitedFiles.writedlm(f, bvmat)
     close(f)
-    
+
     cd("..")
 end

@@ -1,7 +1,10 @@
-function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1})
+function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1})
 
     n = Int(length(w)/2)
-    dx = Float64(1.0/n)
+    #dx = Float64((x[end]-x[1])/n)
+    dx = Float64((x[end]-x[1])/n)
+    #dx_half = (x[end]-x[end-1])/2
+    #dx = [x[2:end]-x[1:end-1]; dx_half]
 
     # correlate the unknown values from the del and E values
     del , E, FF ,B, S, dfde = correlate(w)
@@ -10,38 +13,40 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
 
-    lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
-    lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
+    #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
+    #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
 
-    lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
+    lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
+    dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
 
     # two step forward Euler methods for adding the source term to the right hand-side
     # of the transport equations.
+    #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
+
+
 
     # step 1 : assuming this as a homogeneous equation and advanced half a step
-    w1 = w .+ ((fL - fR) .* ((dt)/(dx)))
-
+    w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
 
     del , E, FF ,B, S, dfde = correlate(w1)
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
 
-    z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
+    z = RHSSource(U,B, del, Ut, Ux, FF, E, S)
 
     #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
     #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
 
-    #dt = max(dtL,dtR)
+    #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
 
     j1, j2 = sepeartionJ(lamb1, lamb2, dt, dx)
 
     # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 =1/2*(w1+w) .+ (dt).*z
+    w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
 
 
-    return w2,dt, j1, j2
+    return w2, dt, lamb1, lamb2
 end
 
 function init(n)
@@ -58,22 +63,49 @@ end
 
 
 function eigenlamb(U::Array{Float64,1}, dfde::Array{Float64,1}, FF::Array{Float64,1}, w::Array{Float64,2})
-    lamb1 =  U.*((dfde .- 1.0)
+    lamb1 =  0.5*U.*((dfde .- 1.0)
             + sqrt.(1.0 .+ 4.0*FF .- 2.0.* dfde .- (4.0*((w[:,2]./w[:,1]) .-1.0).*dfde) .+ dfde.^2))
-    lamb2 = U.*((dfde .- 1.0)
+    lamb2 = 0.5*U.*((dfde .- 1.0)
             - sqrt.(1.0 .+ 4.0*FF .- 2.0.* dfde .- (4.0*((w[:,2]./w[:,1]) .-1.0).*dfde) .+ dfde.^2))
 
     return lamb1, lamb2
 end
 
-function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Float64 )
+function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Array{Float64})
 
     # calculate time step values based on eigenvalues
 
-    dti = cfl.*(dx./(max.(lamb1,lamb2)))
-    dt = minimum(dti)
+    dti = cfl.*(dx./(abs.(lamb1+lamb2)))
+    dt = minimum(abs.(dti))
+
+    #@printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
+
+    if dt< 0.00001
+        println("dt modified for max dt :$dt")
+        dt =0.0005
+    end
+
     return dt
 end
+
+function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Float64)
+
+    # calculate time step values based on eigenvalues
+
+    dti = cfl.*(dx./(abs.(lamb1+lamb2)))
+    dt = minimum(abs.(dti))
+
+    #@printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
+
+    if dt< 0.00001
+        println("dt modified for max dt :$dt")
+        dt =0.0005
+    end
+
+    return dt
+end
+
+
 
 
 function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{Float64,1}, dfde::Array{Float64,1}, del::Array{Float64,1} , E::Array{Float64,1})
@@ -87,8 +119,14 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     # 1) approximation of edge velocity
     UR = U
     UL = U
+
+    UR = limiter(UR, U, [U[2:end]; U[1]])
+    UL = limiter(UL, U, [U[end]; U[1:end-1]])
+
     UipL = UR
     UipR = [UL[2:end]; UL[1]]
+
+
 
     # 2) approximation of FF
     FFR = FF
@@ -121,7 +159,8 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     wsL = maxWaveSpeed(UipL, wipL, dfdeipL, FFipL)
     wsR = maxWaveSpeed(UipR, wipR, dfdeipR, FFipR)
     # selecting the maximum wave speed
-    ws = max.(wsL+wsR)
+    ws = max.(wsL,wsR)
+    #ws = max.(wsL+wsR)
     ww = hcat(ws,ws)
 
     # flux reconstruction of left and right side of the i+1/2 interface
@@ -134,6 +173,7 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     fL[1,:] = 0.5*((F[1,:]) - wsR[1,:].* (wipR[1,:]))
     #fL[1,:] = [0; 0]
 
+    #fR[end,:] = ((F[end,:]) - wsR[end,:].* (wipR[end,:]))
     fR[end,:] = [F[end,1];F[end,2]]
 
     #fR[end,:] = [0.0;0.0]
@@ -146,10 +186,13 @@ end
 function maxWaveSpeed(Uip::Array{Float64,1}, wip::Array{Float64,2}, dfdeip::Array{Float64,1}, FFip::Array{Float64,1})
 
     # calculate wave speed at the interfaces of the cell
-    ws = abs.(Uip).*((dfdeip .- 1.0)
+    wsP = abs.(0.5*Uip).*((dfdeip .- 1.0)
         + sqrt.(1.0 .+ 4.0*FFip .- 2.0.* dfdeip .- (4.0*((wip[:,2]./wip[:,1]) .-1.0).*dfdeip) .+ dfdeip.^2))
 
-    return ws
+    wsN = abs.(0.5*Uip).*((dfdeip .- 1.0)
+            - sqrt.(1.0 .+ 4.0*FFip .- 2.0.* dfdeip .- (4.0*((wip[:,2]./wip[:,1]) .-1.0).*dfdeip) .+ dfdeip.^2))
+
+    return max(wsP, wsN)
 end
 
 function RHSSource(U::Array{Float64,1} ,B::Array{Float64,1}, del::Array{Float64,1},Ut::Array{Float64,1}, Ux::Array{Float64,1}, FF::Array{Float64,1}, E::Array{Float64,1}, S::Array{Float64,1} )
@@ -199,7 +242,7 @@ function sepeartionJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
 
     N1 = length(lamb1)
     lambj1 = sum(lamb1)/N1
-    J1Sep = (dt)/(dx) .* (lamb1[1:end-1] - lamb1[2:end])./ (lambj1*N1)
+    J1Sep = (dt)./(dx) .* (lamb1[1:end-1] - lamb1[2:end])./ (lambj1*N1)
 
     for i=2:N1-1
     if lamb1[i].<0.0
@@ -227,9 +270,46 @@ function initDt(w::Array{Float64,2}, U::Array{Float64,1})
     del , E, FF ,B, S, dfde = correlate(w)
     lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
     n = Int(length(w)/2)
-    dx = Float64(1.0/n)
-    dt = calc_Dt(lamb1 ,lamb2, 0.8, dx)
+    dx = Float64(pi/n)
+    dt = calc_Dt(lamb1 ,lamb2, 0.3, dx)
 
     return dt
+
+end
+
+
+function calc_eigen(E::Array{Float64}, F::Array{Float64},
+                    dfde::Array{Float64}, ue::Array{Float64})
+
+    ncell = length(E)
+    lamb1 = zeros(ncell); lamb2 = zeros(ncell)
+
+    for i = 1:ncell
+        a_q = 1.
+        b_q = -ue[i] * (dfde[i] - 1)
+        c_q = ue[i] * ue[i] * (E[i]*dfde[i] - F[i])
+        lamb1[i] = (-b_q + sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
+        lamb2[i] = (-b_q  -sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
+
+        #Always have lamb1 > lamb2
+        if lamb2[i]>lamb1[i]
+            temp  = lamb2[i]
+            lamb2[i] = lamb1[i]
+            lamb1[i] = temp
+        end
+    end
+
+    return lamb1, lamb2
+end
+
+function limiter(wExtrapolated::Array{Float64,1}, wCell::Array{Float64,1}, wNeighbor::Array{Float64,1})
+
+    w = wExtrapolated;
+    wMax = max.(wCell, wNeighbor);
+    wMin = min.(wCell, wNeighbor);
+    w[w.>wMax] = wMax[w.>wMax];
+    w[w.<wMin] = wMin[w.<wMin];
+
+    return w
 
 end

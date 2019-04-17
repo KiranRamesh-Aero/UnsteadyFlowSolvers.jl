@@ -4,14 +4,6 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
     if startflag == 0
         mat = zeros(0, 12)
         t = 0.
-        tv = 0.
-        del = zeros(ncell-1)
-        E   = zeros(ncell-1)
-        thick_orig = zeros(length(surf.thick))
-        thick_orig_slope = zeros(length(surf.thick_slope))
-        thick_orig[1:end] = surf.thick[1:end]
-        thick_orig_slope[1:end] = surf.thick_slope[1:end]
-        qu = zeros(length(surf.thick))
 
     elseif startflag == 1
         dirvec = readdir()
@@ -46,27 +38,13 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
 
-    # initial momentum and energy shape factors
-
-    delfvm, E, xfvm, quf, quf0 = initViscous(ncell)
-    xfvm = xfvm/pi
-    qu = zeros(surf.ndiv)
-
-    delInter = Spline1D(xfvm, delfvm)
-
-
-    delu = evaluate(delInter, surf.theta)
-    dell = delu
-
-    #dt = 0.0005  #initStepSize(surf, curfield, t, dt, 0, writeArray, vcore, int_wax, i
-
     for istep = 1:nsteps
 
         t = t + dt
-
+        
         #Update kinematic parameters
         update_kinem(surf, t)
-
+        
         #Update flow field parameters if any
         update_externalvel(curfield, t)
 
@@ -85,12 +63,14 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
         #Place dummy  TEV
         push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, 0.0, vcore, 0., 0.))
 
-        #Initial condition for iteration
-        x_init = [surf.aterm[:]; surf.bterm[:]; curfield.tev[end].s; delu[:]; dell[:]]
-
-        if istep == 0
-            quf0 = quf
+        if istep == 1
+            surf.qu[:], surf.ql[:] = calc_edgeVel(iter.surf, [iter.curfield.u[1], iter.curfield.w[1]])
+            surf.quprev[:] = surf.qu[:]
+            surf.qlprev[:] = surf.ql[:]
         end
+        
+        #Initial condition for iteration
+        x_init = [surf.aterm[:]; surf.bterm[:]; curfield.tev[end].s; surf.delu[:]; surf.dell[:]]
 
         iter = iterIBLsolve(surf, curfield, quf, quf0, dt, xfvm, E)
 

@@ -271,7 +271,7 @@ function inviscidInterface(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{
     w1 = zeros(length(del))
     w2 = zeros(length(del))
     w1[1:end] = del[1:end]
-    w2[1:end] = del[1:end].*(E[1:end].+1.0)
+    w2[1:end] = del[1:end].*(E[1:end] .+ 1.0)
     w0 = hcat(w1,w2)
 
     return w0, U0, Ut, Ux
@@ -774,7 +774,7 @@ struct iterIBLsolve
 end
 
 function (iter::iterIBLsolve)(x::Array{Float64})
-
+    
     res = zeros(iter.surf.ndiv*2-2+2*iter.surf.ndiv)
 
     #Assign iterands and calculate residuals

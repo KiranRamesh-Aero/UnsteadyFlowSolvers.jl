@@ -1,0 +1,11 @@
+function initDelE(ncell::Int64)
+
+    m = ncell - 1
+    del, E, F ,B = init(m)
+    x = createUniformFVM(m)
+    quf =  zeros(m)
+    quf0 =  zeros(m)
+
+    return del, E, x, quf, quf0
+
+end

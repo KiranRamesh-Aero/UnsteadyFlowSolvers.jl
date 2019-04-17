@@ -80,9 +80,11 @@ export
     # 2D postprocessing functions
     calc_edgeVel,
 
-IBLThickCoupled,
+#IBLThickCoupled,
+TwoDSurfThickBL,
 transpCoupled,
 iterIBLsolve
+
 
 
 ### source files
@@ -109,14 +111,21 @@ include("thick2D/solvers.jl")             # solver methods
 include("thick2D/postprocess.jl")         # postprocessing functions
 
 
+# low-order 2D thick IBL solvers
+include("thickCoupled/typedefs.jl")            # type definitions
+include("thickCoupled/calcs.jl")               # calculation functions
+include("thickCoupled/solvers.jl")             # solver methods
+include("thickCoupled/postprocess.jl")         # postprocessing functions
+
+
 # 2D plotting functions
 include("plots/plots2D.jl")
 
 # IBL thick-coupled functions
-include("thickCoupled/IBLThickCoupled.jl")
-include("thickCoupled/IBLFV.jl")
-include("thickCoupled/correlate.jl")
-include("thickCoupled/transpCoupled.jl")
+#include("thickCoupled/IBLThickCoupled.jl")
+#include("thickCoupled/IBLFV.jl")
+#include("thickCoupled/correlate.jl")
+#include("thickCoupled/transpCoupled.jl")
 
 # IBL thin-coupled functions
 #include("thinCoupled/IBLCoupled.jl")

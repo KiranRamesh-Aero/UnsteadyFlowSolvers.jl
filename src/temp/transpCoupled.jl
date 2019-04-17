@@ -41,10 +41,10 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
     for istep = 1:nsteps
 
         t = t + dt
-        
+
         #Update kinematic parameters
         update_kinem(surf, t)
-        
+
         #Update flow field parameters if any
         update_externalvel(curfield, t)
 
@@ -68,15 +68,16 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
             surf.quprev[:] = surf.qu[:]
             surf.qlprev[:] = surf.ql[:]
         end
-        
+
         #Initial condition for iteration
         x_init = [surf.aterm[:]; surf.bterm[:]; curfield.tev[end].s; surf.delu[:]; surf.dell[:]]
 
-        iter = iterIBLsolve(surf, curfield, quf, quf0, dt, xfvm, E)
+        iter = iterIBLsolve(surf, curfield)
 
         soln = nlsolve(not_in_place(iter), x_init, method = :newton)
 
         xsoln= soln.zero
+
         #Assign solution
         surf.aterm[:] = xsoln[1:surf.naterm]
         surf.bterm[:] = xsoln[surf.naterm+1:2*surf.naterm]
@@ -93,8 +94,13 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
             surf.aprev[ia] = surf.aterm[ia]
         end
 
+        surf.quprev[:] = surf.qu[:]
+        surf.qlprev[:] = surf.ql[:]
+
         #Calculate bound vortex strengths
         update_bv_src(surf)
+
+        #Add effect of transpiration to sources and vortices
 
         #Wake rollup
         wakeroll(surf, curfield, dt)
@@ -106,7 +112,6 @@ function transpCoupled(surf::TwoDSurfThick, curfield::TwoDFlowField, ncell::Int6
                      cl, cd, cnc, cnnc, cn, cs, stag])
 
 
-        quf0[1:end] = quf[1:end];
 
     end
 

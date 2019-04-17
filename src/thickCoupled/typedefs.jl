@@ -46,7 +46,9 @@ mutable struct TwoDSurfThickBL
     El :: Vector{Float64}
     qu :: Vector{Float64}
     ql :: Vector{Float64}
-    
+quprev :: Vector{Float64}
+qlprev :: Vector{Float64}
+
     function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=140, naterm=136, initpos = [0.; 0.], nfvm=200)
         theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
         thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
@@ -147,85 +149,104 @@ mutable struct TwoDSurfThickBL
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
-            
+
              #Sweep all rows (corresponding to ndiv) for lifting equation
-            
+
             #Sweep columns for aterms
             for n = 1:naterm
-                LHS[i-1,n] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]) 
+                LHS[i-1,n] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i])
             end
 
             #Sweep columns for bterm
             for n = 1:naterm
-                LHS[i-1,n+naterm] = cam_slope[i]*cos(n*theta[i]) 
+                LHS[i-1,n+naterm] = cam_slope[i]*cos(n*theta[i])
             end
 
             #TEV term must be updated in the loop after its location is known
             #Sweep all rows (corresponding to ndiv) for nonlifting equation
-         
+
             for n = 1:naterm
                 LHS[ndiv+i-3,n]  = -cam_slope[i]*sin(n*theta[i])
             end
             for n = 1:naterm
-                LHS[ndiv+i-3,naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]) 
+                LHS[ndiv+i-3,naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i])
             end
         end
-        
+
         #Terms for Kelvin condition
         LHS[2*ndiv-3,1] = 100*pi/2
-        
+
         LHS[2*ndiv-3,2*naterm+1] = 100.
         #LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
-        
+
         # #Kutta
         for n = 1:naterm
             LHS[2*ndiv-2,n] = ((-1)^n)*100.
         end
-        
+
         # #LE Kutta condition
-        
+
         # LHS[2*ndiv-2,1] = 1000.
-        
-        
+
+
         # LHS[2*ndiv-1,1] = sqrt(2. /rho) + 1.
         # for n = 1:naterm
         #     LHS[2*ndiv-1,n+1] = -1.
         #     LHS[2*ndiv-1,n+naterm+1] = 1.
         # end
         levflag = [0;]
-        
+
         delu, dell, Eu, El = initDelE(ndiv)
 
         qu = zeros(ndiv)
-        ql = zeros(surf.ndiv)
-        
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql)
+        ql = zeros(ndiv)
+        quprev = zeros(ndiv)
+        qlprev = zeros(ndiv)
+
+        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, quprev, qlprev)
     end
 end
 
 struct iterIBLsolve
-    surf :: TwoDSurfThick
+    surf :: TwoDSurfThickBL
     curfield :: TwoDFlowField
     dt :: Float64
 end
 
 function (iter::iterIBLsolve)(x::Array{Float64})
-    
-    res = zeros(iter.surf.ndiv*2-2 + 2*iter.surf.ndiv)
-    
+
     #Assign iterands and calculate residuals
     iter.surf.aterm[:] = x[1:iter.surf.naterm]
     iter.surf.bterm[:] = x[iter.surf.naterm+1:2*iter.surf.naterm]
     iter.curfield.tev[end].s = x[2*iter.surf.naterm+1]
-    iter.surf.delu = x[2*iter.surf.naterm+2:2*iter.surf.naterm+1+iter.surf.ndiv]
-    iter.surf.dell = x[2*iter.surf.naterm+iter.surf.ndiv+2:2*iter.surf.naterm+1+2*iter.surf.ndiv]
+
+    iter.surf.qu[:], iter.surf.ql[:] = calc_edgeVel(iter.surf, [iter.curfield.u[1], iter.curfield.w[1]])
+
+    #Derivatives of edge velocity
+    quInter = Spline1D(iter.surf.x, iter.surf.qu)
+    qx = derivative(quInter, iter.surf.x)
+    qt = (iter.surf.qu .- iter.surf.quprev)./iter.dt
+
+    #Construct 2 BL problems going from stag pt to TE
+    #For now, just the upper surface LE->TE
+    #To be mapped - del, E, q, q_prev
+
+    xfvm, w0, quf, qut, qux = mappingAerofoilToFVGrid(iter.surf.delu, iter.surf.Eu, iter.surf.qu, qx, qt, iter.surf.theta, iter.surf.nfvm)
+
+    w, j1 ,j2 = FVMIBL(w0, quf, qut, qux, xfvm, iter.dt);
+    delf = w[:,1]
+    Ef = (w[:,2]./w[:,1]) .- 1.0
+
+    #Reconstruct back to airfoil coordinates
+
+    delInter = Spline1D(xfvm, delf)
+    iter_delu = evaluate(delInter, iter.surf.theta)
+    iter_dell = iter_delu
 
     wtu = zeros(iter.surf.ndiv)
     wtl = zeros(iter.surf.ndiv)
 
-    iter.surf.qu[:], iter.surf.ql[:] = calc_edgeVel(iter.surf, [iter.curfield.u[1], iter.curfield.w[1]])
-
-    wtu[2:end] = diff(iter.surf.qu.*delu)./diff(iter.surf.x)
+    wtu[2:end] = (1/100)*diff(iter.surf.qu.*iter_delu)./diff(iter.surf.x)
     wtu[1] = 2*wtu[2] - wtu[3]
     wtl[:] = wtu[:]
 
@@ -235,41 +256,15 @@ function (iter::iterIBLsolve)(x::Array{Float64})
     for i = 2:iter.surf.ndiv-1
         RHStransp[i-1] += 0.5*(sqrt(1 + (iter.surf.cam_slope[i] + iter.surf.thick_slope[i])^2)*wtu[i]
                                + sqrt(1 + (iter.surf.cam_slope[i] - iter.surf.thick_slope[i])^2)*wtl[i])
-        
+
         RHStransp[iter.surf.ndiv+i-3] += 0.5*(sqrt(1 + (iter.surf.cam_slope[i] + iter.surf.thick_slope[i])^2)*wtu[i]
                                               - sqrt(1 + (iter.surf.cam_slope[i] - iter.surf.thick_slope[i])^2)*wtl[i])
     end
-    
 
     #Update induced velocities to include effect of last shed vortex
     update_indbound(iter.surf, iter.curfield)
 
-    #Construct 2 BL problems going from stag pt to TE
-    #For now, just the upper surface LE->TE
-    #To be mapped - del, E, q, q_prev
-     
-    deluf, Euf, quf, quprevf, xfvm = mappingAerofoilToFVGrid(iter.surf·qu, iter.surf.theta, iter.surf.ncell)
+    newsoln = iter.surf.LHS[1:iter.surf.ndiv*2-2, 1:iter.surf.naterm*2+1] \ (iter.surf.RHS[1:iter.surf.ndiv*2-2] + RHStransp[:])
 
-    #All inputs below must be in FVM grid 
-    w0u, Uu,  Utu, Uxu = inviscidInterface(deluf, Euf, iter.quf, iter.quf0, iter.dt, iter.surf, iter.xfvm)
-
-    w, j1 ,j2 = FVMIBL(w0u, Uu, Utu, Uxu, iter.xfvm, iter.dt);
-    delfvm = w[:,1]
-    Efvm = (w[:,2]./w[:,1]) .- 1.0
-
-    #Reconstruct back to airfoil coordinates
-    
-    delInter = Spline1D(xfvm, delfvm)
-    delu[:] = evaluate(delInter, iter.surf.theta)
-    dell[:] = delu[:]
-
-    EInter = Spline1D(xfvm, Efvm)
-    iter.E[:] = evaluate(EInter, iter.surf.theta)
-    dell[:] = delu[:]
-
-    res[1:iter.surf.ndiv*2-2] = inv(iter.surf.LHS[1:iter.surf.ndiv*2-2, 1:iter.surf.naterm*2+1])*(iter.surf.RHS[1:iter.surf.ndiv*2-2] + RHStransp[:]) - x[1:2*iter.surf.naterm+1]
-    
-    res[2*iter.surf.ndiv-1:end] = [iter.surf.delu; iter.surf.dell] .- x[2*iter.surf.ndiv-1:end]
-
-    return res
+    return newsoln .- x
 end

@@ -74,7 +74,7 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
 
         iter = iterIBLsolve(surf, curfield, dt)
 
-        soln = nlsolve(not_in_place(iter), x_init, method=:newton)
+        soln = nlsolve(not_in_place(iter), x_init, iterations=10)
 
         xsoln = soln.zero
 
@@ -158,6 +158,6 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
-    mat, surf, curfield
+    return mat, surf, curfield
 
 end

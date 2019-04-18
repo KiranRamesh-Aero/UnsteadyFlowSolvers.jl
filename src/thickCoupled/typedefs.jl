@@ -223,15 +223,15 @@ function (iter::iterIBLsolve)(x::Array{Float64})
     iter.surf.qu[:], iter.surf.ql[:] = calc_edgeVel(iter.surf, [iter.curfield.u[1], iter.curfield.w[1]])
 
     #Derivatives of edge velocity
-    quInter = Spline1D(iter.surf.x, iter.surf.qu)
-    qx = derivative(quInter, iter.surf.x)
-    qt = (iter.surf.qu .- iter.surf.quprev)./iter.dt
+    # quInter = Spline1D(iter.surf.x, iter.surf.qu)
+    # qx = derivative(quInter, iter.surf.x)
+    # qt = (iter.surf.qu .- iter.surf.quprev)./iter.dt
 
     #Construct 2 BL problems going from stag pt to TE
     #For now, just the upper surface LE->TE
     #To be mapped - del, E, q, q_prev
 
-    xfvm, w0, quf, qut, qux = mappingAerofoilToFVGrid(iter.surf.delu, iter.surf.Eu, iter.surf.qu, qx, qt, iter.surf.theta, iter.surf.nfvm)
+    xfvm, w0, quf, qut, qux = mappingAerofoilToFVGrid(iter.surf.delu, iter.surf.Eu, iter.surf.qu, iter.surf.quprev, iter.surf.theta, iter.surf.nfvm, iter.dt)
 
     w, j1 ,j2 = FVMIBL(w0, quf, qut, qux, xfvm, iter.dt);
     delf = w[:,1]

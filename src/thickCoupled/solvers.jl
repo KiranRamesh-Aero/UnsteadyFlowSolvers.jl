@@ -74,11 +74,10 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
 
         iter = iterIBLsolve(surf, curfield, dt)
 
-        soln = nlsolve(not_in_place(iter), x_init, iterations=10)
+        soln = nlsolve(not_in_place(iter), x_init)
 
         xsoln = soln.zero
 
-        println("here")
 
         #Assign solution
         surf.aterm[:] = xsoln[1:surf.naterm]
@@ -101,7 +100,9 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
         delInter = Spline1D(xfvm, delf)
         surf.delu[:] = evaluate(delInter, surf.theta)
         surf.dell[:] = surf.delu[:]
-
+        EInter = Spline1D(xfvm, Ef)
+        surf.Eu[:] = evaluate(EInter, surf.theta)
+        surf.El[:] = surf.Eu[:]
 
         #Calculate adot
         update_atermdot(surf, dt)
@@ -126,13 +127,15 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
         #Force calculation
         cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
 
+       
+        
         vle = surf.qu[1]
 
         if vle > 0.
             qspl = Spline1D(surf.x, surf.ql)
             stag = try
                 roots(qspl, maxn=1)[1]
-            catch
+OA            catch
                 0.
             end
         else
@@ -145,14 +148,15 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
         end
 
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, vle,
-                     cl, cd, cnc, cnnc, cn, cs, stag])
+        cl, cd, cnc, cnnc, cn, cs, stag])
 
-
-
+        println("here")
     end
 
     mat = mat'
 
+
+    
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
     DelimitedFiles.writedlm(f, mat)

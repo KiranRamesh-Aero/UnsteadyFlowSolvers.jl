@@ -50,22 +50,25 @@ function smoothEdgeVelocity(qu::Array{Float64,1}, theta::Array{Float64,1}, ncell
 end
 
 
-function mappingAerofoilToFVGrid(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{Float64,1}, qx::Array{Float64,1}, qt::Array{Float64}, theta::Array{Float64,1}, ncell::Int16)
+function mappingAerofoilToFVGrid(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{Float64,1}, qprev::Array{Float64,1}, theta::Array{Float64,1}, ncell::Int16, dt::Float64)
 
     xfvm = collect(range(0,stop=pi,length=ncell))
-
     n = length(xfvm)
     dx = (xfvm[end]-xfvm[1])/(n)
 
     qInter = Spline1D(theta, q)
-    qxInter = Spline1D(theta, qx)
-    qtInter = Spline1D(theta, qt)
+    qprevInter = Spline1D(theta, qprev)
+    
+    qf = evaluate(qInter, xfvm)
+    qprevf = evaluate(qprevInter, xfvm)
+    
+    qxf = derivative(qInter, xfvm)
+    qtf = (qf .- qprevf)./dt
+
+    error("here")
+    
     delInter = Spline1D(theta, del)
     EInter = Spline1D(theta, E)
-
-    qf = evaluate(qInter, xfvm)
-    qxf = evaluate(qxInter, xfvm)
-    qtf = evaluate(qtInter, xfvm)
     delf = evaluate(delInter, xfvm)
     Ef = evaluate(EInter, xfvm)
 
@@ -309,11 +312,11 @@ function update_boundpos(surf::TwoDSurfThickBL, dt::Float64)
         surf.bnd_x_u[i] = surf.bnd_x_u[i] + dt*((surf.pvt*surf.c - surf.x[i])*
                                                 sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] +
                                                                                                             surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
-
+        
         surf.bnd_z_u[i] = surf.bnd_z_u[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c -
                                                                    surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] +
                                                                                                                            surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
-
+        
         surf.bnd_x_l[i] = surf.bnd_x_l[i] + dt*((surf.pvt*surf.c - surf.x[i])*
                                                 sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] -
                                                                                                             surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)

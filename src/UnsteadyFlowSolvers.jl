@@ -6,7 +6,7 @@ import Dierckx: Spline1D, derivative, evaluate, roots
 
 import ForwardDiff
 
-import DelimitedFiles
+import DelimitedFiles: writedlm
 
 import Serialization
 
@@ -84,7 +84,8 @@ export
 TwoDSurfThickBL,
 transpCoupled,
 iterIBLsolve,
-transpTogether
+transpTogether,
+blLagrangian
 
 
 
@@ -95,7 +96,6 @@ include("kinem.jl")
 
 # utility functions
 include("utils.jl")
-
 # vortex count control utility
 include("delVort.jl")
 
@@ -117,6 +117,7 @@ include("thickCoupled/typedefs.jl")            # type definitions
 include("thickCoupled/calcs.jl")               # calculation functions
 include("thickCoupled/solvers.jl")             # solver methods
 include("thickCoupled/postprocess.jl")         # postprocessing functions
+include("thickCoupled/blLag.jl")         # postprocessing functions
 
 
 # 2D plotting functions

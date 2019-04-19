@@ -508,7 +508,7 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     #fL[1,:] = [0; 0]
 
     #fR[end,:] = ((F[end,:]) - wsR[end,:].* (wipR[end,:]))
-    fR[end,:] = #[F[end,1];F[end,2]]
+    fR[end,:] = [F[end,1];F[end,2]]
     #fL[end,:] .= 0
 
     #fR[end,:] = [0.0;0.0]

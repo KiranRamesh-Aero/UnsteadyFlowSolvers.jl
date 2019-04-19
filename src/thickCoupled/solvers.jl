@@ -314,7 +314,7 @@ function transpTogether(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::I
 
         iter = 0
 
-        while res > 1e-6
+        while res > 1e-3
 
             iter += 1
 
@@ -340,7 +340,12 @@ function transpTogether(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::I
             #Update induced velocities to include effect of last shed vortex
             update_indbound(surf, curfield)
 
-            surf.qu[:], surf.ql[:], qux[:], qlx[:] = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+            surf.qu[:], surf.ql[:], _, _ = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+
+            qux[2:end] = diff(surf.qu)./diff(surf.theta)
+            qux[1] = 2*qux[2] - qux[3]
+            qlx[2:end] = diff(surf.ql)./diff(surf.theta)
+            qlx[1] = 2*qlx[2] - qlx[3]
 
 
             #plot(surf.x, surf.qu)
@@ -355,23 +360,21 @@ function transpTogether(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::I
 
             w0 = [surf.delu surf.delu.*(surf.Eu .+ 1)]
 
-            tcur = 0.
-            for i = 1:100
-                w0, tbl, j1 ,j2 = FVMIBL(w0, surf.qu, qut, qux, surf.x, dt/100.)
-                tcur += tbl
-                println("tcur", w0[:,1])
-                plot(surf.x, w0[:,1])
-            end
+            w0, tbl, j1 ,j2 = FVMIBL(w0, surf.qu, qut, qux, surf.theta, dt)
+
+
 
             iter_delu[:] = w0[:,1]
             iter_Eu[:] = (w0[:,2]./w0[:,1]) .- 1.0
             iter_dell[:] = iter_delu[:]
             iter_El[:] = iter_Eu[:]
 
-            #plot(surf.x, iter_delu)
-            error("ehre")
+            plot(surf.x, iter_delu)
+            if (iter > 2)
+            #error("ehre")
+            end
 
-            wtu[2:end] = (1/1000)*diff(surf.qu.*iter_delu)./diff(surf.x)
+            wtu[2:end] = -(1/1000)*diff(surf.qu.*iter_delu)./diff(surf.x)
             wtu[1] = wtu[2]
             wtl[:] = -wtu[:]
 
@@ -400,6 +403,9 @@ function transpTogether(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::I
         surf.delu[end] = surf.delu[end-1]
         surf.Eu[end] = surf.Eu[end-1]
 
+        if istep /10 == 0
+            plot(surf.x, surf.delu)
+        end
         surf.Eu[:] = iter_Eu[:]
         surf.El[:] = iter_El[:]
 

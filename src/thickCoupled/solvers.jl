@@ -60,49 +60,93 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
         #Construct RHS vector
         update_thickRHS(surf, curfield)
 
-        #Place dummy  TEV
-        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, 0.0, vcore, 0., 0.))
+        #Solve inviscid problem
+        invsoln = surf.LHS[1:surf.ndiv*2-2, 1:surf.naterm*2+1] \ surf.RHS[1:surf.ndiv*2-2]
 
-        if istep == 1
-            surf.qu[:], surf.ql[:] = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
-            surf.quprev[:] = surf.qu[:]
-            surf.qlprev[:] = surf.ql[:]
+
+
+        #Assign the solution
+        for i = 1:surf.naterm
+            surf.aterm[i] = invsoln[i]
+            surf.bterm[i] = invsoln[i+surf.naterm]
+        end
+        tevstr = invsoln[2*surf.naterm+1]*surf.uref*surf.c
+        push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
+
+        avisc = zeros(surf.naterm)
+        bvisc = zeros(surf.naterm)
+
+        #Update induced velocities to include effect of last shed vortex
+        update_indbound(surf, curfield)
+
+        res = 1.
+
+        qux = zeros(surf.ndiv)
+        qlx = zeros(surf.ndiv)
+        qut = zeros(surf.ndiv)
+        qlt = zeros(surf.ndiv)
+
+        iter_delu = zeros(surf.ndiv)
+        iter_dell = zeros(surf.ndiv)
+        iter_Eu = zeros(surf.ndiv)
+        iter_El = zeros(surf.ndiv)
+        wtu = zeros(surf.ndiv)
+        wtl = zeros(surf.ndiv)
+
+        #Iterate for viscous solution and interaction
+
+        while res > 1e-6
+
+            surf.aterm[:] = invsoln[1:surf.naterm] .+ avisc[:]
+            surf.bterm[:] = invsoln[surf.naterm+1:2*surf.naterm] .+ bvisc[:]
+
+            surf.qu[:], surf.ql[:], qux[:], qlx[:] = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+
+            if istep == 1
+                surf.quprev[:] = surf.qu[:]
+                surf.qlprev[:] = surf.ql[:]
+            end
+
+            qut[:] = (surf.qu[:] .- surf.quprev[:])./dt
+            qlt[:] = (surf.ql[:] .- surf.qlprev[:])./dt
+
+            w0 = [surf.delu surf.delu.*(surf.Eu .+ 1)]
+            w, j1 ,j2 = FVMIBL(w0, surf.qu, qut, qux, surf.x, dt)
+            iter_delu = w[:,1]
+            iter_Eu = (w[:,2]./w[:,1]) .- 1.0
+            iter_dell[:] = surf.delu[:]
+            iter_El[:] = surf.Eu[:]
+
+            wtu[2:end] = (1/100)*diff(surf.qu.*iter_delu)./diff(surf.x)
+            wtu[1] = 2*wtu[2] - wtu[3]
+            wtl[:] = wtu[:]
+
+            RHStransp = zeros(surf.ndiv*2-2)
+
+            #Add transpiration velocity to RHS
+            for i = 2:surf.ndiv-1
+                RHStransp[i-1] = 0.5*(sqrt(1 + (surf.cam_slope[i] + surf.thick_slope[i])^2)*wtu[i]
+                                       + sqrt(1 + (surf.cam_slope[i] - surf.thick_slope[i])^2)*wtl[i])
+
+                RHStransp[surf.ndiv+i-3] = 0.5*(sqrt(1 + (surf.cam_slope[i] + surf.thick_slope[i])^2)*wtu[i]
+                                                      - sqrt(1 + (surf.cam_slope[i] - surf.thick_slope[i])^2)*wtl[i])
+            end
+
+            #Solve viscous problem
+            viscsoln = surf.LHS[1:surf.ndiv*2-2, 1:surf.naterm*2] \ RHStransp[1:surf.ndiv*2-2]
+
+            res = sqrt(sum((viscsoln[:] .- [avisc;bvisc]).^2))
+
+            println(res)
+
+            avisc[:] = viscsoln[1:surf.naterm]
+            bvisc[:] = viscsoln[surf.naterm+1:end]
+
+
+            error("here")
+
         end
 
-        #Initial condition for iteration
-        x_init = [surf.aterm[:]; surf.bterm[:]; curfield.tev[end].s]
-
-        iter = iterIBLsolve(surf, curfield, dt)
-
-        soln = nlsolve(not_in_place(iter), x_init)
-
-        xsoln = soln.zero
-
-
-        #Assign solution
-        surf.aterm[:] = xsoln[1:surf.naterm]
-        surf.bterm[:] = xsoln[surf.naterm+1:2*surf.naterm]
-        curfield.tev[end].s = xsoln[2*surf.naterm+1]
-
-        #Update BL solution
-        #Derivatives of edge velocity
-        quInter = Spline1D(surf.x, surf.qu)
-        qx = derivative(quInter, surf.x)
-        qt = (surf.qu .- surf.quprev)./dt
-        xfvm, w0, quf, qut, qux = mappingAerofoilToFVGrid(surf.delu, surf.Eu, surf.qu, qx, qt, surf.theta, surf.nfvm)
-
-        w, j1 ,j2 = FVMIBL(w0, quf, qut, qux, xfvm, dt);
-        delf = w[:,1]
-        Ef = (w[:,2]./w[:,1]) .- 1.0
-
-        #Reconstruct back to airfoil coordinates
-
-        delInter = Spline1D(xfvm, delf)
-        surf.delu[:] = evaluate(delInter, surf.theta)
-        surf.dell[:] = surf.delu[:]
-        EInter = Spline1D(xfvm, Ef)
-        surf.Eu[:] = evaluate(EInter, surf.theta)
-        surf.El[:] = surf.Eu[:]
 
         #Calculate adot
         update_atermdot(surf, dt)
@@ -127,8 +171,8 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
         #Force calculation
         cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
 
-       
-        
+
+
         vle = surf.qu[1]
 
         if vle > 0.
@@ -156,7 +200,7 @@ OA            catch
     mat = mat'
 
 
-    
+
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
     DelimitedFiles.writedlm(f, mat)

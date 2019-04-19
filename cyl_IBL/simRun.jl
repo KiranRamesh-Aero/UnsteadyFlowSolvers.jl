@@ -18,7 +18,7 @@ geometry = "Cylinder"
 
 lespcrit = [10.25;]
 
-surf = TwoDSurfThick(geometry, pvt, full_kinem)
+surf = TwoDSurfThickBL(geometry, pvt, full_kinem)
 
 curfield = TwoDFlowField()
 
@@ -26,7 +26,7 @@ dtstar = 0.0001
 
 t_tot = 1.
 
-nsteps = 20#Int(round(t_tot/dtstar))+1
+nsteps = 1#Int(round(t_tot/dtstar))+1
 
 println("nsteps ", nsteps)
 
@@ -39,6 +39,4 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, curfield = lautat(surf, curfield, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
-
-
+#mat, surf, curfield = transpCoupled(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)

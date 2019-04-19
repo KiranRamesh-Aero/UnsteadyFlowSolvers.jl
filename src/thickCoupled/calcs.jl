@@ -49,50 +49,16 @@ function smoothEdgeVelocity(qu::Array{Float64,1}, theta::Array{Float64,1}, ncell
 
 end
 
-
-function mappingAerofoilToFVGrid(del::Array{Float64,1}, E::Array{Float64,1}, q::Array{Float64,1}, qprev::Array{Float64,1}, theta::Array{Float64,1}, ncell::Int16, dt::Float64)
-
-    xfvm = collect(range(0,stop=pi,length=ncell))
-    n = length(xfvm)
-    dx = (xfvm[end]-xfvm[1])/(n)
-
-    qInter = Spline1D(theta, q)
-    qprevInter = Spline1D(theta, qprev)
-    
-    qf = evaluate(qInter, xfvm)
-    qprevf = evaluate(qprevInter, xfvm)
-    
-    qxf = derivative(qInter, xfvm)
-    qtf = (qf .- qprevf)./dt
-
-    error("here")
-    
-    delInter = Spline1D(theta, del)
-    EInter = Spline1D(theta, E)
-    delf = evaluate(delInter, xfvm)
-    Ef = evaluate(EInter, xfvm)
-
-    w1 = zeros(length(delf))
-    w2 = zeros(length(delf))
-    w1[:] = delf[:]
-    w2[:] = delf[:].*(Ef[:] .+ 1.0)
-    w0 = hcat(w1,w2)
-
-    return xfvm, w0, qf, qtf, qxf
-end
-
 function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1}, dt::Float64)
 
-    n = Int(length(w)/2)
-    #dx = Float64((x[end]-x[1])/n)
-    dx = Float64((x[end]-x[1])/n)
-    #dx_half = (x[end]-x[end-1])/2
-    #dx = [x[2:end]-x[1:end-1]; dx_half]
+    n = length(x)
+
+    dx = zeros(n)
+    dx[2:end] = diff(x)
+    dx[1] = dx[2]
 
     # correlate the unknown values from the del and E values
-    del , E, FF ,B, S, dfde = correlate(w)
-    #del , E, FF ,B, S, dfde  = calc_shapes(n,w)
-
+    del, E, FF ,B, S, dfde = correlate(w)
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
 
@@ -107,8 +73,6 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     # of the transport equations.
     #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
 
-
-
     # step 1 : assuming this as a homogeneous equation and advanced half a step
     w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
 
@@ -116,7 +80,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
 
-    z = RHSSource(U,B, del, Ut, Ux, FF, E, S)
+    z = RHSSource(U, B, del, Ut, Ux, FF, E, S)
 
     #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
     #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
@@ -312,11 +276,11 @@ function update_boundpos(surf::TwoDSurfThickBL, dt::Float64)
         surf.bnd_x_u[i] = surf.bnd_x_u[i] + dt*((surf.pvt*surf.c - surf.x[i])*
                                                 sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] +
                                                                                                             surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
-        
+
         surf.bnd_z_u[i] = surf.bnd_z_u[i] + dt*(surf.kinem.hdot + (surf.pvt*surf.c -
                                                                    surf.x[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot - (surf.cam[i] +
                                                                                                                            surf.thick[i])*sin(surf.kinem.alpha)*surf.kinem.alphadot)
-        
+
         surf.bnd_x_l[i] = surf.bnd_x_l[i] + dt*((surf.pvt*surf.c - surf.x[i])*
                                                 sin(surf.kinem.alpha)*surf.kinem.alphadot - surf.kinem.u + (surf.cam[i] -
                                                                                                             surf.thick[i])*cos(surf.kinem.alpha)*surf.kinem.alphadot)
@@ -589,26 +553,26 @@ function RHSSource(U::Array{Float64,1} ,B::Array{Float64,1}, del::Array{Float64,
 
 end
 
-function separationJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Float64)
+function separationJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float64, dx::Array{Float64,1})
 
     N1 = length(lamb1)
     lambj1 = sum(lamb1)/N1
-    J1Sep = (dt)./(dx) .* (lamb1[1:end-1] - lamb1[2:end])./ (lambj1*N1)
+    J1Sep = (dt)./(dx[2:end]) .* (lamb1[1:end-1] - lamb1[2:end])./ (lambj1*N1)
 
-    for i=2:N1-1
-    if lamb1[i].<0.0
-    J1Sep[i] =  (dt)/(dx) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
-    end
+    for i = 2:N1-1
+        if lamb1[i] .< 0.0
+            J1Sep[i] =  (dt)/(dx[i]) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
+        end
     end
 
     N2 = length(lamb2)
     lambj2 = sum(lamb2)/N2
-    J2Sep = (dt)/(dx) .* (lamb2[1:end-1] - lamb2[2:end])./ (lambj2*N2)
+    J2Sep = (dt)/(dx[2:end]) .* (lamb2[1:end-1] - lamb2[2:end])./ (lambj2*N2)
 
-    for i=2:N2-1
-    if lamb2[i].<0.0
-    J2Sep[i] =  (dt)/(dx) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
-    end
+    for i = 2:N2-1
+        if lamb2[i] .< 0.0
+            J2Sep[i] =  (dt)/(dx[i]) * (lamb2[i+1] - lamb2[i-1]) / (lambj2*N2)
+        end
     end
 
     return J1Sep, J2Sep

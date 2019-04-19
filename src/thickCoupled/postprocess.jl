@@ -148,6 +148,8 @@ function calc_edgeVel(surf::TwoDSurfThickBL, vels::Vector{Float64})
 
     q_u = zeros(surf.ndiv)
     q_l = zeros(surf.ndiv)
+    qux = zeros(surf.ndiv)
+    qlx = zeros(surf.ndiv)
 
     for i = 1:surf.ndiv
 
@@ -178,5 +180,10 @@ function calc_edgeVel(surf::TwoDSurfThickBL, vels::Vector{Float64})
 
     end
 
-    return q_u, q_l
+    qux[2:end] = diff(q_u)./diff(surf.x)
+    qux[1] = 2*qux[2] - qux[3]
+    qlx[2:end] = diff(q_l)./diff(surf.x)
+    qlx[1] = 2*qlx[2] - qlx[3]
+
+    return q_u, q_l, qux, qlx
 end

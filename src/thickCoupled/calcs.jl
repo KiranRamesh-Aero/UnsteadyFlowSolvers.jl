@@ -69,6 +69,10 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
     #dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
 
+    #if t_cur + dt > t_tot
+    #    dt = t_tot - t_cur
+    #end
+
     # two step forward Euler methods for adding the source term to the right hand-side
     # of the transport equations.
     #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
@@ -105,6 +109,24 @@ function update_indbound(surf::TwoDSurfThickBL, curfield::TwoDFlowField)
 
     return surf
 end
+
+function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Array{Float64})
+
+    # calculate time step values based on eigenvalues
+
+    dti = cfl.*(dx./(abs.(lamb1+lamb2)))
+    dt = minimum(abs.(dti))
+
+    #@printf(" Max l1: %1.5f, Min l1: %1.5f, Max l2: %1.5f, Min l2: %1.5f \n", maximum(lamb1), minimum(lamb1),maximum(lamb2), minimum(lamb2));
+
+    if dt< 0.00001
+        println("dt modified for max dt :$dt")
+        dt =0.0005
+    end
+
+    return dt
+end
+
 
 function update_kinem(surf::TwoDSurfThickBL, t)
 
@@ -486,7 +508,8 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
     #fL[1,:] = [0; 0]
 
     #fR[end,:] = ((F[end,:]) - wsR[end,:].* (wipR[end,:]))
-    fR[end,:] = [F[end,1];F[end,2]]
+    fR[end,:] = #[F[end,1];F[end,2]]
+    #fL[end,:] .= 0
 
     #fR[end,:] = [0.0;0.0]
 
@@ -533,7 +556,7 @@ function calc_eigen(E::Array{Float64}, F::Array{Float64},
         lamb2[i] = (-b_q  -sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
 
         #Always have lamb1 > lamb2
-        if lamb2[i]>lamb1[i]
+        if lamb2[i] > lamb1[i]
             temp  = lamb2[i]
             lamb2[i] = lamb1[i]
             lamb1[i] = temp

@@ -95,7 +95,6 @@ include("kinem.jl")
 
 # utility functions
 include("utils.jl")
-
 # vortex count control utility
 include("delVort.jl")
 

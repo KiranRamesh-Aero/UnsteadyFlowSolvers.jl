@@ -95,12 +95,21 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
 
         #Iterate for viscous solution and interaction
 
+        iter = 0
         while res > 1e-6
+
+            iter += 1
 
             surf.aterm[:] = invsoln[1:surf.naterm] .+ avisc[:]
             surf.bterm[:] = invsoln[surf.naterm+1:2*surf.naterm] .+ bvisc[:]
 
             surf.qu[:], surf.ql[:], qux[:], qlx[:] = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
+
+            plot(surf.x, surf.qu)
+
+            if iter == 2
+                error("now")
+            end
 
             if istep == 1
                 surf.quprev[:] = surf.qu[:]
@@ -117,9 +126,11 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
             iter_dell[:] = surf.delu[:]
             iter_El[:] = surf.Eu[:]
 
+
+
             wtu[2:end] = (1/100)*diff(surf.qu.*iter_delu)./diff(surf.x)
             wtu[1] = 2*wtu[2] - wtu[3]
-            wtl[:] = wtu[:]
+            wtl[:] = -wtu[:]
 
             RHStransp = zeros(surf.ndiv*2-2)
 
@@ -142,8 +153,7 @@ function transpCoupled(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::In
             avisc[:] = viscsoln[1:surf.naterm]
             bvisc[:] = viscsoln[surf.naterm+1:end]
 
-
-            error("here")
+            println(bvisc)
 
         end
 

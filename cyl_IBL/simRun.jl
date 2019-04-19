@@ -39,4 +39,4 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-#mat, surf, curfield = transpCoupled(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = transpCoupled(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)

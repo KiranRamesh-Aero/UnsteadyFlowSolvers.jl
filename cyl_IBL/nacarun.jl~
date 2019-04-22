@@ -18,11 +18,11 @@ geometry = "Cylinder"
 
 lespcrit = [10.25;]
 
-surf = TwoDSurfThickBL(geometry, pvt, full_kinem, ndiv=140, naterm=136, nfvm=80)
+surf = TwoDSurfThickBL(geometry, pvt, full_kinem, ndiv=140, naterm=136, nfvm=60)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.01
+dtstar = 0.005
 
 t_tot = 1.
 
@@ -39,9 +39,7 @@ writeInterval = t_tot/10.
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-# mat, surf, curfield = transpTogether(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
-
-mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = transpTogether(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
 
 

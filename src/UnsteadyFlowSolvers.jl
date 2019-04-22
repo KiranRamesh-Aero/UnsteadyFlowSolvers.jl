@@ -85,7 +85,13 @@ TwoDSurfThickBL,
 transpCoupled,
 iterIBLsolve,
 transpTogether,
-blLagrangian
+blLagrangian,
+initDelE,
+FVMIBLorig,
+smoothEdges,
+dtfunFVM,
+dtfunjac,
+transpTogetherWake
 
 
 

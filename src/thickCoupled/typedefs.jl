@@ -43,15 +43,15 @@ mutable struct TwoDSurfThickBL
     delu :: Vector{Float64}
     dell :: Vector{Float64}
     Eu :: Vector{Float64}
-    El :: Vector{Float64}
-    qu :: Vector{Float64}
-    ql :: Vector{Float64}
-quprev :: Vector{Float64}
-qlprev :: Vector{Float64}
+El :: Vector{Float64}
+qu :: Vector{Float64}
+ql :: Vector{Float64}
+su :: Vector{Float64}
+sl :: Vector{Float64}
 
-    function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=140, naterm=136, initpos = [0.; 0.], nfvm=200)
-        theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
-        thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
+function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=140, naterm=136, initpos = [0.; 0.], nfvm=60)
+    theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
+    thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
         bnd_x_l = zeros(ndiv); bnd_z_l = zeros(ndiv); bnd_x_chord = zeros(ndiv); bnd_z_chord = zeros(ndiv)
 
         kinem = KinemPar(0, 0, 0, 0, 0, 0)
@@ -196,15 +196,31 @@ qlprev :: Vector{Float64}
         # end
         levflag = [0;]
 
-        delu, dell, Eu, El = initDelE(ndiv)
+delu, dell, Eu, El = initDelE(ndiv)
 
-        qu = zeros(ndiv)
-        ql = zeros(ndiv)
-        quprev = zeros(ndiv)
-        qlprev = zeros(ndiv)
+qu = zeros(ndiv)
+ql = zeros(ndiv)
 
-        new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, quprev, qlprev)
-    end
+su = zeros(ndiv)
+sl = zeros(ndiv)
+
+dsdx = zeros(ndiv)
+for i = 1:ndiv
+    dsdx[i] = sqrt(1 + (cam_slope[i] + thick_slope[i])^2)
+end
+su[1] = 0.
+for i = 2:ndiv
+    su[i] = simpleTrapz(dsdx[1:i], x[1:i])
+end
+for i = 1:ndiv
+    dsdx[i] = sqrt(1 + (cam_slope[i] - thick_slope[i])^2)
+end
+sl[1] = 0.
+for i = 2:ndiv
+    sl[i] = simpleTrapz(dsdx[1:i], x[1:i])
+end
+new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, su, sl)
+end
 end
 
 struct iterIBLsolve

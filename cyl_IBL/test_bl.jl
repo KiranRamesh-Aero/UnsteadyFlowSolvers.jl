@@ -20,14 +20,17 @@ using UnsteadyFlowSolvers
 
 ncell = 200
 #x = collect(range(1e-6, stop=1-1e-6, length=ncell))
-x = collect(range(1e-6, stop=pi-1e-6, length=ncell))
+
+theta = collect(range(1e-6, stop=pi-1e-6, length=ncell))
+x = 1/2*(1 .- cos.(theta))*pi
+#x = collect(range(1e-6, stop=pi-1e-6, length=ncell))
 
 #theta = acos.(2*x .- 1)
 
 #u = 2*sin.(theta)
 u = 2*sin.(x)
 #ux = 2*cos.(theta)
-ux = 4*cos.(x)
+ux = 2*cos.(x)
 ut = zeros(length(ncell))
 
 del, _, E, _ = initDelE(ncell)
@@ -36,9 +39,9 @@ w0[:,1] = del[:]
 w0[:,2] = del[:].*(E[:] .+ 1)
 
 t = 0.
-t_tot = 0.9
+t_tot = 1.4
 
-x, w, t = FVMIBLorig(w0, u, ut, ux, x, t, t_tot)
+x, w, t = FVMIBLgrid(w0, u, ut, ux, x, t, t_tot)
 
 #while t < t_tot
 

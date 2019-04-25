@@ -41,10 +41,12 @@ delvort = delNone()
 
 # mat, surf, curfield = transpTogether(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
-mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+#mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+
+mat, surf, curfield = transpSimul(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
 
 
 #eps, eta, x, u = blLagrangian(0.001, 3.0, 200, 60, 1e-6,
-     1e-3, 1, 0.5)
+#     1e-3, 1, 0.5)
 

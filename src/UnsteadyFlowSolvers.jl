@@ -4,7 +4,7 @@ module UnsteadyFlowSolvers
 
 import Dierckx: Spline1D, derivative, evaluate, roots
 
-import ForwardDiff
+using ForwardDiff
 
 import DelimitedFiles: writedlm
 
@@ -28,6 +28,7 @@ import Revise
 using Printf
 
 using DataStructures
+
 using Interpolations
 
 export
@@ -79,19 +80,22 @@ export
 
     # 2D postprocessing functions
     calc_edgeVel,
-
-#IBLThickCoupled,
-TwoDSurfThickBL,
-transpCoupled,
-iterIBLsolve,
-transpTogether,
-blLagrangian,
-initDelE,
-FVMIBLorig,
-smoothEdges,
-dtfunFVM,
-dtfunjac,
-transpTogetherWake
+    
+    #IBLThickCoupled,
+    TwoDSurfThickBL,
+    transpCoupled,
+    iterIBLsolve,
+    transpTogether,
+    blLagrangian,
+    initDelE,
+    FVMIBLorig,
+    smoothEdges,
+    dtfunFVM,
+    dtfunjac,
+    transpTogetherWake,
+    transpSimul,
+    transResidual,
+    FVMIBLgrid
 
 
 

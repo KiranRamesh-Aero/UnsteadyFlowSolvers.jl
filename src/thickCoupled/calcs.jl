@@ -165,6 +165,74 @@ function FVMIBLorig(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,
 end
 
 
+function FVMIBLgrid(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1}, t::Float64, t_tot::Float64)
+
+    n = length(x)
+
+    dx = zeros(n)
+    dx[2:end] = diff(x)
+    dx[1] = dx[2]
+    
+    csep = zeros(n)
+
+    while t < t_tot
+        # correlate the unknown values from the del and E values
+        del, E, FF ,B, S, dfde = correlate(w)
+
+        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
+
+        #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
+        #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
+
+        #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
+        lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
+        dt = calc_Dt(lamb1 ,lamb2, 0.5, ones(length(x)).*dx)
+
+        if t + dt > t_tot
+            dt = t_tot - t
+        end
+
+        #if t_cur + dt > t_tot
+        #    dt = t_tot - t_cur
+        #end
+
+        # two step forward Euler methods for adding the source term to the right hand-side
+        # of the transport equations.
+        #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
+
+        # step 1 : assuming this as a homogeneous equation and advanced half a step
+        w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
+
+        del , E, FF ,B, S, dfde = correlate(w1)
+
+        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
+
+        z = RHSSource(U, B, del, Ut, Ux, FF, E, S)
+
+        #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
+        #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
+
+        #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
+
+        j1, j2 = separationJ(lamb1, lamb2, dt, ones(length(x)).*dx)
+
+        # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
+        w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
+
+        w[:,:] = w2[:,:]
+        t += dt
+
+        for i = 20:n-20
+            csep[i] = (w[i+1,1] - w[i,1])/(x[i+1,1] - w[i,1])/pi
+        end
+        #println(t, "   ", maximum(csep))
+
+    end
+
+    return x, w, t
+end
+
+
 function update_indbound(surf::TwoDSurfThickBL, curfield::TwoDFlowField)
     surf.uind_u[1:surf.ndiv], surf.wind_u[1:surf.ndiv] = ind_vel([curfield.tev;
                                                                   curfield.lev; curfield.extv], surf.bnd_x_u, surf.bnd_z_u)
@@ -921,6 +989,9 @@ function dtfunFVM(w::Array{Float64,1}, U::Array{Float64,1}, Ut::Array{Float64,1}
     return dfdt
 end
 
+
+
+
 function dtfunjac(w, U, Ut, Ux, x)
 
     n = Int(length(w)/2)
@@ -946,11 +1017,169 @@ function dtfunjac(w, U, Ut, Ux, x)
     dfde = 4*4.8274*E.^3 - 3*5.9816*E.^2 + 2*4.0274*E .+ 0.23247
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = dtfunfluxReconjac(del, E , U, FF, dfde)
-
+    
     z = RHSSourcejac(U, B, del, Ut, Ux, FF, E, S)
-
+    
     dfdt = ([fL[:,1]; fL[:,2]] - [fR[:,1]; fR[:,2]])./ones(2*n)*dx .+ [z[:,1]; z[:,2]]
-
+    
     return dfdt
 end
 
+function transResidual!(F, x, naterm, uref, theta, xtev, ztev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c, su, delstart, Estart, LHS, RHS, cache)
+    nfvm = length(delstart)
+    ndiv = length(theta)
+    
+    aterm = x[1:naterm]
+    bterm = x[naterm+1:2*naterm]
+    stev = x[2*naterm+1:2*naterm+1]
+    
+    #res = zeros(2*naterm+1 + 2*ndiv)
+
+    qutf = zeros(nfvm)
+    quxf = zeros(nfvm)
+
+    #println(typeof(aterm))
+    #println(typeof(stev))
+    
+    # surf.aterm[:] = x[1:surf.naterm]
+    # surf.bterm[:] = x[surf.naterm+1:2*surf.naterm]
+    # #curfield.tev[end].s = x[2*surf.naterm+1]
+    # #tev hasnt been added yet 
+    # del = x[2*surf.naterm+1:2*surf.naterm+surf.nfvm]
+    # E = x[2*surf.naterm+surf.nfvm+1:2*surf.naterm+2*surf.nfvm]
+
+    calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
+
+    #Transform problem to cOordinate along surface
+    #srange = collect(range(0, stop=su[end], length=nfvm))
+    #println(length(su))
+    #println(length(qu))
+    
+    #qInter = Spline1D(su, qu)
+    #quf = evaluate(qInter, srange)
+
+    
+    qux[2:end] = diff(qu)./diff(su)
+    qux[1] = 2*quxf[2] - quxf[3]
+    
+    smoothEdges!(quxf, 10)
+    
+    qut[:] .= (qu[:] .- quprev[:])./dt
+    
+    # delInter = Spline1D(surf.su, surf.delu)
+    # EInter = Spline1D(surf.su, surf.Eu)
+    # delf = evaluate(delInter, srange)
+    # Ef = evaluate(EInter, srange)
+    
+    w0 = [delstart delstart.*(Estart .+ 1)]
+    
+    _, w0, tt = FVMIBLgrid(w0, qu, qut, qux, su, t-dt, t)
+    
+    delu = w0[:,1]
+    Eu = w0[:,2]./w0[:,1] - 1.
+    
+    smoothEdges!(delu, 5)
+
+    xf = c/2 .* (1. .- cos.(theta))
+    
+    wtu[2:end] = (1/sqrt(Re))*diff(qu.*delu)./diff(xf)
+    wtu[1] = wtu[2]
+    
+    smoothEdges!(wtu, 5)
+     
+    RHStransp = zeros(2*ndiv-2)
+    
+    for i = 2:ndiv-1
+        RHStransp[i-1] = 0.5*(wtu[i] + wtl[i])
+        RHStransp[surf.ndiv+i-3] = 0.5*(wtu[i] - wtl[i])
+    end
+    
+    x_solved = LHS[1:ndiv*2-2, 1:naterm*2+1] \ (RHS[1:ndiv*2-2] + RHStransp[:])
+
+    #Residual for inviscid problem
+    F[1:2*naterm+1] = x_solved .- x[1:2*naterm+1]
+    #Residual for viscous problem
+    F[2*naterm+2:end] = delu .- x[2*naterm+2:end]
+end
+
+
+
+
+function itp_nonuniform(val::Real, itp_uniform, x, y)
+    i = 2
+    while val > x[i]
+        i += 1
+    end
+    λ = (val - x[i-1])/(x[i] - x[i-1])
+
+    itp_uniform[i - 1 + λ]
+end
+
+
+
+function splint(xa,ya,y2a,n,x)
+    
+    xa(n),y2a(n),ya(n)
+
+    klo=1
+    khi=n
+    
+    while khi-klo < 1
+        k = (khi + klo)/2
+        if xa[k]  > x  
+            khi=k
+        else
+            klo=k
+        end
+    end
+    h = xa[khi] - xa[klo]
+    if h == 0
+        error("bad xa input for splint")
+    end
+    a = (xa[khi] - x)/h
+    b = (x-xa[klo])/h
+    y = a*ya[klo] + b*ya[khi] + ((a^3-a)*y2a[klo] + (b^3-b)*y2a[khi])*(h^2)/6
+
+    return y
+end 
+
+
+
+function spline(x,y,n,yp1,ypn) 
+
+    nmax=3000
+    
+    # if yp1 > 99e30
+    #     y2[1] = 0
+    #     u[1] = 0
+    # else
+    #     y2[1] = -0.5
+    #     u[1] = (3. /(x[2]-x[1]))*((y[2]-y[1])/(x[2]-x[1])-yp1)
+    # end
+
+    i = 2:n-1
+    im = 1:n-2
+    ip = 3:n
+    sig = (x[i] .- x[im])./(x[ip] .- x[im])
+    p = sig*y2[im] .+ 2
+    y2 = (sig-1.)./p
+    u = (6. *((y[ip] .- y[i])./(x[ip] .- x[i]) .- (y[i] .- y[im])
+                    ./(x[i] .- x[im]))./(x[ip] .- x[im]) .- sig*u[im])./p
+
+    # if ypn > 99e30
+    #     qn = 0
+    #     un = 0
+    # else
+    #     qn = 0.5
+    #     un = (3. /(x[n]-x[n-1]))*(ypn-(y[n]-y[n-1])/(x[n]-x[n-1]))
+    # end 
+    y2[n] = (un-qn*u[n-1])/(qn*y2[n-1]+1.)
+    for k = n-1:-1:1
+        y2[k] = y2[k]*y2[k+1] + u[k]
+    end 
+    
+    return y2
+    
+end 
+
+    

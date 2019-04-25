@@ -22,11 +22,11 @@ surf = TwoDSurfThickBL(geometry, pvt, full_kinem, ndiv=140, naterm=136, nfvm=80)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.01
+dtstar = 0.0001
 
 t_tot = 1.
 
-nsteps = 500#Int(round(t_tot/dtstar))+1
+nsteps = 1#500#Int(round(t_tot/dtstar))+1
 
 println("nsteps ", nsteps)
 
@@ -43,10 +43,10 @@ delvort = delNone()
 
 #mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
+#const dual_cache = DiffCache(rand(surf.ndiv))
+
+
 mat, surf, curfield = transpSimul(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
-
-
-
 #eps, eta, x, u = blLagrangian(0.001, 3.0, 200, 60, 1e-6,
 #     1e-3, 1, 0.5)
 

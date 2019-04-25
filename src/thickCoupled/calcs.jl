@@ -65,8 +65,8 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
     #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
 
     #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-    lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
-    #dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
+    lamb1 ,lamb2 = calc_eigenjac(E, FF, dfde, U)
+    dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
 
     #if t_cur + dt > t_tot
     #    dt = t_tot - t_cur
@@ -83,7 +83,7 @@ function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, 
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
 
-    z = RHSSource(U, B, del, Ut, Ux, FF, E, S)
+    z = RHSSourcejac(U, B, del, Ut, Ux, FF, E, S)
 
     #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
     #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
@@ -165,71 +165,55 @@ function FVMIBLorig(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,
 end
 
 
-function FVMIBLgrid(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1}, t::Float64, t_tot::Float64)
+function FVMIBLgrid(w, U, Ut, Ux, x, dt)
 
     n = length(x)
 
     dx = zeros(n)
     dx[2:end] = diff(x)
     dx[1] = dx[2]
-    
-    csep = zeros(n)
 
-    while t < t_tot
+    #csep = zeros(n)
+
+    wfin = zeros(Number, size(w))
+
+    wfin[:,:] = w[:,:]
+
+    #while t < t_tot
         # correlate the unknown values from the del and E values
         del, E, FF ,B, S, dfde = correlate(w)
 
-        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
+        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = dtfunfluxReconjac(del, E, U, FF, dfde)
 
-        #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
-        #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
+        #lamb1 ,lamb2 = calc_eigenjac(E, FF, dfde, U)
+        #dt = calc_Dtjac(lamb1 ,lamb2, 0.5, ones(length(x)).*dx)
 
-        #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-        lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
-        dt = calc_Dt(lamb1 ,lamb2, 0.5, ones(length(x)).*dx)
-
-        if t + dt > t_tot
-            dt = t_tot - t
-        end
-
-        #if t_cur + dt > t_tot
-        #    dt = t_tot - t_cur
-        #end
-
-        # two step forward Euler methods for adding the source term to the right hand-side
-        # of the transport equations.
-        #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
+        #if t + dt > t_tot
+     #       dt = t_tot - t
+      #  end
 
         # step 1 : assuming this as a homogeneous equation and advanced half a step
-        w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
+        w1 = wfin.+ ((fL - fR).*((dt/2)./(dx)))
 
         del , E, FF ,B, S, dfde = correlate(w1)
 
-        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
+        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = dtfunfluxReconjac(del, E, U, FF, dfde)
 
-        z = RHSSource(U, B, del, Ut, Ux, FF, E, S)
-
-        #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
-        #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
-
-        #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
-
-        j1, j2 = separationJ(lamb1, lamb2, dt, ones(length(x)).*dx)
+        z = RHSSourcejac(U, B, del, Ut, Ux, FF, E, S)
 
         # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-        w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
+        w2 = (wfin) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
 
-        w[:,:] = w2[:,:]
-        t += dt
+        wfin[:,:] = w2[:,:]
+       # t += dt
 
-        for i = 20:n-20
-            csep[i] = (w[i+1,1] - w[i,1])/(x[i+1,1] - w[i,1])/pi
-        end
-        #println(t, "   ", maximum(csep))
+        # for i = 20:n-20
+        #     csep[i] = (wfin[i+1,1] - w[i,1])/(x[i+1,1] - w[i,1])/pi
+        # end
 
-    end
+  #  end
 
-    return x, w, t
+    return x, wfin
 end
 
 
@@ -256,6 +240,16 @@ function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64,
     #    println("dt modified for max dt :$dt")
     #    dt =0.0005
     #end
+
+    return dt
+end
+
+function calc_Dtjac(lamb1, lamb2, cfl, dx)
+
+    # calculate time step values based on eigenvalues
+
+    dti = cfl.*(dx./(abs.(lamb1+lamb2)))
+    dt = minimum(abs.(dti))
 
     return dt
 end
@@ -739,8 +733,8 @@ function dtfunfluxReconjac(delF, Ef, U, FF, dfde)
     UR = U
     UL = U
 
-    UR = limiter(UR, U, [U[2:end]; U[1]])
-    UL = limiter(UL, U, [U[end]; U[1:end-1]])
+    UR = limiterjac(UR, U, [U[2:end]; U[1]])
+    UL = limiterjac(UL, U, [U[end]; U[1:end-1]])
 
     #Why is this kind of cyclic condition used?
 
@@ -818,6 +812,19 @@ function limiter(wExtrapolated::Array{Float64,1}, wCell::Array{Float64,1}, wNeig
 
 end
 
+function limiterjac(wExtrapolated, wCell, wNeighbor)
+
+    w = wExtrapolated;
+    wMax = max.(wCell, wNeighbor);
+    wMin = min.(wCell, wNeighbor);
+    w[w.>wMax] = wMax[w.>wMax];
+    w[w.<wMin] = wMin[w.<wMin];
+
+    return w
+
+end
+
+
 function maxWaveSpeed(Uip::Array{Float64,1}, wip::Array{Float64,2}, dfdeip::Array{Float64,1}, FFip::Array{Float64,1})
 
     # calculate wave speed at the interfaces of the cell
@@ -847,6 +854,30 @@ function calc_eigen(E::Array{Float64}, F::Array{Float64},
 
     ncell = length(E)
     lamb1 = zeros(ncell); lamb2 = zeros(ncell)
+
+    for i = 1:ncell
+        a_q = 1.
+        b_q = -ue[i] * (dfde[i] - 1)
+        c_q = ue[i] * ue[i] * (E[i]*dfde[i] - F[i])
+        lamb1[i] = (-b_q + sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
+        lamb2[i] = (-b_q  -sqrt(b_q*b_q - 4*a_q*c_q))/(2*a_q)
+
+        #Always have lamb1 > lamb2
+        if lamb2[i] > lamb1[i]
+            temp  = lamb2[i]
+            lamb2[i] = lamb1[i]
+            lamb1[i] = temp
+        end
+    end
+
+    return lamb1, lamb2
+end
+
+function calc_eigenjac(E, F,
+                    dfde, ue)
+
+    ncell = length(E)
+    lamb1 = zeros(Number, ncell); lamb2 = zeros(Number, ncell)
 
     for i = 1:ncell
         a_q = 1.
@@ -1017,89 +1048,115 @@ function dtfunjac(w, U, Ut, Ux, x)
     dfde = 4*4.8274*E.^3 - 3*5.9816*E.^2 + 2*4.0274*E .+ 0.23247
 
     fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = dtfunfluxReconjac(del, E , U, FF, dfde)
-    
+
     z = RHSSourcejac(U, B, del, Ut, Ux, FF, E, S)
-    
+
     dfdt = ([fL[:,1]; fL[:,2]] - [fR[:,1]; fR[:,2]])./ones(2*n)*dx .+ [z[:,1]; z[:,2]]
-    
+
     return dfdt
 end
 
-function transResidual!(F, x, naterm, uref, theta, xtev, ztev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c, su, delstart, Estart, LHS, RHS, cache)
+# struct MyTag end
+# struct DiffCache{T<:AbstractArray, S<:AbstractArray}
+#     du::T
+#     dual_du::S
+# end
+
+# function DiffCache(T, size, ::Type{Val{chunk_size}}) where chunk_size
+#     DiffCache(zeros(T, size...), zeros(ForwardDiff.Dual{nothing,T,chunk_size}, size...))
+# end
+
+# DiffCache(u::AbstractArray) = DiffCache(eltype(u),size(u),Val{ForwardDiff.pickchunksize(length(u))})
+
+# get_tmp(dc::DiffCache, ::Type{T}) where {T<:ForwardDiff.Dual} = dc.dual_du
+# get_tmp(dc::DiffCache, T) = dc.du
+
+
+
+
+function transResidual!(F, x, naterm, uref, theta, xtev, ztev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c, su, delstart, Estart, LHS, RHS, quprev, dt, t, Re)
+
     nfvm = length(delstart)
     ndiv = length(theta)
-    
+
     aterm = x[1:naterm]
     bterm = x[naterm+1:2*naterm]
     stev = x[2*naterm+1:2*naterm+1]
-    
-    #res = zeros(2*naterm+1 + 2*ndiv)
 
-    qutf = zeros(nfvm)
-    quxf = zeros(nfvm)
+    qut = zeros(ndiv)
+    qux = zeros(ndiv)
+
+    wtu = zeros(ndiv)
+    wtl = zeros(ndiv)
 
     #println(typeof(aterm))
     #println(typeof(stev))
-    
+
     # surf.aterm[:] = x[1:surf.naterm]
     # surf.bterm[:] = x[surf.naterm+1:2*surf.naterm]
     # #curfield.tev[end].s = x[2*surf.naterm+1]
-    # #tev hasnt been added yet 
+    # #tev hasnt been added yet
     # del = x[2*surf.naterm+1:2*surf.naterm+surf.nfvm]
     # E = x[2*surf.naterm+surf.nfvm+1:2*surf.naterm+2*surf.nfvm]
 
-    calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
+    qu, ql = calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
+
 
     #Transform problem to cOordinate along surface
     #srange = collect(range(0, stop=su[end], length=nfvm))
     #println(length(su))
     #println(length(qu))
-    
+
     #qInter = Spline1D(su, qu)
     #quf = evaluate(qInter, srange)
 
-    
+
     qux[2:end] = diff(qu)./diff(su)
-    qux[1] = 2*quxf[2] - quxf[3]
-    
-    smoothEdges!(quxf, 10)
-    
+    qux[1] = 2*qux[2] - qux[3]
+
+    #smoothEdges!(qux, 10)
+
     qut[:] .= (qu[:] .- quprev[:])./dt
-    
+
     # delInter = Spline1D(surf.su, surf.delu)
     # EInter = Spline1D(surf.su, surf.Eu)
     # delf = evaluate(delInter, srange)
     # Ef = evaluate(EInter, srange)
-    
+
     w0 = [delstart delstart.*(Estart .+ 1)]
-    
-    _, w0, tt = FVMIBLgrid(w0, qu, qut, qux, su, t-dt, t)
-    
+
+    _, w0 = FVMIBLgrid(w0, qu, qut, qux, su, dt)
+
     delu = w0[:,1]
-    Eu = w0[:,2]./w0[:,1] - 1.
-    
-    smoothEdges!(delu, 5)
+    Eu = w0[:,2]./w0[:,1] .- 1.
+
+    #smoothEdges!(delu, 5)
 
     xf = c/2 .* (1. .- cos.(theta))
-    
+
     wtu[2:end] = (1/sqrt(Re))*diff(qu.*delu)./diff(xf)
     wtu[1] = wtu[2]
-    
-    smoothEdges!(wtu, 5)
-     
+
+    #smoothEdges!(wtu, 5)
+
     RHStransp = zeros(2*ndiv-2)
-    
+
     for i = 2:ndiv-1
         RHStransp[i-1] = 0.5*(wtu[i] + wtl[i])
-        RHStransp[surf.ndiv+i-3] = 0.5*(wtu[i] - wtl[i])
+        RHStransp[ndiv+i-3] = 0.5*(wtu[i] - wtl[i])
     end
-    
+
+    figure(1)
+    plot(xf, wtu)
+
     x_solved = LHS[1:ndiv*2-2, 1:naterm*2+1] \ (RHS[1:ndiv*2-2] + RHStransp[:])
 
     #Residual for inviscid problem
     F[1:2*naterm+1] = x_solved .- x[1:2*naterm+1]
     #Residual for viscous problem
-    F[2*naterm+2:end] = delu .- x[2*naterm+2:end]
+    println(sum(wtu))
+    F[2*naterm+2:end] = [delu; Eu] .- x[2*naterm+2:end]
+
 end
 
 
@@ -1118,15 +1175,15 @@ end
 
 
 function splint(xa,ya,y2a,n,x)
-    
+
     xa(n),y2a(n),ya(n)
 
     klo=1
     khi=n
-    
+
     while khi-klo < 1
         k = (khi + klo)/2
-        if xa[k]  > x  
+        if xa[k]  > x
             khi=k
         else
             klo=k
@@ -1141,14 +1198,14 @@ function splint(xa,ya,y2a,n,x)
     y = a*ya[klo] + b*ya[khi] + ((a^3-a)*y2a[klo] + (b^3-b)*y2a[khi])*(h^2)/6
 
     return y
-end 
+end
 
 
 
-function spline(x,y,n,yp1,ypn) 
+function spline(x,y,n,yp1,ypn)
 
     nmax=3000
-    
+
     # if yp1 > 99e30
     #     y2[1] = 0
     #     u[1] = 0
@@ -1172,14 +1229,14 @@ function spline(x,y,n,yp1,ypn)
     # else
     #     qn = 0.5
     #     un = (3. /(x[n]-x[n-1]))*(ypn-(y[n]-y[n-1])/(x[n]-x[n-1]))
-    # end 
+    # end
     y2[n] = (un-qn*u[n-1])/(qn*y2[n-1]+1.)
     for k = n-1:-1:1
         y2[k] = y2[k]*y2[k+1] + u[k]
-    end 
-    
-    return y2
-    
-end 
+    end
 
-    
+    return y2
+
+end
+
+

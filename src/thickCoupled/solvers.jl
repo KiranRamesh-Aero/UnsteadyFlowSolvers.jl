@@ -883,9 +883,9 @@ function transpSimul(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::Int6
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
 
-    quprevf = zeros(surf.nfvm)
+    quprev = zeros(surf.ndiv)
 
-    
+
     for istep = 1:nsteps
 
         t = t + dt
@@ -921,152 +921,50 @@ function transpSimul(surf::TwoDSurfThickBL, curfield::TwoDFlowField, ncell::Int6
         #Estart = evaluate(EInter, srange)
 
         xinit = zeros(2*surf.naterm+1+2*surf.ndiv)
-        
+
         xinit[1:2*surf.naterm+1] = xinv[:]
         xinit[2*surf.naterm+2:2*surf.naterm+surf.ndiv+1] = surf.delu[:]
         xinit[2*surf.naterm+surf.ndiv+2:end] = surf.Eu[:]
 
-        
-        #cache1=DiffCache(surf.theta)
-        
-        IBLsimul!(Fvec, xvec) = transResidual!(Fvec, xvec, surf.naterm, surf.uref, surf.theta, xloc_tev, zloc_tev, vcore, surf.bnd_x_u, surf.bnd_z_u, surf.bnd_x_l, surf.bnd_z_l, surf.uind_u, surf.wind_u, surf.uind_l, surf.wind_l, [curfield.u[1]; curfield.w[1]], surf.kinem.alpha, surf.kinem.alphadot, surf.kinem.u, surf.kinem.hdot, surf.cam, surf.thick, surf.cam_slope, surf.thick_slope, surf.pvt, surf.c, surf.su, surf.delu, surf.Eu, surf.LHS, surf.RHS, cache)
 
-        soln = nlsolve(IBLsimul!, xinit, autodiff=:forward)
-        
-        error("here")    
-            
+        #cache1=DiffCache(surf.theta)
+
+        # IBLsimul!(Fvec, xvec) = transResidual!(Fvec, xvec, surf.naterm, surf.uref, surf.theta, xloc_tev, zloc_tev, vcore, surf.bnd_x_u, surf.bnd_z_u, surf.bnd_x_l, surf.bnd_z_l, surf.uind_u, surf.wind_u, surf.uind_l, surf.wind_l, [curfield.u[1]; curfield.w[1]], surf.kinem.alpha, surf.kinem.alphadot, surf.kinem.u, surf.kinem.hdot, surf.cam, surf.thick, surf.cam_slope, surf.thick_slope, surf.pvt, surf.c, surf.su, surf.delu, surf.Eu, surf.LHS, surf.RHS, quprev, dt, t, Re)
+
+        resfn!(F, xvec) = transResidual!(F, xvec, surf.naterm, surf.uref, surf.theta, xloc_tev, zloc_tev, vcore, surf.bnd_x_u, surf.bnd_z_u, surf.bnd_x_l, surf.bnd_z_l, surf.uind_u, surf.wind_u, surf.uind_l, surf.wind_l, [curfield.u[1]; curfield.w[1]], surf.kinem.alpha, surf.kinem.alphadot, surf.kinem.u, surf.kinem.hdot, surf.cam, surf.thick, surf.cam_slope, surf.thick_slope, surf.pvt, surf.c, surf.su, surf.delu, surf.Eu, surf.LHS, surf.RHS, quprev, dt, t, Re)
+
+        #resjac = xvec -> ForwardDiff.gradient(resfn, xvec)
+
+        #Custom Newton iteration to solve system of equations
+
+
+
+        #resjac(xinit)
+        #println(resfn(xinit))
+
+        soln = nlsolve(resfn!, xinit, iterations=5)
+                       #, method=:newton, ftol=1e-3, xtol=1e-3)
+
+        println("soln")
+
+
+        error("here")
+
         #Iterate for viscous solution and interaction
 
-        iter = 0
 
-        while (iter < 2 || res > 5e-3)
-
-            iter += 1
-
-            if iter > 1
-                pop!(curfield.tev)
-            end
-
-            #plot(surf.x[2:end-1], surf.RHS[surf.ndiv-1:2*surf.ndiv-4] + RHStransp[surf.ndiv-1:2*surf.ndiv-4])
-
-            
-            soln = surf.LHS[1:surf.ndiv*2-2, 1:surf.naterm*2+1] \ (surf.RHS[1:surf.ndiv*2-2] + RHStransp[:])
-
-            res = sqrt(sum((soln[1:end-1] .- [surf.aterm; surf.bterm]).^2))
-
-            #Assign the solution
-            for i = 1:surf.naterm
-                surf.aterm[i] = soln[i]
-                surf.bterm[i] = soln[i+surf.naterm]
-            end
-            tevstr = soln[2*surf.naterm+1]*surf.uref*surf.c
-
-            push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
-            #Update induced velocities to include effect of last shed vortex
-            update_indbound(surf, curfield)
-
-            #Dont update qu during iteration - just the inviscid value.
-            #This basically means no strong coupling.
-            if iter == 1
-                surf.qu[:], surf.ql[:] = calc_edgeVel(surf, [curfield.u[1], curfield.w[1]])
-            end
-
-            #Transform problem to cOordinate along surface
-            srange = collect(range(0, stop=surf.su[end], length=surf.nfvm))
-            qInter = Spline1D(surf.su, surf.qu)
-            quf = evaluate(qInter, srange)
-            #qxs = derivative(qInter, srange)
-            qutf = zeros(surf.nfvm)
-            quxf = zeros(surf.nfvm)
-
-            quxf[2:end] = diff(quf)./diff(srange)
-            quxf[1] = 2*quxf[2] - quxf[3]
-
-            smoothEdges!(quxf, 10)
-
-            if istep == 1
-                quprevf[:] = quf[:]
-            end
-
-            qutf[:] .= (quf[:] .- quprevf[:])./dt
-
-            delInter = Spline1D(surf.su, surf.delu)
-            EInter = Spline1D(surf.su, surf.Eu)
-            delf = evaluate(delInter, srange)
-            Ef = evaluate(EInter, srange)
-
-            w0 = [delf delf.*(Ef .+ 1)]
-
-            _, w0, tt = FVMIBLorig(w0, quf, qutf, quxf, srange, t-dt, t)
-
-
-            delf[:] = w0[:,1]
-
-            delInter = Spline1D(srange, delf)
-            Ef[:] = (w0[:,2]./w0[:,1]) .- 1.0
-
-
-            EInter = Spline1D(srange, Ef)
-
-            iter_delu[:] = evaluate(delInter, surf.su)
-            iter_Eu[:] = evaluate(EInter, surf.su)
-
-            #println(iter_delu)
-
-            #plot(surf.x, iter_delu)
-
-            smoothEdges!(iter_delu, 5)
-
-            wtu[2:end] = (1/sqrt(Re))*diff(surf.qu.*iter_delu)./diff(surf.x)
-            wtu[1] = wtu[2]
-
-            smoothEdges!(wtu, 10)
-
-            negind = 1000
-            for i = Int(floor(surf.ndiv/2)):surf.ndiv
-                if wtu[i] < 0.
-                    negind = i
-                    break
-                end
-            end
-            nsm = 15
-            for i = negind-nsm+1:surf.ndiv
-                wtu[i] = wtu[negind-nsm] + (surf.x[i] - surf.x[negind-nsm])*(0 - wtu[negind-nsm])/(surf.x[end] - surf.x[negind-nsm])
-            end
-
-            # wtu[wtu .< 0] .= 0.
-
-            # maxind = argmax(wtu[Int(floor(surf.ndiv/2)):surf.ndiv]) + Int(floor(surf.ndiv/2)) - 1
-
-            # wtuSpl = Spline1D([surf.x[1:maxind]; surf.c], [wtu[1:maxind]; 0.])
-            # for i = maxind+1:surf.ndiv
-            #     wtu[i] = evaluate(wtuSpl, surf.x[i])
+            # if istep ==70 && iter == 1
+            #     figure(1)
+            #     plot(surf.x, iter_delu)
+            #     figure(2)
+            #     plot(srange, quxf)
+            #     figure(3)
+            #     plot(surf.x, wtu)
+            #     error("here")
             # end
 
-            # wtl[:] = -wtu[:]
 
-            if istep ==70 && iter == 1
-                figure(1)
-                plot(surf.x, iter_delu)
-                figure(2)
-                plot(srange, quxf)
-                figure(3)
-                plot(surf.x, wtu)
-                error("here")
-            end
-
-            RHStransp[:] .= 0.
-
-            #Add transpiration velocity to RHS
-            for i = 2:surf.ndiv-1
-                RHStransp[i-1] = 0.5*(wtu[i] + wtl[i])
-                RHStransp[surf.ndiv+i-3] = 0.5*(wtu[i] - wtl[i])
-            end
-
-            println(istep, "   ", res)
-        end
-
-        quprevf[:] = quf[:]
+        #quprev[:] = qu[:]
 
         #Assign bl
         surf.delu[:] = iter_delu[:]

@@ -187,10 +187,13 @@ end
 function calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
 
     #for newton iteration in IBL
-    
+
     ndiv = length(theta)
     naterm = length(aterm)
-    
+
+    q_u = zeros(ndiv)
+    q_l = zeros(ndiv)
+
     for i in eachindex(theta)
 
         l_x = 0; l_z = 0; t_x = 0; t_z = 0;
@@ -205,7 +208,7 @@ function calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u,
         l_z *= uref
         t_x *= uref
         t_z *= uref
-        
+
         # uind_tev_u = zeros(eltype(stev), ndiv)
         # wind_tev_u = zeros(eltype(stev), ndiv)
         #uind_tev_l = zeros(ndiv)
@@ -222,41 +225,39 @@ function calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u,
         uind_tev_u = -stev.*zdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
         #wind_tev_u[itr] = +stev*xdist/(2*pi*sqrt(vctev^4 + distsq*distsq))
         wind_tev_u = +stev.*xdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-        
+
         #end
-        
+
         xdist = xtev .- bnd_x_l
         zdist = ztev .- bnd_z_l
         distsq = xdist.*xdist .+ zdist.*zdist
         uind_tev_l = -stev.*zdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
         wind_tev_l = +stev.*xdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-        
-        
+
+
         uind_tot_u = uind_u .+ uind_tev_u
         wind_tot_u = wind_u .+ wind_tev_u
-        
+
         uind_tot_l = uind_l .+ uind_tev_l
         wind_tot_l = wind_l .+ wind_tev_l
-        
+
         w_x_u = uind_tot_u[i]*cos(alpha) - wind_tot_u[i]*sin(alpha)
         w_z_u = uind_tot_u[i]*sin(alpha) + wind_tot_u[i]*cos(alpha)
         w_x_l = uind_tot_l[i]*cos(alpha) - wind_tot_l[i]*sin(alpha)
         w_z_l = uind_tot_l[i]*sin(alpha) + wind_tot_l[i]*cos(alpha)
 
         xf = c/2. .*(1. .- cos.(theta))
-        
+
         utot_u = (u + vels[1])*cos(alpha) + (hdot - vels[2])*sin(alpha) - alphadot*(cam[i] + thick[i]) + w_x_u + l_x + t_x
         wtot_u = (u + vels[1])*sin(alpha) + (hdot - vels[2])*cos(alpha) + alphadot*(xf[i] - pvt*c) + w_z_u + l_z + t_z
         utot_l = (u + vels[1])*cos(alpha) + (hdot - vels[2])*sin(alpha) - alphadot*(cam[i] - thick[i]) + w_x_l - l_x + t_x
         wtot_l = (u + vels[1])*sin(alpha) + (hdot - vels[2])*cos(alpha) + alphadot*(xf[i] - pvt*c) + w_z_l + l_z - t_z
-    
+
         q_u[i] = (1. /sqrt(1. + (cam_slope[i] + thick_slope[i])^2))*(utot_u + (cam_slope[i] + thick_slope[i])*wtot_u)
         q_l[i] = (1. /sqrt(1. + (cam_slope[i] - thick_slope[i])^2))*(utot_l + (cam_slope[i] - thick_slope[i])*wtot_l)
 
-        # push!(q_u, qqu)
-        # push!(q_l, qql)
 
-        
+
     end
 
     return q_u, q_l

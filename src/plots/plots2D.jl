@@ -43,13 +43,13 @@ function makeVortPlots2D()
     
     if multsurfflag == 0 #single surface
 
-        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+        tev, _ = readdlm("tev", '\t', Float64, header=true)
         lev =   try
             DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
         catch
             zeros(0,3)
         end
-        bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+        bv, _ = readdlm("boundv", '\t', Float64, header=true)
 
         xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
         zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
@@ -66,13 +66,13 @@ function makeVortPlots2D()
             if dirresults[i] != 0
                 dirstr="$(dirresults[i])"
                 cd(dirstr)
-                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+                tev, _ = readdlm("tev", '\t', Float64, header=true)
                 lev =   try
-                    DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                    readdlm("lev", '\t', Float64, header=true)[1]
                 catch
                     zeros(0,3)
                 end
-                bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+                bv, _ = readdlm("boundv", '\t', Float64, header=true)
 
                 viewVort2D(tev, lev, bv)
                 axis([xmin-1, xmax+1, zmin-1, zmax+1])
@@ -84,9 +84,9 @@ function makeVortPlots2D()
 
     else #multiple surfaces
 
-        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+        tev, _ = readdlm("tev", '\t', Float64, header=true)
         lev =   try
-            DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+            readdlm("lev", '\t', Float64, header=true)[1]
         catch
             zeros(0,3)
         end
@@ -98,9 +98,9 @@ function makeVortPlots2D()
 
             end
         end
-        bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
+        bv, _ = readdlm("boundv-1", '\t', Float64, header=true)
         for i = 2:nsurf
-            bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)
+            bvt, _ = readdlm("boundv-$i", '\t', Float64, header=true)
             bv = [bv;bvt;]
         end
 
@@ -119,15 +119,15 @@ function makeVortPlots2D()
             if dirresults[i] != 0
                 dirstr="$(dirresults[i])"
                 cd(dirstr)
-                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+                tev, _ = readdlm("tev", '\t', Float64, header=true)
                 lev =   try
-                    DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                    readdlm("lev", '\t', Float64, header=true)[1]
                 catch
                     zeros(0,3)
                 end
-                bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
+                bv, _ = readdlm("boundv-1", '\t', Float64, header=true)
                 for i = 2:nsurf
-                    bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)
+                    bvt, _ = readdlm("boundv-$i", '\t', Float64, header=true)
                     bv = [bv;bvt;]
                 end
                 viewVort2D(tev, lev, bv)
@@ -147,7 +147,7 @@ function makeForcePlots2D()
     end
     mkdir("forcePlots")
 
-    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    mat, _ = readdlm("resultsSummary", '\t', Float64, header=true)
 
     if length(mat[1,:]) == 8 #only 1 surface
         t = mat[:,1]
@@ -294,7 +294,7 @@ end
 
 function checkConverge(k::Float64)
     
-    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    mat, _ = readdlm("resultsSummary", '\t', Float64, header=true)
     
     T = pi/k
 
@@ -373,7 +373,7 @@ end
 
 function makeKinemClVortPlots2D()
 
-    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    mat, _ = readdlm("resultsSummary", '\t', Float64, header=true)
 
     t = mat[:,1]
     len = length(t)
@@ -395,13 +395,13 @@ function makeKinemClVortPlots2D()
         error("this plot function is only written for single surface")
     end
     
-    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    tev, _ = readdlm("tev", '\t', Float64, header=true)
     lev =   try
-        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+        readdlm("lev", '\t', Float64, header=true)[1]
     catch
         zeros(0,3)
     end
-    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    bv, _ = readdlm("boundv", '\t', Float64, header=true)
     
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
@@ -475,13 +475,13 @@ function makeKinemClVortPlots2D()
             ylabel(L"$C_l$")
 
             subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
-            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            tev, _ = readdlm("tev", '\t', Float64, header=true)
             lev =   try
-                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                readdlm("lev", '\t', Float64, header=true)[1]
             catch
                 zeros(0,3)
             end
-            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            bv, _ = readdlm("boundv", '\t', Float64, header=true)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
             
@@ -496,7 +496,7 @@ end
 
 function makeKinemVelVortPlots2D()
 
-    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    mat, _ = readdlm("resultsSummary", '\t', Float64, header=true)
 
     t = mat[:,1]
     len = length(t)
@@ -518,13 +518,13 @@ function makeKinemVelVortPlots2D()
         error("this plot function is only written for single surface")
     end
     
-    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    tev, _ = readdlm("tev", '\t', Float64, header=true)
     lev =   try
-        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+        readdlm("lev", '\t', Float64, header=true)[1]
     catch
         zeros(0,3)
     end
-    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    bv, _ = readdlm("boundv", '\t', Float64, header=true)
     
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
@@ -598,13 +598,13 @@ function makeKinemVelVortPlots2D()
             ylabel(L"$C_l$")
 
             subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
-            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            tev, _ = readdlm("tev", '\t', Float64, header=true)
             lev =   try
-                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                readdlm("lev", '\t', Float64, header=true)[1]
             catch
                 zeros(0,3)
             end
-            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            bv, _ = readdlm("boundv", '\t', Float64, header=true)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
             

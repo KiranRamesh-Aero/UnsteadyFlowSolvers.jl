@@ -6,7 +6,7 @@ import Dierckx: Spline1D, derivative, evaluate, roots
 
 using ForwardDiff
 
-import DelimitedFiles: writedlm
+import DelimitedFiles: writedlm, readdlm
 
 import Serialization
 
@@ -95,7 +95,8 @@ export
     transpTogetherWake,
     transpSimul,
     transResidual,
-    FVMIBLgrid
+    FVMIBLgridvar,
+    IBLshed
 
 
 

@@ -43,12 +43,14 @@ mutable struct TwoDSurfThickBL
     delu :: Vector{Float64}
     dell :: Vector{Float64}
     Eu :: Vector{Float64}
-El :: Vector{Float64}
-qu :: Vector{Float64}
-ql :: Vector{Float64}
-su :: Vector{Float64}
-sl :: Vector{Float64}
-
+    El :: Vector{Float64}
+    qu :: Vector{Float64}
+    ql :: Vector{Float64}
+    su :: Vector{Float64}
+    sl :: Vector{Float64}
+    wtu :: Vector{Float64}
+    wtl :: Vector{Float64}
+    
 function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=140, naterm=136, initpos = [0.; 0.], nfvm=60)
     theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
     thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
@@ -143,10 +145,21 @@ function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1
             thder = 0.5*(thick_slope[i] + thick_slope[i+1])
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
-
-        LHS = zeros(2*ndiv-2,naterm*2+2)
-        RHS = zeros(2*ndiv-2)
-
+    #Transpiration sources
+    for i = 1:ndiv-1
+        xsrc = 0.5*(bnd_x_u[i] + bnd_x_u[i+1])
+        zsrc = 0.5*(bnd_z_u[i] + bnd_z_u[i+1])
+        push!(src, TwoDSource(xsrc, zsrc, 0))
+    end
+    for i = 1:ndiv-1
+        xsrc = 0.5*(bnd_x_l[i] + bnd_x_l[i+1])
+        zsrc = 0.5*(bnd_z_l[i] + bnd_z_l[i+1])
+        push!(src, TwoDSource(xsrc, zsrc, 0))
+    end
+    
+    LHS = zeros(2*ndiv-2,naterm*2+2)
+    RHS = zeros(2*ndiv-2)
+    
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
 
@@ -196,7 +209,7 @@ function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1
         # end
         levflag = [0;]
 
-delu, dell, Eu, El = initDelE(ndiv)
+delu, dell, Eu, El = initDelE(ndiv-1)
 
 qu = zeros(ndiv)
 ql = zeros(ndiv)
@@ -219,7 +232,11 @@ sl[1] = 0.
 for i = 2:ndiv
     sl[i] = simpleTrapz(dsdx[1:i], x[1:i])
 end
-new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, su, sl)
+
+    wtu = zeros(ndiv)
+    wtl = zeros(ndiv)
+    
+new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, su, sl, wtu, wtl)
 end
 end
 

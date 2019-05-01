@@ -35,6 +35,7 @@ mutable struct TwoDSurfThickBL
     src :: Vector{TwoDSource}
     lespcrit :: Vector{Float64}
     levflag :: Vector{Int8}
+    tevflag :: Vector{Int8}
     initpos :: Vector{Float64}
     rho :: Float64
     LHS :: Array{Float64}
@@ -50,7 +51,7 @@ mutable struct TwoDSurfThickBL
     sl :: Vector{Float64}
     wtu :: Vector{Float64}
     wtl :: Vector{Float64}
-    
+      
 function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=140, naterm=136, initpos = [0.; 0.], nfvm=60)
     theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
     thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
@@ -207,7 +208,8 @@ function TwoDSurfThickBL(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1
         #     LHS[2*ndiv-1,n+1] = -1.
         #     LHS[2*ndiv-1,n+naterm+1] = 1.
         # end
-        levflag = [0;]
+    levflag = [0;]
+    tevflag = [0;]
 
 delu, dell, Eu, El = initDelE(ndiv-1)
 
@@ -236,7 +238,7 @@ end
     wtu = zeros(ndiv)
     wtl = zeros(ndiv)
     
-new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, su, sl, wtu, wtl)
+new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, tevflag,  initpos, rho, LHS, RHS, nfvm, delu, dell, Eu, El, qu, ql, su, sl, wtu, wtl)
 end
 end
 

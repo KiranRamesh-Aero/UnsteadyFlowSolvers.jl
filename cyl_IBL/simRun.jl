@@ -22,7 +22,7 @@ surf = TwoDSurfThickBL(geometry, pvt, full_kinem, ndiv=140, naterm=136, nfvm=80)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.015
+dtstar = 0.0075
 
 t_tot = 1.
 

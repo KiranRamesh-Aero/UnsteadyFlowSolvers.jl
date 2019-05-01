@@ -34,136 +34,6 @@ function correlate(w)
     return del, E, F ,B, S, dfde
 end
 
-function smoothEdgeVelocity(qu::Array{Float64,1}, theta::Array{Float64,1}, ncell::Int64, xCoarse::Int64)
-
-
-    thetacoarse = collect(range(0, stop = pi, length = xCoarse))
-    thetafine = collect(range(0, stop = pi, length = ncell))
-    quCoarseInter = Spline1D(theta, qu)
-    quCoarse = evaluate(quCoarseInter, thetacoarse)
-    quFineInt = Spline1D(thetacoarse, quCoarse)
-    quFine = evaluate(quFineInt, thetafine)
-
-    return quFine, thetafine
-
-end
-
-function FVMIBL(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1}, dt::Float64)
-
-    n = length(x)
-
-    dx = zeros(n)
-    dx[2:end] = diff(x)
-    dx[1] = dx[2]
-
-    # correlate the unknown values from the del and E values
-    del, E, FF ,B, S, dfde = correlate(w)
-
-    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
-
-    #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
-    #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
-
-    #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-    lamb1 ,lamb2 = calc_eigenjac(E, FF, dfde, U)
-    dt = calc_Dt(lamb1 ,lamb2, 0.5, dx)
-
-    #if t_cur + dt > t_tot
-    #    dt = t_tot - t_cur
-    #end
-
-    # two step forward Euler methods for adding the source term to the right hand-side
-    # of the transport equations.
-    #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
-
-    # step 1 : assuming this as a homogeneous equation and advanced half a step
-    w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
-
-    del , E, FF ,B, S, dfde = correlate(w1)
-
-    fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
-
-    z = RHSSourcejac(U, B, del, Ut, Ux, FF, E, S)
-
-    #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
-    #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
-
-    #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
-
-    j1, j2 = separationJ(lamb1, lamb2, dt, dx)
-
-    # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-    w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
-
-
-    return w2, dt, lamb1, lamb2
-end
-
-function FVMIBLorig(w::Array{Float64,2}, U::Array{Float64,1}, Ut::Array{Float64,1}, Ux::Array{Float64,1}, x::Array{Float64,1}, t::Float64, t_tot::Float64)
-
-    n = length(x)
-
-    dx = Float64((x[end]-x[1])/n)
-
-    csep = zeros(n)
-
-    while t < t_tot
-        # correlate the unknown values from the del and E values
-        del, E, FF ,B, S, dfde = correlate(w)
-
-        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w , U, FF, dfde, del, E)
-
-        #lamb1L ,lamb2L = eigenlamb(UipL, dfdeipL, FFipL, wipL)
-        #lamb1R ,lamb2R = eigenlamb(UipR, dfdeipR, FFipR, wipR)
-
-        #lamb1 ,lamb2 = eigenlamb(U, dfde, FF, w)
-        lamb1 ,lamb2 = calc_eigen(E, FF, dfde, U)
-        dt = calc_Dt(lamb1 ,lamb2, 0.5, ones(length(x)).*dx)
-
-        if t + dt > t_tot
-            dt = t_tot - t
-        end
-
-        #if t_cur + dt > t_tot
-        #    dt = t_tot - t_cur
-        #end
-
-        # two step forward Euler methods for adding the source term to the right hand-side
-        # of the transport equations.
-        #z = RHSSource(U,B, del,Ut, Ux, FF, E, S)
-
-        # step 1 : assuming this as a homogeneous equation and advanced half a step
-        w1 = w.+ ((fL - fR).*((dt/2)./(dx)))
-
-        del , E, FF ,B, S, dfde = correlate(w1)
-
-        fL, fR, UipL ,UipR, FFipL, FFipR, dfdeipL, dfdeipR, wipL, wipR = fluxReconstruction(w1 , U, FF, dfde, del, E)
-
-        z = RHSSource(U, B, del, Ut, Ux, FF, E, S)
-
-        #dtL = calc_Dt(UipL, dfdeipL, FFipL, wipL, 0.8, dx)
-        #dtR = calc_Dt(UipR, dfdeipR, FFipR, wipR, 0.8, dx)
-
-        #dt = calc_Dt(lamb1 ,lamb2, 0.6, dx)
-
-        j1, j2 = separationJ(lamb1, lamb2, dt, ones(length(x)).*dx)
-
-        # step 2 : by considering source terms advanced a full step using 2nd order midpoint rule
-        w2 = (w) + (fL - fR).* ((dt)./(dx)) .+ (dt).*z
-
-        w[:,:] = w2[:,:]
-        t += dt
-
-        for i = 20:n-20
-            csep[i] = (w[i+1,1] - w[i,1])/(x[i+1,1] - w[i,1])/pi
-        end
-        #println(t, "   ", maximum(csep))
-
-    end
-
-    return x, w, t
-end
-
 
 function update_indbound(surf::TwoDSurfThickBL, curfield::TwoDFlowField)
     surf.uind_u[1:surf.ndiv], surf.wind_u[1:surf.ndiv] = ind_vel([curfield.tev;
@@ -176,9 +46,9 @@ function update_indbound(surf::TwoDSurfThickBL, curfield::TwoDFlowField)
 end
 
 function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64, dx::Array{Float64})
-
+    
     # calculate time step values based on eigenvalues
-
+    
     dti = cfl.*(dx./(abs.(lamb1+lamb2)))
     dt = minimum(abs.(dti))
 
@@ -191,17 +61,6 @@ function calc_Dt(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, cfl::Float64,
 
     return dt
 end
-
-function calc_Dtjac(lamb1, lamb2, cfl, dx)
-
-    # calculate time step values based on eigenvalues
-
-    dti = cfl.*(dx./(abs.(lamb1+lamb2)))
-    dt = minimum(abs.(dti))
-
-    return dt
-end
-
 
 function update_kinem(surf::TwoDSurfThickBL, t)
 
@@ -395,77 +254,6 @@ function update_boundpos(surf::TwoDSurfThickBL, dt::Float64)
     return surf
 end
 
-
-function update_thickLHS(surf::TwoDSurfThickBL, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
-    #Calculate the missing column in LHS that depends on last shed vortex location
-
-    ntev = length(curfield.tev)
-
-    if ntev == 0
-        xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
-        zloc_tev = surf.bnd_z_chord[surf.ndiv]
-    else
-        xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
-        zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
-    end
-
-    dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
-
-    uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
-    ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
-
-    for i = 2:surf.ndiv-1
-
-
-        #Sweep all rows (corresponding to ndiv) for lifting equation
-
-        #Sweep columns for aterms
-        for n = 1:surf.naterm
-           surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
-        end
-
-        #Sweep columns for bterm
-        for n = 1:surf.naterm
-           surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
-        end
-
-        #TEV term must be updated in the loop after its location is known
-        #Sweep all rows (corresponding to ndiv) for nonlifting equation
-
-        for n = 1:surf.naterm
-           surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
-        end
-        for n = 1:surf.naterm
-           surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
-        end
-
-
-        wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
-                   wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
-
-        wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
-                   wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
-
-        wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
-                   ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
-
-        wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
-                   ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
-
-        surf.LHS[i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
-            surf.thick_slope[i]*wlx + wlz
-
-        surf.LHS[surf.ndiv+i-3,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
-            surf.thick_slope[i]*wtx + wtz
-
-    end
-
-    #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
-    #uu[1]*sin(surf.kinem.alpha)
-
-
-    return surf, xloc_tev, zloc_tev
-end
 
 function update_thickLHS2V(surf::TwoDSurfThickBL, curfield::TwoDFlowField, dt::Float64, vcore::Float64, i_xsl)
     #Calculate the missing column in LHS that depends on last shed vortex location
@@ -675,7 +463,6 @@ function fluxReconstruction(w::Array{Float64,2}, U::Array{Float64,1}, FF::Array{
 
 end
 
-
 function limiter(wExtrapolated::Array{Float64,1}, wCell::Array{Float64,1}, wNeighbor::Array{Float64,1})
 
     w = wExtrapolated;
@@ -820,97 +607,6 @@ function smoothEdges!(q::Array{Float64}, nsm::Int)
     return q
 end
 
-
-
-function transResidual(x, naterm, uref, theta, xtev, ztev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c, su, delstart, Estart, LHS, RHS, qucprev, dt, t, Re)
-
-    ndiv = length(theta)
-
-    aterm = x[1:naterm]
-    bterm = x[naterm+1:2*naterm]
-    stev = x[2*naterm+1:2*naterm+1]
-    
-    quc = zeros(ndiv-1)
-    quxc = zeros(ndiv-1)
-    qutc = zeros(ndiv-1)
-    dsu = zeros(ndiv-1)
-    suc = zeros(ndiv-1)
-
-    
-    wtu = zeros(ndiv)
-    wtl = zeros(ndiv)
-
-    F = zeros(2*naterm+1)
-    
-    #println(typeof(aterm))
-    #println(typeof(stev))
-
-    # surf.aterm[:] = x[1:surf.naterm]
-    # surf.bterm[:] = x[surf.naterm+1:2*surf.naterm]
-    # #curfield.tev[end].s = x[2*surf.naterm+1]
-    # #tev hasnt been added yet
-    # del = x[2*surf.naterm+1:2*surf.naterm+surf.nfvm]
-    # E = x[2*surf.naterm+surf.nfvm+1:2*surf.naterm+2*surf.nfvm]
-
-    qu, ql = calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
-
-    #Solve the FV problem at cell centres
-    for i = 1:ndiv-1
-        quc[i] = (qu[i] + qu[i+1])/2
-        suc[i] = (su[i] + su[i+1])/2
-    end
-    
-    quxc[2:end] = diff(quc)./diff(suc)
-    quxc[1] = 2*quxc[2] - quxc[3]
-    
-    #smoothEdges!(qux, 10)
-
-    qutc[:] .= (quc[:] .- qucprev[:])./dt
-
-    dsu = diff(su)
-    
-    w0 = [delstart delstart.*(Estart .+ 1)]
-    
-    w0 = FVMIBLgridfixed(w0, quc, qutc, quxc, dsu, dt)
-    
-    delu = w0[:,1]
-    Eu = w0[:,2]./w0[:,1] .- 1.
-
-    delu = [delu; delu[end]]
-    Eu = [Eu; Eu[end]]
-    #smoothEdges!(delu, 5)
-    
-    xf = c/2 .* (1. .- cos.(theta))
-
-    wtu[2:end] = (1/sqrt(Re))*diff(qu.*delu)./diff(xf)
-    wtu[1] = wtu[2]
-
-    wtl[:] = -wtu[:]
-    
-    #smoothEdges!(wtu, 5)
-
-    RHStransp = zeros(2*ndiv-2)
-
-    for i = 2:ndiv-1
-        RHStransp[i-1] = 0.5*(wtu[i] + wtl[i])
-        RHStransp[ndiv+i-3] = 0.5*(wtu[i] - wtl[i])
-    end
-
-    figure(1)
-    plot(xf, wtu)
-
-    x_solved = LHS[1:ndiv*2-2, 1:naterm*2+1] \ (RHS[1:ndiv*2-2] + RHStransp[:])
-    
-    #Residual for inviscid problem
-    #F[1:2*ndiv-2] = LHS[1:ndiv*2-2, 1:naterm*2+1]*x[1:2*naterm+1] - (RHS[1:ndiv*2-2] + RHStransp[:])
-    F[1:2*naterm+1] = abs.(x_solved .- x[1:2*naterm+1])
-    #Residual for viscous problem
-    println(sum(wtu))
-    #F[2*naterm+2:end] = abs.([delu[1:end-1]; Eu[1:end-1]] .- x[2*naterm+2:end])
-
-    return F
-end
-
 function FVMIBLgridfixed(w, U, Ut, Ux, dx, dt)
 
 
@@ -987,10 +683,6 @@ function FVMIBLgridvar(w, U, Ut, Ux, dx, t, t_tot)
         
         t += dt
 
-        for i = 10:n-10
-            csep[i] = (w[i+1,1] - w[i,1])/(w[i,1] - w[i-1,1])
-        end
-        
         #csepmax = maximum(csep)
         #println(t, "   ", maximum(csepmax), "    ", argmax(csep))
         # if csepmax > 2.
@@ -999,41 +691,16 @@ function FVMIBLgridvar(w, U, Ut, Ux, dx, t, t_tot)
         # end
         
         j1, j2 = separationJ(lamb1, lamb2, dt, dx)
+        jmax = maximum(j1)
+        if jmax > 1e-4
+             println("Separation identified", "    jsep=$jmax", "   i_s=$(argmax(j1))")
+            i_s = argmax(j1) 
+        end
         
     end
     
       
-    return w, i_s, j1*1000, j2*1000
+    return w, i_s
 end
 
 
-function newton(f, x1, x2, maxiter, tol)
-
-    f1 = f(x1)
-    n = 2
-    l = length(x1)
-    fl = length(f1)
-    
-    while n < maxiter+1
-        f2 = f(x2)
-        df = zeros(fl,l)
-        for i = 2:fl
-            for j = 2:l
-                df[i,j] = (f2[i] - f1[i])/(x2[j] - x1[j])
-            end
-        end
-        df[1,:] = df[2,:]
-        df[:,1] = df[:,2]
-        
-        x1 = x2
-        f1 = f2
-        x2 = x1 - df*f1
-        res = sqrt(mean((x2 .-x1).^2))
-        println(res)
-        if res < tol
-            break
-        end
-        n += 1
-    end
-    return x2
-end

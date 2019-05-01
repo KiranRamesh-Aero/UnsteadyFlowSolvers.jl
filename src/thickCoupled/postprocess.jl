@@ -184,82 +184,87 @@ function calc_edgeVel(surf::TwoDSurfThickBL, vels::Vector{Float64})
 end
 
 
-function calc_edgeVelIBL(uref, theta, xtev, ztev, stev, vctev, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, aterm, bterm, uind_u, wind_u, uind_l, wind_l, vels, alpha, alphadot, u, hdot, cam, thick, cam_slope, thick_slope, pvt, c)
 
-    #for newton iteration in IBL
-
-    ndiv = length(theta)
-    naterm = length(aterm)
-
-    q_u = zeros(ndiv)
-    q_l = zeros(ndiv)
-
-    for i in eachindex(theta)
-
-        l_x = 0; l_z = 0; t_x = 0; t_z = 0;
-
-        for n = 1:naterm
-            l_x += aterm[n]*sin(n*theta[i])
-            l_z += aterm[n]*cos(n*theta[i])
-            t_x -= bterm[n]*cos(n*theta[i])
-            t_z += bterm[n]*sin(n*theta[i])
-        end
-        l_x *= uref
-        l_z *= uref
-        t_x *= uref
-        t_z *= uref
-
-        # uind_tev_u = zeros(eltype(stev), ndiv)
-        # wind_tev_u = zeros(eltype(stev), ndiv)
-        #uind_tev_l = zeros(ndiv)
-        #wind_tev_l = zeros(ndiv)
-
-        #for itr = 1:ndiv
-        #     xdist = xtev - bnd_x_u[itr]
-        xdist = xtev .- bnd_x_u
-        #zdist = ztev - bnd_z_u[itr]
-        zdist = ztev .- bnd_z_u
-        distsq = xdist.*xdist .+ zdist.*zdist
-        #println(stev, "  ", vctev)
-        #uind_tev_u[itr] = -stev*zdist/(2*pi*sqrt(vctev^4 + distsq*distsq))
-        uind_tev_u = -stev.*zdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-        #wind_tev_u[itr] = +stev*xdist/(2*pi*sqrt(vctev^4 + distsq*distsq))
-        wind_tev_u = +stev.*xdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-
-        #end
-
-        xdist = xtev .- bnd_x_l
-        zdist = ztev .- bnd_z_l
-        distsq = xdist.*xdist .+ zdist.*zdist
-        uind_tev_l = -stev.*zdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-        wind_tev_l = +stev.*xdist/(2*pi*sqrt.(vctev^4 .+ distsq.*distsq))
-
-
-        uind_tot_u = uind_u .+ uind_tev_u
-        wind_tot_u = wind_u .+ wind_tev_u
-
-        uind_tot_l = uind_l .+ uind_tev_l
-        wind_tot_l = wind_l .+ wind_tev_l
-
-        w_x_u = uind_tot_u[i]*cos(alpha) - wind_tot_u[i]*sin(alpha)
-        w_z_u = uind_tot_u[i]*sin(alpha) + wind_tot_u[i]*cos(alpha)
-        w_x_l = uind_tot_l[i]*cos(alpha) - wind_tot_l[i]*sin(alpha)
-        w_z_l = uind_tot_l[i]*sin(alpha) + wind_tot_l[i]*cos(alpha)
-
-        xf = c/2. .*(1. .- cos.(theta))
-
-        utot_u = (u + vels[1])*cos(alpha) + (hdot - vels[2])*sin(alpha) - alphadot*(cam[i] + thick[i]) + w_x_u + l_x + t_x
-        wtot_u = (u + vels[1])*sin(alpha) + (hdot - vels[2])*cos(alpha) + alphadot*(xf[i] - pvt*c) + w_z_u + l_z + t_z
-        utot_l = (u + vels[1])*cos(alpha) + (hdot - vels[2])*sin(alpha) - alphadot*(cam[i] - thick[i]) + w_x_l - l_x + t_x
-        wtot_l = (u + vels[1])*sin(alpha) + (hdot - vels[2])*cos(alpha) + alphadot*(xf[i] - pvt*c) + w_z_l + l_z - t_z
-
-        q_u[i] = (1. /sqrt(1. + (cam_slope[i] + thick_slope[i])^2))*(utot_u + (cam_slope[i] + thick_slope[i])*wtot_u)
-        q_l[i] = (1. /sqrt(1. + (cam_slope[i] - thick_slope[i])^2))*(utot_l + (cam_slope[i] - thick_slope[i])*wtot_l)
-
-
-
+function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThickBL, curfield::TwoDFlowField)
+    dirvec = readdir()
+    if dirname in dirvec
+        rm(dirname, recursive=true)
     end
+    mkdir(dirname)
+    cd(dirname)
 
-    return q_u, q_l
+    f = open("timeKinem", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
+    writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
+    close(f)
+
+    f = open("FourierCoeffsA", "w")
+    Serialization.serialize(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
+    mat = zeros(surf.naterm+1, 2)
+    mat[:,1] = [surf.a0[1];surf.aterm[:]]
+    mat[:,2] = [surf.a0dot[1];surf.adot[:]]
+    writedlm(f, mat)
+    close(f)
+
+    f = open("FourierCoeffsB", "w")
+    Serialization.serialize(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
+    mat = zeros(surf.naterm, 1)
+    mat[:,1] = surf.bterm[:]
+    writedlm(f, mat)
+    close(f)
+
+    # f = open("forces", "w")
+    # write(f, ["#cl \t", "cd \t", "cm \t", "Gamma \t", "cn \t", "cs \t", "cnc \t",
+    #           "cnnc \t", "nonl \t", "cm_n \t", "cm_pvt \t", "nonl_m \n"])
+    # cl, cd, cm, gamma, cn, cs, cnc, cncc, nonl, cm_n, cm_pvt, nonl_m = calc_forces_more(surf)
+    # writedlm(f, [cl, cd, cm, gamma, cn, cs, cnc, cnnc, nonl, cm_n, cm_pvt, nonl_m])
+    # close(f)
+
+    f = open("tev", "w")
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
+    tevmat = zeros(length(curfield.tev), 3)
+    for i = 1:length(curfield.tev)
+        tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
+    end
+    writedlm(f, tevmat)
+    close(f)
+
+    f = open("lev", "w")
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
+    levmat = zeros(length(curfield.lev), 3)
+    for i = 1:length(curfield.lev)
+        levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
+    end
+    writedlm(f, levmat)
+    close(f)
+
+    f = open("boundv", "w")
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
+    bvmat = zeros(length(surf.bv), 3)
+    for i = 1:length(surf.bv)
+        bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
+    end
+    writedlm(f, bvmat)
+    close(f)
+
+    f = open("src", "w")
+    Serialization.serialize(f, ["#strength \t", "x-position \t", "z-position \n"])
+    bvmat = zeros(length(surf.src), 3)
+    for i = 1:length(surf.src)
+        bvmat[i,:] = [surf.src[i].s surf.src[i].x surf.src[i].z]
+    end
+    writedlm(f, bvmat)
+    close(f)
+
+    f = open("afoutline", "w")
+    Serialization.serialize(f, ["x-position \t", "z-position \n"])
+    bvmat = zeros(2*length(surf.bnd_x_u), 2)
+    for i = 1:length(surf.bnd_x_u)
+        bvmat[i,:] = [surf.bnd_x_u[i]  surf.bnd_z_u[i]]
+        bvmat[i+length(surf.bnd_x_u),:] = [surf.bnd_x_l[i]  surf.bnd_z_l[i]]
+    end
+    writedlm(f, bvmat)
+    close(f)
+    
+    cd("..")
 end
-

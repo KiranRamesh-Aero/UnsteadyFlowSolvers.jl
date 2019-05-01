@@ -49,6 +49,7 @@ function makeVortPlots2D()
         catch
             zeros(0,3)
         end
+
         bv, _ = readdlm("boundv", '\t', Float64, header=true)
 
         xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
@@ -73,8 +74,15 @@ function makeVortPlots2D()
                     zeros(0,3)
                 end
                 bv, _ = readdlm("boundv", '\t', Float64, header=true)
-
+                
+                af = try
+                    readdlm("afoutline", '\t', Float64, header=true)[1]
+                catch
+                    zeros(0,2)
+                end
+                                
                 viewVort2D(tev, lev, bv)
+                plot(af[:,1], af[:,2])
                 axis([xmin-1, xmax+1, zmin-1, zmax+1])
                 savefig("../vortPlots/$(dirresults[i]).png")
                 close()

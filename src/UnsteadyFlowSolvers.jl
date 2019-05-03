@@ -18,6 +18,8 @@ import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout
 
+import SpecialFunctions: besselh
+
 import Plots: @layout
 
 import LaTeXStrings: @L_str
@@ -46,6 +48,7 @@ export
     CosDef,
 
     # 2D low-order solver types
+    TheoDef,
     TwoDSurf,
     TwoDOFPar,
     KinemPar2DOF,
@@ -69,6 +72,7 @@ export
     getEndCycle,
 
     # 2D low-order solver methods
+    theodorsen,
     lautat,
     ldvm,
     ldvmLin,
@@ -96,7 +100,8 @@ export
     transpSimul,
     transResidual,
     FVMIBLgridvar,
-    IBLshed
+    IBLshed,
+    IBLsheddisp
 
 
 

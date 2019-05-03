@@ -1,3 +1,14 @@
+# Theodorsen solver input
+struct TheoDef
+    alpha_amp :: Float64
+    h_amp :: Float64
+    alpha_mean :: Float64
+    alpha_zl :: Float64
+    k :: Float64
+    phi :: Float64
+    pvt :: Float64
+end
+
 """
     TwoDVort(x,z,s,vc,vx,vz)
 

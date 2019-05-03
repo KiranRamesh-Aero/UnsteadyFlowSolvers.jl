@@ -39,7 +39,7 @@ writeInterval = 0.1
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, curfield = IBLshed(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = IBLsheddisp(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
 #mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 

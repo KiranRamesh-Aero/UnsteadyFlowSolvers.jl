@@ -272,13 +272,13 @@ function update_thickLHS2V(surf::TwoDSurfThickBL, curfield::TwoDFlowField, dt::F
     vz = vz1 + vz2
 
     
-    if ntev == 0
-        xloc_tev = surf.bnd_x_l[i_xsl] + 0.5*vx*dt
-        zloc_tev = surf.bnd_z_l[i_xsl] + 0.5*vz*dt
-    else
-        xloc_tev = surf.bnd_x_l[i_xsl] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_l[i_xsl])
-        zloc_tev = surf.bnd_z_l[i_xsl] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_l[i_xsl])
-    end
+    #  if ntev == 0
+    xloc_tev = surf.bnd_x_l[i_xsl] + 0.5*vx*dt
+    zloc_tev = surf.bnd_z_l[i_xsl] + 0.5*vz*dt - 0.001
+    # else
+    #     xloc_tev = surf.bnd_x_l[i_xsl] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_l[i_xsl])
+    #     zloc_tev = surf.bnd_z_l[i_xsl] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_l[i_xsl])
+    # end
 
     dummylsv = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
     #dummylsv = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
@@ -291,25 +291,25 @@ function update_thickLHS2V(surf::TwoDSurfThickBL, curfield::TwoDFlowField, dt::F
         
         #Sweep all rows (corresponding to ndiv) for lifting equation
         
-        # #Sweep columns for aterms
-        # for n = 1:surf.naterm
-        #     surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
-        # end
+        #Sweep columns for aterms
+        for n = 1:surf.naterm
+            surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
+        end
 
-        # #Sweep columns for bterm
-        # for n = 1:surf.naterm
-        #    surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
-        # end
+        #Sweep columns for bterm
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
+        end
 
-        # #TEV term must be updated in the loop after its location is known
-        # #Sweep all rows (corresponding to ndiv) for nonlifting equation
+        #TEV term must be updated in the loop after its location is known
+        #Sweep all rows (corresponding to ndiv) for nonlifting equation
 
-        # for n = 1:surf.naterm
-        #    surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
-        # end
-        # for n = 1:surf.naterm
-        #    surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
-        # end
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+        end
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+        end
 
 
         wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +

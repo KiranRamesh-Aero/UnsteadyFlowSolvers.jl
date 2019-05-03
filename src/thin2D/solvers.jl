@@ -1,3 +1,43 @@
+
+function theodorsen(theo::TheoDef)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # reduced frequency
+
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
+
+    #define a
+    a = (theo.pvt-0.5)/0.5
+
+    wt = [0:2*pi/360:2*pi;]
+
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
+
+    # steady-state Cl
+    Cl_ss = 2*pi*(theo.alpha_mean - theo.alpha_zl)
+
+    # plunge contribution
+    Cl_h = 2*pi*theo.k^2*theo.h_amp*exp.(im*wt) - im*4*pi*theo.k*C*theo.h_amp*exp.(im*wt)
+
+    # pitch contribution
+    Cl_alpha = (im*pi*theo.k + pi*theo.k^2*a)*theo.alpha_amp*exp.(im*(wt .+ theo.phi)) + (1 .+ im*theo.k*(0.5-a))*2*pi*C*theo.alpha_amp*exp.(im*(wt .+ theo.phi))
+
+    # total contributions
+    Cl_tot = Cl_ss .+ Cl_h .+ Cl_alpha
+
+    return wt/(2*pi), Cl_h, Cl_alpha, Cl_tot
+
+end
+
+
 """
     lautat(surf, curfield, nsteps=500, dtstar=0.015, startflag=0,
 writeflag=0, writeInterval=1000., delvort=delNone(), maxwrite=100,

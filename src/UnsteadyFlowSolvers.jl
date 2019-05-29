@@ -14,6 +14,8 @@ import NLsolve: nlsolve, not_in_place
 
 import Statistics: mean
 
+import LinearAlgebra
+
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout
@@ -65,10 +67,14 @@ export
     ldvm,
     ldvmLin,
     ldvm2DOF,
+    LVE,
 
     # 2D plot output functions
     makeForcePlots2D,
-    makeVortPlots2D
+    makeVortPlots2D,
+
+    # XFOIL Wrapper
+    xfoilWrapper
 
 ### source files
 
@@ -85,9 +91,12 @@ include("delVort.jl")
 include("lowOrder2D/typedefs.jl")            # type definitions
 include("lowOrder2D/calcs.jl")               # calculation functions
 include("lowOrder2D/solvers.jl")             # solver methods
-include("lowOrder2D/postprocess.jl")         # postprocessing functions
+include("lowOrder2D/LVE.jl")                 # Lumped Vortex Element method
 
 # 2D plotting functions
 include("plots/plots2D.jl")
+
+# XFOIL Wrapper
+include("xfoil/XfoilWrapper.jl")
 
 end

@@ -42,7 +42,7 @@ function add_indbound_b(surf::TwoDSurf, surfj::TwoDSurf)
     surf.uind[:] += uind
     surf.wind[:] += wind
     return surf
-    
+
 end
 
 # Function for updating the downwash
@@ -408,7 +408,7 @@ function place_lev(surf::TwoDSurf,field::TwoDFlowField,dt)
 end
 
 function place_lev(surf::Vector{TwoDSurf},field::TwoDFlowField,dt,shed_ind::Vector{Int})
-    nsurf = length(surf) 
+    nsurf = length(surf)
     nlev = length(field.lev)
 
     for i = 1:nsurf
@@ -422,7 +422,7 @@ function place_lev(surf::Vector{TwoDSurf},field::TwoDFlowField,dt,shed_ind::Vect
             else
                 xloc = surf[i].bnd_x[1]+(1. /3.)*(field.lev[nlev-nsurf+i].x - surf[i].bnd_x[1])
                 zloc = surf[i].bnd_z[1]+(1. /3.)*(field.lev[nlev-nsurf+i].z - surf[i].bnd_z[1])
-                push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))            
+                push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf[i].c,0.,0.))
             end
         else
             push!(field.lev, TwoDVort(0., 0., 0., 0., 0., 0.))
@@ -455,6 +455,17 @@ function ind_vel(src::Vector{TwoDVort},t_x,t_z)
             wind[itr] = wind[itr] + src[isr].s*xdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
         end
     end
+    return uind, wind
+end
+# Same as above except allows for only one vortex and one collocation point
+#   Used for influence coefficients
+function ind_vel(src::TwoDVort,t_x,t_z)
+    #'s' stands for source and 't' for target
+    xdist = src.x - t_x
+    zdist = src.z - t_z
+    distsq = xdist*xdist + zdist*zdist
+    uind = -src.s*zdist/(2*pi*sqrt(src.vc*src.vc*src.vc*src.vc + distsq*distsq))
+    wind = src.s*xdist/(2*pi*sqrt(src.vc*src.vc*src.vc*src.vc + distsq*distsq))
     return uind, wind
 end
 
@@ -600,14 +611,14 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
     R1 = 4*strpar.kappa*surf.uref*surf.uref*cl/(pi*surf.c*surf.c) - 2*strpar.w_h*strpar.w_h*(strpar.cubic_h_1*kinem.h + strpar.cubic_h_3*kinem.h^3)/surf.c - strpar.x_alpha*sin(kinem.alpha)*kinem.alphadot*kinem.alphadot
 
     R2 = 8*strpar.kappa*surf.uref*surf.uref*cm/(pi*surf.c*surf.c) - strpar.w_alpha*strpar.w_alpha*strpar.r_alpha*strpar.r_alpha*(strpar.cubic_alpha_1*kinem.alpha + strpar.cubic_alpha_3*kinem.alpha^3)
-    
+
     kinem.hddot_pr = (1/(m11*m22-m21*m12))*(m22*R1-m12*R2)
     kinem.alphaddot_pr = (1/(m11*m22-m21*m12))*(-m21*R1+m11*R2)
 
     #Kinematics are updated according to the 2DOF response
     kinem.alphadot = kinem.alphadot_pr + (dt/12.)*(23*kinem.alphaddot_pr - 16*kinem.alphaddot_pr2 + 5*kinem.alphaddot_pr3)
     kinem.hdot = kinem.hdot_pr + (dt/12)*(23*kinem.hddot_pr-16*kinem.hddot_pr2 + 5*kinem.hddot_pr3)
-    
+
     kinem.alpha = kinem.alpha_pr + (dt/12)*(23*kinem.alphadot_pr-16*kinem.alphadot_pr2 + 5*kinem.alphadot_pr3)
     kinem.h = kinem.h_pr + (dt/12)*(23*kinem.hdot_pr - 16*kinem.hdot_pr2 + 5*kinem.hdot_pr3)
 
@@ -616,9 +627,32 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
     surf.kinem.hdot = kinem.hdot
     surf.kinem.alpha = kinem.alpha
     surf.kinem.h = kinem.h
-    
+
     return surf, kinem
 end
 
+function globalFrame(surf::TwoDSurf,x::Vector{Float64},z::Vector{Float64},t::Float64)
+    # Given inrtial frame and kinematics, find global positions
+    alpha = surf.kindef.alpha(t)
+    X0 = -surf.kindef.u(t)*t
+    Z0 = surf.kindef.h(t)
+    pvt = surf.pvt
 
-    
+    X = (x .- pvt).*cosd(alpha) + z.*sind(alpha) .+ X0
+    Z = -(x .- pvt).*sind(alpha) + z.*cosd(alpha) .+ Z0
+
+    return X,Z
+end
+
+function refresh_vortex(surf::TwoDSurf,vor_loc,refresh::Bool = false)
+    # Updates vortex locations and if refresh == True also sets strength to 1
+    #   in order to solve for influence coefficients
+    for i=1:length(surf.bv)
+        surf.bv[i].x = vor_loc[i,1]
+        surf.bv[i].z = vor_loc[i,2]
+        if refresh || surf.bv[i].s == 0
+            surf.bv[i].s = 1
+        end
+    end
+    return surf
+end

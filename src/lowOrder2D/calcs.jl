@@ -461,11 +461,11 @@ end
 #   Used for influence coefficients
 function ind_vel(src::TwoDVort,t_x,t_z)
     #'s' stands for source and 't' for target
-    xdist = src.x - t_x
-    zdist = src.z - t_z
-    distsq = xdist*xdist + zdist*zdist
-    uind = -src.s*zdist/(2*pi*sqrt(src.vc*src.vc*src.vc*src.vc + distsq*distsq))
-    wind = src.s*xdist/(2*pi*sqrt(src.vc*src.vc*src.vc*src.vc + distsq*distsq))
+    xdist = src.x .- t_x
+    zdist = src.z .- t_z
+    distsq = xdist.*xdist + zdist.*zdist
+    uind = -src.s.*zdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
+    wind = src.s.*xdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
     return uind, wind
 end
 
@@ -631,7 +631,7 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
     return surf, kinem
 end
 
-function globalFrame(surf::TwoDSurf,x::Vector{Float64},z::Vector{Float64},t::Float64)
+function globalFrame(surf::TwoDSurf,x,z,t::Float64)
     # Given inrtial frame and kinematics, find global positions
     alpha = surf.kindef.alpha(t)
     X0 = -surf.kindef.u(t)*t
@@ -644,6 +644,7 @@ function globalFrame(surf::TwoDSurf,x::Vector{Float64},z::Vector{Float64},t::Flo
     return X,Z
 end
 
+
 function refresh_vortex(surf::TwoDSurf,vor_loc,refresh::Bool = false)
     # Updates vortex locations and if refresh == True also sets strength to 1
     #   in order to solve for influence coefficients
@@ -655,4 +656,27 @@ function refresh_vortex(surf::TwoDSurf,vor_loc,refresh::Bool = false)
         end
     end
     return surf
+end
+
+function ind_vel2(src::TwoDVort,t_x,t_z,gloFrame::Bool = false)
+    # Calculation based on Dr. Narisipur's code (Not in use)
+    distsq = (t_x .- src.x).^2 + (t_z .- src.z).^2 .+ src.vc^4
+    uind = src.s ./ ( 2*pi*distsq) .* (t_z .- src.z)
+    wind = -src.s ./ ( 2*pi*distsq) .* (t_x .- src.x)
+    return uind, wind
+end
+
+function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
+    vorx = map(q -> q.x,surf.bv)
+    vorz = map(q -> q.z,surf.bv)
+    if size(field.tev,1) == 0
+        xloc = surf.bv[end].x + 0.5*surf.kinem.u*dt
+        zloc = surf.bv[end].z
+    else
+        xloc = surf.bv[end].x + (1. /3.)*(field.tev[end].x - surf.bv[end].x)
+
+        zloc = surf.bv[end].z + (1. /3.)*(field.tev[end].z - surf.bv[end].z)
+    end
+    push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+    return field
 end

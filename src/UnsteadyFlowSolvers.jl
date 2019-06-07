@@ -18,7 +18,7 @@ import LinearAlgebra
 
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
-    close, tight_layout
+    close, tight_layout, contour
 
 import Plots: @layout
 

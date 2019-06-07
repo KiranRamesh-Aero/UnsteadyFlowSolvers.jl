@@ -64,7 +64,7 @@ struct TwoDSurf
     levflag :: Vector{Int8}
     initpos :: Vector{Float64}
     rho :: Float64
-    
+
     function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
         theta = zeros(ndiv)
         x = zeros(ndiv)
@@ -214,7 +214,7 @@ function (kelv::KelvinCondition)(tev_iter::Array{Float64})
     ntev = length(kelv.field.tev)
 
     uprev, wprev = ind_vel([kelv.field.tev[ntev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
-    
+
     #Update the TEV strength
     kelv.field.tev[ntev].s = tev_iter[1]
 
@@ -222,7 +222,7 @@ function (kelv::KelvinCondition)(tev_iter::Array{Float64})
 
     kelv.surf.uind[:] = kelv.surf.uind[:] .- uprev .+ unow
     kelv.surf.wind[:] = kelv.surf.wind[:] .- wprev .+ wnow
-    
+
     #Calculate downwash
     update_downwash(kelv.surf, [kelv.field.u[1],kelv.field.w[1]])
 
@@ -246,10 +246,10 @@ function (kelv::KelvinConditionMult)(tev_iter::Array{Float64})
     nsurf = length(kelv.surf)
 
     val = zeros(nsurf)
-    
+
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
-    
+
     tev_list = kelv.field.tev[ntev-nsurf+1:ntev]
     for i = 1:nsurf
 
@@ -260,7 +260,7 @@ function (kelv::KelvinConditionMult)(tev_iter::Array{Float64})
             end
         end
         uprev, wprev = ind_vel([tev_list; bv_list], kelv.surf[i].bnd_x, kelv.surf[i].bnd_z)
-    
+
         #Update the TEV strength
         kelv.field.tev[ntev-nsurf+i].s = tev_iter[i]
 
@@ -268,18 +268,18 @@ function (kelv::KelvinConditionMult)(tev_iter::Array{Float64})
 
         kelv.surf[i].uind[:] = kelv.surf[i].uind[:] .- uprev .+ unow
         kelv.surf[i].wind[:] = kelv.surf[i].wind[:] .- wprev .+ wnow
-    
+
         #Calculate downwash
         update_downwash(kelv.surf[i], [kelv.field.u[1],kelv.field.w[1]])
     end
-    
+
     for i = 1:nsurf
         #Update Fourier coefficients and bv strength
         update_a0anda1(kelv.surf[i])
         update_a2toan(kelv.surf[i])
         update_bv(kelv.surf[i])
-        
-        
+
+
         val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.) -
             kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0prev[1] + kelv.surf[i].aprev[1]/2.) +
             kelv.field.tev[ntev-nsurf+i].s
@@ -295,12 +295,12 @@ end
 
 function (kelv::KelvinKutta)(v_iter::Array{Float64})
     val = zeros(2)
-    
+
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
 
     uprev, wprev = ind_vel([kelv.field.tev[ntev]; kelv.field.lev[nlev]], kelv.surf.bnd_x, kelv.surf.bnd_z)
-    
+
     #Update the TEV and LEV strengths
     kelv.field.tev[ntev].s = v_iter[1]
     kelv.field.lev[nlev].s = v_iter[2]
@@ -309,17 +309,17 @@ function (kelv::KelvinKutta)(v_iter::Array{Float64})
 
     kelv.surf.uind[:] = kelv.surf.uind[:] .- uprev .+ unow
     kelv.surf.wind[:] = kelv.surf.wind[:] .- wprev .+ wnow
-    
+
     #Calculate downwash
     update_downwash(kelv.surf ,[kelv.field.u[1],kelv.field.w[1]])
 
     #Calculate first two fourier coefficients
     update_a0anda1(kelv.surf)
 
-    val[1] = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.) - 
+    val[1] = kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0[1] + kelv.surf.aterm[1]/2.) -
         kelv.surf.uref*kelv.surf.c*pi*(kelv.surf.a0prev[1] + kelv.surf.aprev[1]/2.) +
         kelv.field.tev[ntev].s + kelv.field.lev[nlev].s
-    
+
     if (kelv.surf.a0[1] > 0)
         lesp_cond = kelv.surf.lespcrit[1]
     else
@@ -343,7 +343,7 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
 
     nlev = length(kelv.field.lev)
     ntev = length(kelv.field.tev)
-    
+
     tev_list = kelv.field.tev[ntev-nsurf+1:ntev]
     lev_list = kelv.field.lev[nlev-nsurf.+kelv.shed_ind]
 
@@ -356,20 +356,20 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
             end
         end
         uprev, wprev = ind_vel([tev_list; lev_list; bv_list], kelv.surf[i].bnd_x, kelv.surf[i].bnd_z)
-        
+
         #Update the shed vortex strengths
         kelv.field.tev[ntev-nsurf+i].s = v_iter[i]
-    
+
         if i in kelv.shed_ind
             levcount += 1
             kelv.field.lev[nlev-nsurf+i].s = v_iter[nsurf+levcount]
-        end            
+        end
 
         unow, wnow = ind_vel([tev_list; lev_list; bv_list], kelv.surf[i].bnd_x, kelv.surf[i].bnd_z)
 
         kelv.surf[i].uind[:] = kelv.surf[i].uind[:] .- uprev .+ unow
         kelv.surf[i].wind[:] = kelv.surf[i].wind[:] .- wprev .+ wnow
-        
+
         #Calculate downwash
         update_downwash(kelv.surf[i], [kelv.field.u[1],kelv.field.w[1]])
     end
@@ -391,14 +391,59 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
             else
                 lesp_cond = -kelv.surf[i].lespcrit[1]
             end
-            
+
             val[levcount+nsurf] = kelv.surf[i].a0[1] - lesp_cond
         else
             val[i] = kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0[1] + kelv.surf[i].aterm[1]/2.) -
                 kelv.surf[i].uref*kelv.surf[i].c*pi*(kelv.surf[i].a0prev[1] + kelv.surf[i].aprev[1]/2.) +
                 kelv.field.tev[ntev-nsurf+i].s
         end
-    end   
+    end
     return val
 end
 
+mutable struct meshgrid
+    camX :: Vector{Float64}
+    camZ :: Vector{Float64}
+    x :: Array{Float64}
+    z :: Array{Float64}
+    uMat :: Array{Float64}
+    wMat :: Array{Float64}
+    velMag :: Array{Float64}
+
+    function meshgrid(surf::TwoDSurf,offset,t,width::Int64 = 100,view::String = "square")
+        farBnd = surf.x[end] + surf.c*offset
+        nearBnd = surf.x[1] - surf.c*offset
+        zBnd = ( farBnd - nearBnd ) / 2
+        if view == "wakeview"
+            farBnd = 2*farBnd
+        end
+
+        # Global frame translation
+        X0 = -surf.kindef.u(t)*t
+        Z0 = surf.kindef.h(t)
+
+        lowX = nearBnd + X0 - surf.pvt*surf.c
+        uppX = farBnd + X0 - surf.pvt*surf.c
+        lowZ = -zBnd + Z0
+        uppZ = zBnd + Z0
+
+        # Finding global camber line postion
+        camX, camZ = globalFrame(surf,surf.x,surf.cam,t)
+
+        # Creating meshgrid
+        step = (farBnd-nearBnd)/(width-1)
+        range = lowX:step:uppX
+        height = zBnd*2/step + 1
+        x = [ j for i = 1:height, j = range]
+
+        range = uppZ:-step:lowZ
+        z = [ i for i = range , j = 1:size(x,2)]
+
+        uMat = 0 .* x .+ surf.kinem.u
+        wMat = 0 .* x .+ surf.kinem.hdot
+        velMag = 0 .* x
+
+        new(camX, camZ, x, z, uMat, wMat, velMag)
+    end
+end

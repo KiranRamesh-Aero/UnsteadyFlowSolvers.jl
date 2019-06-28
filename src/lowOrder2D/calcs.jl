@@ -645,15 +645,11 @@ function globalFrame(surf::TwoDSurf,x,z,t::Float64)
 end
 
 
-function refresh_vortex(surf::TwoDSurf,vor_loc,refresh::Bool = false)
-    # Updates vortex locations and if refresh == True also sets strength to 1
-    #   in order to solve for influence coefficients
+function refresh_vortex(surf::TwoDSurf,vor_loc)
+    # Updates vortex locations
     for i=1:length(surf.bv)
         surf.bv[i].x = vor_loc[i,1]
         surf.bv[i].z = vor_loc[i,2]
-        if refresh || surf.bv[i].s == 0
-            surf.bv[i].s = 1
-        end
     end
     return surf
 end
@@ -679,4 +675,70 @@ function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
     end
     push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
     return field
+end
+
+function Vor_global(surf::TwoDSurf,t,curfield::TwoDFlowField,glo_field::TwoDFlowField)
+    # finds and updates the global positions of the vortexes in curfield to
+    #   glo_field
+    ntev = size(curfield.tev,1)
+    nlev = size(curfield.lev,1)
+    vorx = [map(q -> q.x,curfield.tev); map(q -> q.x,curfield.lev)]
+    vorz = [map(q -> q.z,curfield.tev); map(q -> q.z,curfield.lev)]
+
+    # Global frmae conversion
+    vorX, vorZ = globalFrame(surf,vorx,vorz,t)
+
+    # Update global TEV
+    for i = 1:ntev
+        glo_field.tev[i].x = vorX[i]
+        glo_field.tev[i].z = vorZ[i]
+    end
+    # Update global LEV
+    for i = 1:nlev
+        glo_field.lev[i].x = vorX[i+ntev]
+        glo_field.lev[i].z = vorZ[i+ntev]
+    end
+    return glo_field
+end
+
+function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n)
+    # With the surface and flowfield, determine the influence matrix "a"
+    a = zeros(surf.ndiv,surf.ndiv)
+    a[end,:] .= 1. # for wake portion
+
+    # Bound vortices (a_ij)
+    for j = 1:surf.ndiv-1, k = 1:surf.ndiv-1
+        # j is test location, k is vortex source
+        src = surf.bv[k]
+        t_x = coll_loc[j,1]
+        t_z = coll_loc[j,2]
+        xdist = src.x .- t_x
+        zdist = src.z .- t_z
+        distsq = xdist.*xdist + zdist.*zdist
+
+        u = -zdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
+        w = xdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
+
+        a[j,k] = u*n[j,1] + w*n[j,2]
+    end
+
+    # Wake vortices (a_iw)
+    if length(curfield.tev) > 0 # If there are wake vortexs
+        # Calculate wake influence coefficents
+        src = curfield.tev
+        t_x = coll_loc[:,1]
+        t_z = coll_loc[:,2]
+        u_w = zeros(length(t_x))
+        w_w = zeros(length(t_x))
+
+        for itr = 1:length(t_x), isr = 1:length(src)
+            xdist = src[isr].x - t_x[itr]
+            zdist = src[isr].z - t_z[itr]
+            distsq = xdist*xdist + zdist*zdist
+            u_w[itr] = u_w[itr] - zdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
+            w_w[itr] = w_w[itr] + xdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
+        end
+        a[1:end-1,surf.ndiv] = u_w.*n[:,1] + w_w.*n[:,2]
+    end
+    return a
 end

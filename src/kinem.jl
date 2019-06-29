@@ -1,6 +1,6 @@
 abstract type MotionDef end
 
-type KinemPar
+mutable struct KinemPar
     alpha :: Float64
     h :: Float64
     alphadot :: Float64
@@ -9,13 +9,13 @@ type KinemPar
     udot :: Float64
 end
 
-type KinemDef
+mutable struct KinemDef
     alpha :: MotionDef
     h :: MotionDef
     u :: MotionDef
 end
 
-immutable EldUpDef <: MotionDef
+struct EldUpDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
@@ -29,7 +29,7 @@ function (eld::EldUpDef)(t)
 end
 
 
-immutable EldUptstartDef <: MotionDef
+struct EldUptstartDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
@@ -44,7 +44,7 @@ function (eld::EldUptstartDef)(t)
 end
 
 
-immutable EldRampReturnDef <: MotionDef
+struct EldRampReturnDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
@@ -53,9 +53,9 @@ end
 function (eld::EldRampReturnDef)(tt)
     fr = eld.K/(pi*abs(eld.amp));
     t1 = 1.
-    t2 = t1 + (1./(2*pi*fr));
+    t2 = t1 + (1. /(2*pi*fr));
     t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
-    t4 = t3 + (1./(2*pi*fr));
+    t4 = t3 + (1. /(2*pi*fr));
     t5 = t4+1.;
 
     nstep = round(Int,t5/0.015) + 1
@@ -75,7 +75,7 @@ function (eld::EldRampReturnDef)(tt)
 end
 
 
-immutable ConstDef <: MotionDef
+struct ConstDef <: MotionDef
     amp :: Float64
 end
 
@@ -84,7 +84,7 @@ function (cons::ConstDef)(t)
 end
 
 
-immutable LinearDef <: MotionDef
+struct LinearDef <: MotionDef
     tstart :: Float64
     vstart :: Float64
     vend :: Float64
@@ -101,7 +101,7 @@ function (lin::LinearDef)(t)
     end
 end
 
-immutable BendingDef <: MotionDef
+struct BendingDef <: MotionDef
     spl :: Spline1D
     scale :: Float64
     k :: Float64
@@ -109,7 +109,7 @@ immutable BendingDef <: MotionDef
 end
 
 
-immutable SinDef <: MotionDef
+struct SinDef <: MotionDef
   mean :: Float64
   amp :: Float64
   k :: Float64
@@ -121,7 +121,7 @@ function (kin::SinDef)(t)
 end
 
 
-immutable CosDef <: MotionDef
+struct CosDef <: MotionDef
   mean :: Float64
   amp :: Float64
   k :: Float64
@@ -132,7 +132,21 @@ function (kin::CosDef)(t)
   (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
 end
 
-immutable EldUpIntDef <: MotionDef
+struct StepGustDef <: MotionDef
+    amp :: Float64
+    tstart :: Float64
+    tgust :: Float64
+end
+ function (sgust::StepGustDef)(t)
+    if t >= sgust.tstart && t <= sgust.tstart+sgust.tgust
+        amp = (sgust.amp)
+    else
+        amp = 0.
+    end
+    amp
+end
+
+struct EldUpIntDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
@@ -168,7 +182,7 @@ function (eld::EldUpIntDef)(t)
 end
 
 
-immutable EldUpInttstartDef <: MotionDef
+struct EldUpInttstartDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
@@ -190,7 +204,7 @@ function (eld::EldUpInttstartDef)(t)
     amp = 0
     for i = 1:nsteps
       tmpt = (i-1)*dt
-                  if (eld.amp == 0.)
+	  if (eld.amp == 0.)
       	 hdot = 0.
       else
          hdot = ((eld.K/sm)*log(cosh(sm*(tmpt - t1))/cosh(sm*(tmpt - t2))))+(eld.amp/2.)

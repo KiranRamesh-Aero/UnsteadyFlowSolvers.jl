@@ -1,10 +1,9 @@
 abstract type delVortDef end
 
-type delNone <:delVortDef end
+mutable struct delNone <:delVortDef end
 
-type delSpalart <: delVortDef
+mutable struct delSpalart <: delVortDef
     limit :: Int64
     dist :: Float64
     tol :: Float64
 end
-

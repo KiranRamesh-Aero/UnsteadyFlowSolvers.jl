@@ -17,16 +17,6 @@ type TwoDVort
     vz :: Float64
 end
 
-type TwoDVVort
-    x :: Float64
-    z :: Float64
-    s :: Float64
-    vc :: Float64
-    vx :: Float64
-    vz :: Float64
-    dvc :: Float64
-end
-
 immutable TwoDFlowField
     velX :: MotionDef
     velZ :: MotionDef
@@ -42,25 +32,6 @@ immutable TwoDFlowField
         lev = TwoDVort[]
         extv = TwoDVort[]
         new(velX, velZ, u, w, tev, lev, extv)
-    end
-end
-
-immutable TwoDVFlowField
-    velX :: MotionDef
-    velZ :: MotionDef
-    u :: Vector{Float64}
-    w :: Vector{Float64}
-    tev :: Vector{TwoDVVort}
-    lev :: Vector{TwoDVVort}
-    extv :: Vector{TwoDVVort}
-    nu :: Float64
-    function TwoDVFlowField(nu, velX = ConstDef(0.), velZ = ConstDef(0.))
-        u = [0;]
-        w = [0;]
-        tev = TwoDVort[]
-        lev = TwoDVort[]
-        extv = TwoDVort[]
-        new(velX, velZ, u, w, tev, lev, extv, nu)
     end
 end
 

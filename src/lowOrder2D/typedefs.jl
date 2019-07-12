@@ -403,6 +403,11 @@ function (kelv::KelvinKuttaMult)(v_iter::Array{Float64})
 end
 
 mutable struct meshgrid
+    t :: Float64
+    alpha :: Float64
+    circ :: Vector{Float64}
+    vorX :: Vector{Float64}
+    vorZ :: Vector{Float64}
     camX :: Vector{Float64}
     camZ :: Vector{Float64}
     x :: Array{Float64}
@@ -411,11 +416,11 @@ mutable struct meshgrid
     wMat :: Array{Float64}
     velMag :: Array{Float64}
 
-    function meshgrid(surf::TwoDSurf,offset,t,width::Int64 = 100,view::String = "square")
+    function meshgrid(surf::TwoDSurf,vorts::Vector{TwoDVort},offset,t,width::Int64 = 100,view::String = "square")
         farBnd = surf.x[end] + surf.c*offset
         nearBnd = surf.x[1] - surf.c*offset
         zBnd = ( farBnd - nearBnd ) / 2
-        if view == "wakeview"
+        if view == "wake"
             farBnd = 2*farBnd
         end
 
@@ -444,6 +449,23 @@ mutable struct meshgrid
         wMat = 0 .* x .+ surf.kinem.hdot
         velMag = 0 .* x
 
-        new(camX, camZ, x, z, uMat, wMat, velMag)
+        t = 0
+        alpha = surf.kinem.alpha
+        circ = zeros(surf.ndiv-1)
+
+        vorX = []
+        vorZ = []
+        for i = 1:length(vorts)
+            vx = vorts[i].x
+            vz = vorts[i].z
+            if vx >= lowX && vx <= uppX
+                if vz >= lowZ && vz <= uppZ
+                    vorX = [vorX;vx]
+                    vorZ = [vorZ;vz]
+                end
+            end
+        end
+
+        new(t,alpha,circ,vorX,vorZ,camX, camZ, x, z, uMat, wMat, velMag)
     end
 end

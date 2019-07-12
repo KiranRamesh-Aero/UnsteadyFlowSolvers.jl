@@ -16,6 +16,8 @@ import Statistics: mean
 
 import LinearAlgebra
 
+import Dates
+
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout, contour
@@ -92,6 +94,7 @@ include("lowOrder2D/typedefs.jl")            # type definitions
 include("lowOrder2D/calcs.jl")               # calculation functions
 include("lowOrder2D/solvers.jl")             # solver methods
 include("lowOrder2D/LVE.jl")                 # Lumped Vortex Element method
+include("lowOrder2D/postprocess.jl")
 
 # 2D plotting functions
 include("plots/plots2D.jl")

@@ -632,7 +632,7 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
 end
 
 function globalFrame(surf::TwoDSurf,x,z,t::Float64)
-    # Given inrtial frame and kinematics, find global positions
+    # Given body frame and kinematics, find global positions
     alpha = surf.kindef.alpha(t)
     X0 = -surf.kindef.u(t)*t
     Z0 = surf.kindef.h(t)
@@ -646,20 +646,12 @@ end
 
 
 function refresh_vortex(surf::TwoDSurf,vor_loc)
-    # Updates vortex locations
+    # Updates vortex locations to vor_loc
     for i=1:length(surf.bv)
         surf.bv[i].x = vor_loc[i,1]
         surf.bv[i].z = vor_loc[i,2]
     end
     return surf
-end
-
-function ind_vel2(src::TwoDVort,t_x,t_z,gloFrame::Bool = false)
-    # Calculation based on Dr. Narisipur's code (Not in use)
-    distsq = (t_x .- src.x).^2 + (t_z .- src.z).^2 .+ src.vc^4
-    uind = src.s ./ ( 2*pi*distsq) .* (t_z .- src.z)
-    wind = -src.s ./ ( 2*pi*distsq) .* (t_x .- src.x)
-    return uind, wind
 end
 
 function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
@@ -738,7 +730,7 @@ function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n)
             u_w[itr] = u_w[itr] - zdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
             w_w[itr] = w_w[itr] + xdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
         end
-        a[1:end-1,surf.ndiv] = u_w.*n[:,1] + w_w.*n[:,2]
+        a[1:end-1,end] = u_w.*n[:,1] + w_w.*n[:,2]
     end
     return a
 end

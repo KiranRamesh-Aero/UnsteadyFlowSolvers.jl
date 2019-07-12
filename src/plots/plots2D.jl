@@ -10,7 +10,7 @@ function viewVort2D(tev::Vector{TwoDVort}, lev::Vector{TwoDVort}, bv::Vector{Two
     tev = hcat(map(q->q.s, tev), map(q->q.x, tev), map(q->q.z, tev))
     lev = hcat(map(q->q.s, lev), map(q->q.x, lev), map(q->q.z, lev))
     bv = hcat(map(q->q.s, bv), map(q->q.x, bv), map(q->q.z, bv))
-    
+
     scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
     sc2 = scatter(bv[:,2], bv[:,3], s=5, c=bv[:,1], edgecolors="none")
@@ -40,7 +40,7 @@ function makeVortPlots2D()
     if isfile("boundv-1") == true  #only 1 surface
         multsurfflag = 1
     end
-    
+
     if multsurfflag == 0 #single surface
 
         tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
@@ -293,9 +293,9 @@ function makeForcePlots2D()
 end
 
 function checkConverge(k::Float64)
-    
+
     mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
-    
+
     T = pi/k
 
     end_cycle = mat[end,1]
@@ -310,7 +310,7 @@ function checkConverge(k::Float64)
         ncyc = ncyc + 1
     end
 
-    #Lift convergence 
+    #Lift convergence
     figure
     for i = 1:ncyc
         start_t = real(i-1)*T
@@ -323,14 +323,14 @@ function checkConverge(k::Float64)
     xmax = 1.
     zmin = minimum(mat[:,6])
     zmax = maximum(mat[:,6])
-    axis([xmin, xmax, zmin, zmax])        
+    axis([xmin, xmax, zmin, zmax])
 
     xlabel(L"$t^*$")
     ylabel(L"$C_l$")
     savefig("forcePlots/cl-convergence.png")
     close()
 
-    #Drag convergence 
+    #Drag convergence
     figure
     for i = 1:ncyc
         start_t = real(i-1)*T
@@ -343,14 +343,14 @@ function checkConverge(k::Float64)
     xmax = 1.
     zmin = minimum(mat[:,7])
     zmax = maximum(mat[:,7])
-    axis([xmin, xmax, zmin, zmax])        
+    axis([xmin, xmax, zmin, zmax])
 
     xlabel(L"$t^*$")
     ylabel(L"$C_d$")
     savefig("forcePlots/cd-convergence.png")
     close()
 
-    #Pitching moment convergence 
+    #Pitching moment convergence
     figure
     for i = 1:ncyc
         start_t = real(i-1)*T
@@ -363,7 +363,7 @@ function checkConverge(k::Float64)
     xmax = 1.
     zmin = minimum(mat[:,8])
     zmax = maximum(mat[:,8])
-    axis([xmin, xmax, zmin, zmax])        
+    axis([xmin, xmax, zmin, zmax])
 
     xlabel(L"$t^*$")
     ylabel(L"$C_m$")
@@ -384,17 +384,17 @@ function makeKinemClVortPlots2D()
 
     dirvec = readdir()
     dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
-    
+
     #Determine axis limits
     dirmax = maximum(dirresults)
-    
+
     cd("$(dirmax)")
-    
+
     multsurfflag = 0
     if isfile("boundv-1") == true  #only 1 surface
         error("this plot function is only written for single surface")
     end
-    
+
     tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
     lev =   try
         DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
@@ -402,28 +402,28 @@ function makeKinemClVortPlots2D()
         zeros(0,3)
     end
     bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
-    
+
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
     xmaxv = maximum([tev[:,2];lev[:,2];])
     zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
-    
+
     cd("..")
-        
+
     if "infoPlots" in dirvec
         rm("infoPlots", recursive=true)
     end
     mkdir("infoPlots")
-    
+
     for i=1:length(dirresults)
         if dirresults[i] != 0
             dirstr="$(dirresults[i])"
             cd(dirstr)
 
             t_cur = dirresults[i]
-            
+
             figure(figsize=(8,8))
-            
+
             subplot2grid((6, 2), (0, 0))
             plot(t, alpha)
             plot([t_cur; t_cur], [-10000; 10000], "k-")
@@ -484,7 +484,7 @@ function makeKinemClVortPlots2D()
             bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
-            
+
             tight_layout()
 
             savefig("../infoPlots/$(dirresults[i]).png")
@@ -507,17 +507,17 @@ function makeKinemVelVortPlots2D()
 
     dirvec = readdir()
     dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
-    
+
     #Determine axis limits
     dirmax = maximum(dirresults)
-    
+
     cd("$(dirmax)")
-    
+
     multsurfflag = 0
     if isfile("boundv-1") == true  #only 1 surface
         error("this plot function is only written for single surface")
     end
-    
+
     tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
     lev =   try
         DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
@@ -525,28 +525,28 @@ function makeKinemVelVortPlots2D()
         zeros(0,3)
     end
     bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
-    
+
     xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
     zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
     xmaxv = maximum([tev[:,2];lev[:,2];])
     zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
-    
+
     cd("..")
-        
+
     if "infoPlots" in dirvec
         rm("infoPlots", recursive=true)
     end
     mkdir("infoPlots")
-    
+
     for i=1:length(dirresults)
         if dirresults[i] != 0
             dirstr="$(dirresults[i])"
             cd(dirstr)
 
             t_cur = dirresults[i]
-            
+
             figure(figsize=(8,8))
-            
+
             subplot2grid((6, 2), (0, 0))
             plot(t, alpha)
             plot([t_cur; t_cur], [-10000; 10000], "k-")
@@ -607,7 +607,7 @@ function makeKinemVelVortPlots2D()
             bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
-            
+
             tight_layout()
 
             savefig("../infoPlots/$(dirresults[i]).png")
@@ -617,5 +617,9 @@ function makeKinemVelVortPlots2D()
     end
 end
 
-
-            
+function meshPlot(mesh :: meshgrid, lvl:: Int64 = 200, scheme::Symbol = :lightrainbow_r)
+    # Plots arifoil with a 2D mesh of surrounding velocities
+    contour(mesh.x[1,:],mesh.z[:,1], mesh.velMag,fill=true,levels = lvl,c = scheme)
+    scatter!(mesh.vorX, mesh.vorZ,markersize = 1, markerstrokestyle = :dot, markerstrokecolor = :white)
+    plot!(mesh.camX,mesh.camZ,color = :black, linewidth = 3, aspect_ratio = :equal,legend = :none,axis = false)
+end

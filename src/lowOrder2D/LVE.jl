@@ -16,6 +16,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     aniStep = round((nsteps-1) / frameCnt) # Frames to capture animation on
     aniStep < 1 ? aniStep = 1 : aniStep
     frames = 0
+    prevNow = 0
 
     # Normal vectors for each panel
     n = hcat(sin.(surf.cam_slope),cos.(surf.cam_slope))
@@ -57,9 +58,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         for j = 1:surf.ndiv-1
             theta = surf.kinem.alpha
             # relVel = [U_t ; W_t]
-            global relVel = [cosd(theta) sind(theta) ; -sind(theta) cosd(theta)] * [-surf.kinem.u ; -surf.kinem.hdot] + [-surf.kinem.alphadot*coll_loc[j,2] ; surf.kinem.alphadot * coll_loc[j,1]]
-            #U = -surf.kinem.u
-            #W = -surf.kinem.hdot
+            global relVel = -[cosd(theta) -sind(theta) ; sind(theta) cosd(theta)] * [-surf.kinem.u ; -surf.kinem.hdot] + [-surf.kinem.alphadot*coll_loc[j,2] ; surf.kinem.alphadot * (coll_loc[j,1] - surf.pvt)]
             u_w = 0
             w_w = 0
             if length(curfield.tev) > 0 # Trailing edge vortexs exist
@@ -70,12 +69,14 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             # RHS = -[U_t + u_w , W_t + w_w] dot n
             global RHS[j] = -(relVel[1] + u_w)*n[j,1] - (relVel[2] + w_w)*n[j,2]
         end
+        curfield.u[1] = surf.kinem.u*cosd(surf.kinem.alpha) + surf.kinem.hdot*cosd(surf.kinem.alpha)
+        curfield.w[1] = surf.kinem.hdot*cosd(surf.kinem.alpha) + surf.kinem.u*cosd(surf.kinem.alpha)
 
         ## Vortex Strenghths a*circ = RHS
         global circ = a\RHS
-        circChange = sum(circ[1:end-1]) - prevCirc
+        circChange = sum(circ[1:end-1]) - prevCirc #bound vorticy circ change
         prevCirc = sum(circ[1:end-1])
-        for j = 1:surf.ndiv-1
+        for j = 1:surf.ndiv-1 # Set bv circs
             surf.bv[j].s = circ[j]
         end
         ## TEV setup
@@ -90,30 +91,39 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         ## Velocity Components
         # Global reference frame
         glo_vor[:,1],glo_vor[:,2] = globalFrame(surf,vor_loc[:,1],vor_loc[:,2],t)
-        refresh_vortex(surf,glo_vor)
         push!(glo_field.tev,TwoDVort(0,0,curfield.tev[end].s,0.02*surf.c,0.,0.))
 
         # Position mesh
         if i % aniStep == 0.
-            view = "wake"
-            global mesh = meshgrid(surf,.25,t,100,view)
+            glo_surf = refresh_vortex(surf,glo_vor)
+            temp = Int(i / aniStep)
+            now = Dates.format(Dates.now(), "HH:MM")
+            if prevNow == now
+                println("$temp / $frameCnt")
+            else
+                println("$temp / $frameCnt,  $now")
+            end
+            prevNow = now
             # Velocities at mesh points
             glo_field = Vor_global(surf,t,curfield,glo_field)
-            vorts = [surf.bv ; glo_field.tev[:]]
+            vorts = glo_field.tev[:]
+            view = "wake"
+            global mesh = meshgrid(surf,vorts,.25,t,100,view)
+            vorts = [vorts ; glo_surf.bv]
             for j = 1:size(vorts,1)
                 u,w = ind_vel(vorts[j],mesh.x,mesh.z)
                 global mesh.uMat = mesh.uMat .+ u
                 global mesh.wMat = mesh.wMat .+ w
                 global mesh.velMag = sqrt.(mesh.uMat.^2 + mesh.wMat.^2)
+                global mesh.t = t
+                global mesh.circ = circ
             end
             if frames == 0
                 frames = [mesh;]
             else
                 push!(frames,mesh)
             end
-            #meshPlot(mesh,200,:kdc) Not working
         end
-
         if i > 0
             ## Pressures (Change in pressure for each panel)
             for j = 1:length(dp)
@@ -125,9 +135,9 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             cn = sum( dp[j]*ds[j] for j = 1:length(dp) ) / ndem
             # LESP
             x = 1 - 2*ds[1] / surf.c
-            LESP = 1.13 * circ[1] / ( surf.kinem.u * surf.c * ( acosd(x) + sin(acosd(x) )))
+            surf.a0[1] = 1.13 * circ[1] / ( surf.kinem.u * surf.c * ( acosd(x) + sin(acosd(x) )))
             # Cs suction
-            cs = 2*pi*LESP^2
+            cs = 2*pi*surf.a0[1]^2
             # Cl lift
             x = surf.kinem.alpha
             cl = cn*cosd(x) + cs*sind(x)
@@ -146,5 +156,5 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     end
     mat = mat'
     test = a
-    return newsurf,frames,curfield,glo_field,mat,test
+    return frames,glo_field,mat,test
 end

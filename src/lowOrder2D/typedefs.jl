@@ -17,6 +17,17 @@ mutable struct  TwoDVort
     vz :: Float64
 end
 
+mutable struct  TwoDVVort
+    x :: Float64
+    z :: Float64
+    s :: Float64
+    vc :: Float64
+    vx :: Float64
+    vz :: Float64
+    dvc :: Float64
+end
+
+
 struct TwoDFlowField
     velX :: MotionDef
     velZ :: MotionDef
@@ -32,6 +43,25 @@ struct TwoDFlowField
         lev = TwoDVort[]
         extv = TwoDVort[]
         new(velX, velZ, u, w, tev, lev, extv)
+    end
+end
+
+struct TwoDVFlowField
+    velX :: MotionDef
+    velZ :: MotionDef
+    u :: Vector{Float64}
+    w :: Vector{Float64}
+    tev :: Vector{TwoDVVort}
+    lev :: Vector{TwoDVVort}
+    extv :: Vector{TwoDVVort}
+    Re :: Float64
+    function TwoDVFlowField(Re, velX = ConstDef(0.), velZ = ConstDef(0.))
+        u = [0;]
+        w = [0;]
+        tev = TwoDVVort[]
+        lev = TwoDVVort[]
+        extv = TwoDVVort[]
+        new(velX, velZ, u, w, tev, lev, extv, Re)
     end
 end
 

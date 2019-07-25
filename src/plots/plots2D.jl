@@ -623,3 +623,37 @@ function meshPlot(mesh :: meshgrid, lvl:: Int64 = 200, scheme::Symbol = :lightra
     scatter!(mesh.vorX, mesh.vorZ,markersize = 1, markerstrokestyle = :dot, markerstrokecolor = :white)
     plot!(mesh.camX,mesh.camZ,color = :black, linewidth = 3, aspect_ratio = :equal,legend = :none,axis = false)
 end
+
+function subPlotForces(mat, xVar :: Int64, xVarLabel :: String, saveName :: String)
+    # Create Cl,Cd,Cm,LESP vs xVar plot
+    # mat = [t , alpha , h , u , LESP , cl , cd , cm] for each timestep
+    xVar = mat[:,xVar] ;
+    cl = mat[:,6] ;
+    cd = mat[:,7] ;
+    cm = mat[:,8] ;
+    LESP = mat[:,5] ;
+
+    subplot(221)
+    plot(xVar,cl) ;
+    xlabel(xVarLabel)
+    ylabel("Cl")
+
+    subplot(222)
+    plot(xVar,cd) ;
+    xlabel(xVarLabel)
+    ylabel("Cd")
+
+    subplot(223)
+    plot(xVar,cm) ;
+    xlabel(xVarLabel)
+    ylabel("Cm")
+
+    subplot(224)
+    plot(xVar,LESP) ;
+    xlabel(xVarLabel)
+    ylabel("LESP")
+
+    tight_layout()
+    savefig(saveName)
+    close()
+end

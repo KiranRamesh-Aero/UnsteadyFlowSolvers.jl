@@ -631,17 +631,30 @@ function update_kinem2DOF(surf::TwoDSurf, strpar :: TwoDOFPar, kinem :: KinemPar
     return surf, kinem
 end
 
-function globalFrame(surf::TwoDSurf,x,z,t::Float64)
+function IFR(surf::TwoDSurf,x,z,t::Float64)
     # Given body frame and kinematics, find global positions
     alpha = surf.kindef.alpha(t)
     X0 = -surf.kindef.u(t)*t
     Z0 = surf.kindef.h(t)
     pvt = surf.pvt
 
-    X = (x .- pvt).*cosd(alpha) + z.*sind(alpha) .+ X0
-    Z = -(x .- pvt).*sind(alpha) + z.*cosd(alpha) .+ Z0
+    X = (x .- pvt).*cos(alpha) + z.*sin(alpha) .+ X0
+    Z = -(x .- pvt).*sin(alpha) + z.*cos(alpha) .+ Z0
 
     return X,Z
+end
+
+function BFR(surf::TwoDSurf,X,Z,t::Float64)
+    # Given inertial frame and kinematics, find body positions
+    alpha = surf.kindef.alpha(t)
+    X0 = -surf.kindef.u(t)*t
+    Z0 = surf.kindef.h(t)
+    pvt = surf.pvt
+
+    x = (X .- X0).*cos(alpha) + (Z .- Z0).*sin(alpha) .+ pvt
+    z = -(X .- X0).*sin(alpha) + (Z .- Z0).*cos(alpha)
+
+    return x,z
 end
 
 
@@ -669,28 +682,28 @@ function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
     return field
 end
 
-function Vor_global(surf::TwoDSurf,t,curfield::TwoDFlowField,glo_field::TwoDFlowField)
-    # finds and updates the global positions of the vortexes in curfield to
-    #   glo_field
-    ntev = size(curfield.tev,1)
-    nlev = size(curfield.lev,1)
-    vorx = [map(q -> q.x,curfield.tev); map(q -> q.x,curfield.lev)]
-    vorz = [map(q -> q.z,curfield.tev); map(q -> q.z,curfield.lev)]
+function vor_BFR(surf::TwoDSurf,t,IFR_field::TwoDFlowField,curfield::TwoDFlowField)
+    # finds and updates the BFR positions of the vortexes in IFR_field to
+    #   curfield
+    ntev = size(IFR_field.tev,1)
+    nlev = size(IFR_field.lev,1)
+    vorx = [map(q -> q.x,IFR_field.tev); map(q -> q.x,IFR_field.lev)]
+    vorz = [map(q -> q.z,IFR_field.tev); map(q -> q.z,IFR_field.lev)]
 
-    # Global frmae conversion
-    vorX, vorZ = globalFrame(surf,vorx,vorz,t)
+    # Body frame conversion
+    vorx, vorz = BFR(surf,vorx,vorz,t)
 
     # Update global TEV
     for i = 1:ntev
-        glo_field.tev[i].x = vorX[i]
-        glo_field.tev[i].z = vorZ[i]
+        curfield.tev[i].x = vorx[i]
+        curfield.tev[i].z = vorz[i]
     end
     # Update global LEV
     for i = 1:nlev
-        glo_field.lev[i].x = vorX[i+ntev]
-        glo_field.lev[i].z = vorZ[i+ntev]
+        curfield.lev[i].x = vorx[i+ntev]
+        curfield.lev[i].z = vorz[i+ntev]
     end
-    return glo_field
+    return curfield
 end
 
 function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n)

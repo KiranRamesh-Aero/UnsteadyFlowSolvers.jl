@@ -65,7 +65,7 @@ struct TwoDSurf
     initpos :: Vector{Float64}
     rho :: Float64
 
-    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04)
+    function TwoDSurf(coord_file, pvt, kindef,lespcrit=zeros(1); c=1., uref=1., ndiv=70, naterm=35, initpos = [0.; 0.], rho = 0.04, camberType = "radial")
         theta = zeros(ndiv)
         x = zeros(ndiv)
         cam = zeros(ndiv)
@@ -74,11 +74,19 @@ struct TwoDSurf
         bnd_z = zeros(ndiv)
         kinem = KinemPar(0, 0, 0, 0, 0, 0)
 
-        dtheta = pi/(ndiv-1)
-        for ib = 1:ndiv
-            theta[ib] = (ib-1.)*dtheta
-            x[ib] = c/2. *(1-cos(theta[ib]))
+        if camberType == "radial"
+            dtheta = pi/(ndiv-1)
+            for ib = 1:ndiv
+                theta[ib] = (ib-1.)*dtheta
+                x[ib] = c/2. *(1-cos(theta[ib]))
+            end
+        elseif camberType == "linear"
+            dx = c / (ndiv-1)
+            for ib = 2:ndiv
+                x[ib] = x[ib-1] + dx
+            end
         end
+
         if (coord_file != "FlatPlate")
             cam, cam_slope = camber_calc(x, coord_file)
         end
@@ -422,6 +430,12 @@ mutable struct meshgrid
         zBnd = ( farBnd - nearBnd ) / 2
         if view == "wake"
             farBnd = 2*farBnd
+        elseif view == "largewake"
+            farBnd = 3*farBnd
+            zBnd = 2*zBnd
+        elseif view == "longwake"
+            farBnd = 5*farBnd
+            zBnd = 2*zBnd
         end
 
         # Global frame translation
@@ -434,7 +448,7 @@ mutable struct meshgrid
         uppZ = zBnd + Z0
 
         # Finding global camber line postion
-        camX, camZ = globalFrame(surf,surf.x,surf.cam,t)
+        camX, camZ = IFR(surf,surf.x,surf.cam,t)
 
         # Creating meshgrid
         step = (farBnd-nearBnd)/(width-1)

@@ -12,16 +12,18 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     global RHS = zeros(surf.ndiv)
     IFR_vor = 0 .* vor_loc # Global frame
     IFR_field = TwoDFlowField()
+    IFR_surf = TwoDSurf(surf.coord_file,surf.pvt,surf.kindef,surf.lespcrit; ndiv = surf.ndiv, camberType = "linear")
     dp = zeros(surf.ndiv-1,1) # change in panel pressure
     aniStep = round((nsteps-1) / frameCnt) # Frames to capture animation on
     aniStep < 1 ? aniStep = 1 : aniStep
     frames = 0
     prevNow = 0
+    tevCirc = []
 
     #   length of each panel
     ds = sqrt.(( surf.x[1:end-1]-surf.x[2:end]).^2 + (surf.cam[1:end-1]-surf.cam[2:end]).^2)
     #   Surf cam_slope does not give the correct panel locations
-    cam_slope = asind.((surf.cam[2:end]-surf.cam[1:end-1])./ds)
+    cam_slope = asind.((surf.cam[2:end]-surf.cam[1:end-1])./ds) # [deg]
 
     # Normal vectors for each panel
     n = hcat(-sind.(cam_slope),cosd.(cam_slope))
@@ -36,10 +38,12 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     #   Collocation points (at 75% panel chordwise)
     coll_loc[:,1] = surf.x[1:end-1] + .75 .* ds .* cosd.(cam_slope)
     coll_loc[:,2] = surf.cam[1:end-1] + .75 .* ds .* sind.(cam_slope)
-    vcore = 1.3 * dtstar * surf.c # From Dr. Narisipur's paper
+
+    ## Refresh vortex values
+    refresh_vortex(surf,vor_loc)
 
     ## Time Stepping Loop
-    t = 0
+    t = -dtstar
 
     for i = 0:nsteps
         t += dtstar
@@ -47,52 +51,50 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         # Update Kinematics
         update_kinem(surf, t)
 
-        ## Refresh vortex values
-        refresh_vortex(surf,vor_loc)
-
         ## Influence Coeffcients
-        global a = influence_coeff(surf,curfield,coll_loc,n)
+        a = influence_coeff(surf,curfield,coll_loc,n,dtstar)
 
         ## RHS Vector
         RHS[end] = prevCirc # previous total circulation
+        # u_w, w_w
+        if length(curfield.tev) > 0 # Trailing edge vortexs exist
+            surf.uind[1:end-1], surf.wind[1:end-1] = ind_vel([curfield.tev; curfield.lev],coll_loc[:,1],coll_loc[:,2])
+            #surf.uind[end-1] = surf.uind[end-2]
+            #surf.wind[end-1] = surf.wind[end-2]
+        end
         for j = 1:surf.ndiv-1
-            theta = surf.kinem.alpha
-            # relVel = [U_t ; W_t]
-            global relVel = [cos(theta) -sin(theta) ; sin(theta) cos(theta)] * [surf.kinem.u ; -surf.kinem.hdot] + [-surf.kinem.alphadot*coll_loc[j,2] ; surf.kinem.alphadot * (coll_loc[j,1] - surf.pvt)]
-            u_w = 0
-            w_w = 0
-            if length(curfield.tev) > 0 # Trailing edge vortexs exist
-                u_w,w_w = ind_vel(curfield.tev,coll_loc[j,1],coll_loc[j,2])
-                global u_w = u_w[1]
-                global w_w = w_w[1]
-            end
+            alpha = surf.kinem.alpha
+            # relVel = [U(t) ; W(t)]
+            global relVel = [cos(alpha) -sin(alpha) ; sin(alpha) cos(alpha)] * [surf.kinem.u ; -surf.kinem.hdot] + [-surf.kinem.alphadot*coll_loc[j,2] ; surf.kinem.alphadot * (coll_loc[j,1] - surf.pvt)]
+
             # RHS = -[U_t + u_w , W_t + w_w] dot n
-            global RHS[j] = -(relVel[1] + u_w)*n[j,1] - (relVel[2] + w_w)*n[j,2]
+            global RHS[j] = -((relVel[1] + surf.uind[j])*n[j,1] + (relVel[2] + surf.wind[j])*n[j,2])
+
         end
 
         ## Vortex Strenghths a*circ = RHS
         global circ = a\RHS
+
         circChange = sum(circ[1:end-1]) - prevCirc #bound vorticy circ change
         prevCirc = sum(circ[1:end-1])
+
         for j = 1:surf.ndiv-1 # Set bv circs
             surf.bv[j].s = circ[j]
         end
         # Inertial reference frame
         IFR_vor[:,1],IFR_vor[:,2] = IFR(surf,vor_loc[:,1],vor_loc[:,2],t)
-        IFR_surf = refresh_vortex(surf,IFR_vor)
+        IFR_surf = refresh_vortex(IFR_surf,IFR_vor)
 
         ## TEV setup
         place_tev2(IFR_surf,IFR_field,dtstar)
-        if length(IFR_field.tev) == 1
-            IFR_field.tev[1].s = 0
-        else
+        if length(IFR_field.tev) > 1
             IFR_field.tev[end].s = circ[end]
         end
 
         # Position mesh
         if i % aniStep == 0.
 
-            temp = Int(i / aniStep)
+            temp = Int(i / aniStep) + 1
             now = Dates.format(Dates.now(), "HH:MM")
             if prevNow == now
                 println("$temp / $frameCnt")
@@ -121,7 +123,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         if i > 0
             ## Pressures (Change in pressure for each panel)
             for j = 1:length(dp)
-                dp[j] = surf.rho * ( ( (relVel[1] + u_w)*tau[j,1] + (relVel[2] + w_w)*tau[j,2] ) * circ[j]/ds[j] + circChange )
+                dp[j] = surf.rho * ( ( (relVel[1] + surf.uind[j])*tau[j,1] + (relVel[2] + surf.wind[j])*tau[j,2] ) * circ[j]/ds[j] + circChange )
             end
             ## Loads
             # Cn normal
@@ -141,16 +143,20 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             ndem = ndem * surf.c # change ndem to moment ndem
             cm = -sum( dp[j]*ds[j]*(vor_loc[j,1]-surf.pvt) for j = 1:length(dp) ) / ndem
 
-            mat = hcat(mat,[t, surf.kinem.alpha*180/pi, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+            mat = hcat(mat,[t, surf.kinem.alpha*180/pi, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm]) # Pressures and loads
+
         end
         ## Wake Rollup
         IFR_field = wakeroll(IFR_surf,IFR_field,dtstar)
 
         # Convert IFR_field values to curfield (IFR to BFR)
         push!(curfield.tev,TwoDVort(0,0,IFR_field.tev[end].s,0.02*surf.c,0.,0.))
-        vor_BFR(surf,dtstar,IFR_field,curfield)
+        vor_BFR(surf,t,IFR_field,curfield)
+
+        tevCirc = [tevCirc ; prevCirc]
+
     end
     mat = mat'
-    test = ds
+    test = tevCirc
     return frames,IFR_field,mat,test
 end

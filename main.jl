@@ -56,39 +56,39 @@ end
 t_tot = ceil(t)
 =#
 t_tot = 9
-resol = 100 # Step resolution from calculation (x/100%)
-nsteps = Int(round(t_tot/dtstar))+1
-#nsteps = 1000 #DEBUG
+nsteps = Int(round(t_tot/dtstar))
+#nsteps = 3 #DEBUG
 
 println("Running LVE")
 frames, ifr_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
-#n,tau,a,RHS,ds,cam_slope,vor_loc,coll_loc,relVel = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar)
+#circ,a,RHS = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar)
 
-#=
+#
 println("Running LDVM")
 startflag = 0
 writeflag = 0
 writeInterval = t_tot/18.
-surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit)
-curfield = UnsteadyFlowSolvers.TwoDFlowField()
+surf2 = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 4)
+curfield2 = UnsteadyFlowSolvers.TwoDFlowField()
 delvort = UnsteadyFlowSolvers.delNone()
 
-mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf, curfield, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
-=#
+mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+#mat2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+#
 # mat = [t , alpha , h , u , LESP , cl , cd , cm] for each timestep
 
-#= Velocity plot
+# Velocity plot
 using Plots
 pyplot()
-single = false ;
-if single == true
+single = "none" ;
+if single == "true"
     mesh = frames[end]
 
     contour(mesh.x[1,:],mesh.z[:,1], mesh.velMag,fill=true,levels = 200,c = :lightrainbow_r)
     scatter!(mesh.vorX, mesh.vorZ,markersize = 1.5, markerstrokestyle = :dot, markerstrokecolor = :white)
     plot!(mesh.camX,mesh.camZ,color = :black, linewidth = 3, aspect_ratio = :equal,legend = :none,axis = false)
-else # Make full list of images in folder
-    dir = "case_$case steps_$nsteps resol_$resol"
+elseif single == "false" # Make full list of images in folder
+    dir = "case_$case steps_$nsteps"
     mkdir(dir)
     for i = 1:length(frames)
         mesh = frames[i]
@@ -100,7 +100,7 @@ else # Make full list of images in folder
         savefig("$dir/$i")
     end
 end
-=#
+#
 #= Plot circ vs alpha
 circ = map(q -> q.circ[1],frames)
 alpha = map(q -> q.alpha,frames)
@@ -120,4 +120,6 @@ alpha = Int(alpha)
 #plot(mat2[:,1],mat2[:,2], xlabel = "t*", ylabel = "AoA")
 #savefig("RameshData_Motion_$alpha")
 
-UnsteadyFlowSolvers.subPlotForces(mat,1,"t","MyData_$alpha")
+UnsteadyFlowSolvers.subPlotForces(mat,1,"t*","MyData_$alpha")
+
+plot(mat[:,1],test[1:end-1], xlabel = "t*", ylabel = "TEV Strength")

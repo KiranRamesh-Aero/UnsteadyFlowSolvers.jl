@@ -457,7 +457,7 @@ function ind_vel(src::Vector{TwoDVort},t_x,t_z)
     end
     return uind, wind
 end
-# Same as above except allows for only one vortex and one collocation point
+# Same as above except allows for only one vortex and multiple collocation points
 #   Used for influence coefficients
 function ind_vel(src::TwoDVort,t_x,t_z)
     #'s' stands for source and 't' for target
@@ -638,7 +638,7 @@ function IFR(surf::TwoDSurf,x,z,t::Float64)
     Z0 = surf.kindef.h(t)
     pvt = surf.pvt
 
-    X = (x .- pvt).*cos(alpha) + z.*sin(alpha) .+ X0
+    X = (x .- pvt).*cos(alpha) + z.*sin(alpha) .+ X0 .+ pvt
     Z = -(x .- pvt).*sin(alpha) + z.*cos(alpha) .+ Z0
 
     return X,Z
@@ -651,8 +651,8 @@ function BFR(surf::TwoDSurf,X,Z,t::Float64)
     Z0 = surf.kindef.h(t)
     pvt = surf.pvt
 
-    x = (X .- X0).*cos(alpha) + (Z .- Z0).*sin(alpha) .+ pvt
-    z = -(X .- X0).*sin(alpha) + (Z .- Z0).*cos(alpha)
+    x = (X .- X0 .- pvt).*cos(alpha) - (Z .- Z0).*sin(alpha) .+ pvt
+    z = (X .- X0 .- pvt).*sin(alpha) + (Z .- Z0).*cos(alpha)
 
     return x,z
 end
@@ -675,7 +675,6 @@ function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
         zloc = surf.bv[end].z
     else
         xloc = surf.bv[end].x + (1. /3.)*(field.tev[end].x - surf.bv[end].x)
-
         zloc = surf.bv[end].z + (1. /3.)*(field.tev[end].z - surf.bv[end].z)
     end
     push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
@@ -687,18 +686,18 @@ function vor_BFR(surf::TwoDSurf,t,IFR_field::TwoDFlowField,curfield::TwoDFlowFie
     #   curfield
     ntev = size(IFR_field.tev,1)
     nlev = size(IFR_field.lev,1)
-    vorx = [map(q -> q.x,IFR_field.tev); map(q -> q.x,IFR_field.lev)]
-    vorz = [map(q -> q.z,IFR_field.tev); map(q -> q.z,IFR_field.lev)]
+    vorX = [map(q -> q.x,IFR_field.tev); map(q -> q.x,IFR_field.lev)]
+    vorZ = [map(q -> q.z,IFR_field.tev); map(q -> q.z,IFR_field.lev)]
 
     # Body frame conversion
-    vorx, vorz = BFR(surf,vorx,vorz,t)
+    vorx, vorz = BFR(surf,vorX,vorZ,t)
 
-    # Update global TEV
+    # Update bfr TEV
     for i = 1:ntev
         curfield.tev[i].x = vorx[i]
         curfield.tev[i].z = vorz[i]
     end
-    # Update global LEV
+    # Update bfr LEV
     for i = 1:nlev
         curfield.lev[i].x = vorx[i+ntev]
         curfield.lev[i].z = vorz[i+ntev]
@@ -706,44 +705,39 @@ function vor_BFR(surf::TwoDSurf,t,IFR_field::TwoDFlowField,curfield::TwoDFlowFie
     return curfield
 end
 
-function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n)
+function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt)
     # With the surface and flowfield, determine the influence matrix "a"
     a = zeros(surf.ndiv,surf.ndiv)
     a[end,:] .= 1. # for wake portion
+    vc = surf.bv[1].vc
 
-    # Bound vortices (a_ij)
-    for j = 1:surf.ndiv-1, k = 1:surf.ndiv-1
-        # j is test location, k is vortex source
-        src = surf.bv[k]
-        t_x = coll_loc[j,1]
-        t_z = coll_loc[j,2]
-        xdist = src.x .- t_x
-        zdist = src.z .- t_z
-        distsq = xdist.*xdist + zdist.*zdist
-
-        u = -zdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
-        w = xdist./(2*pi*sqrt.(src.vc*src.vc*src.vc*src.vc .+ distsq.*distsq))
-
-        a[j,k] = u*n[j,1] + w*n[j,2]
+    if size(curfield.tev,1) == 0 # calculate TEV placement location
+        xloc = surf.bv[end].x + 0.5*surf.kinem.u*dt*cos(surf.kinem.alpha)
+        zloc = surf.bv[end].z + 0.5*surf.kinem.u*dt*sin(surf.kinem.alpha)
+    else
+        xloc = surf.bv[end].x + (1. /3.)*(curfield.tev[end].x - surf.bv[end].x)
+        zloc = surf.bv[end].z + (1. /3.)*(curfield.tev[end].z - surf.bv[end].z)
     end
 
-    # Wake vortices (a_iw)
-    if length(curfield.tev) > 0 # If there are wake vortexs
-        # Calculate wake influence coefficents
-        src = curfield.tev
-        t_x = coll_loc[:,1]
-        t_z = coll_loc[:,2]
-        u_w = zeros(length(t_x))
-        w_w = zeros(length(t_x))
+    for i = 1:surf.ndiv-1, j = 1:surf.ndiv
+        # i is test location, j is vortex source
+        t_x = coll_loc[i,1]
+        t_z = coll_loc[i,2]
 
-        for itr = 1:length(t_x), isr = 1:length(src)
-            xdist = src[isr].x - t_x[itr]
-            zdist = src[isr].z - t_z[itr]
-            distsq = xdist*xdist + zdist*zdist
-            u_w[itr] = u_w[itr] - zdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
-            w_w[itr] = w_w[itr] + xdist/(2*pi*sqrt(src[isr].vc*src[isr].vc*src[isr].vc*src[isr].vc + distsq*distsq))
+        if j < surf.ndiv # Bound vortices (a_ij)
+            src = surf.bv[j]
+            xdist = src.x .- t_x
+            zdist = src.z .- t_z
+        else # Wake vorticy (a_iw)
+            xdist = xloc .- t_x
+            zdist = zloc .- t_z
         end
-        a[1:end-1,end] = u_w.*n[:,1] + w_w.*n[:,2]
+
+        distsq = xdist.*xdist + zdist.*zdist
+        u = -zdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+        w = xdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+
+        a[i,j] = u*n[i,1] + w*n[i,2]
     end
     return a
 end

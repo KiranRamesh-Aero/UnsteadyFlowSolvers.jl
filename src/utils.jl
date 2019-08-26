@@ -107,7 +107,7 @@ function camber_calc(x::Vector,airfoil::String)
 
     cam = zeros(ndiv)
     cam_slope = zeros(ndiv)
-    in_air = DelimitedFiles.readdlm(airfoil, Float64);
+    in_air = readdlm(airfoil, Float64);
     xcoord = in_air[:,1];
     ycoord = in_air[:,2];
     ncoord = length(xcoord);
@@ -134,6 +134,8 @@ function camber_calc(x::Vector,airfoil::String)
     return cam, cam_slope
 end
 
+
+
 function camber_thick_calc(x::Vector,coord_file::String)
     #Determine camber and camber slope on airfoil from airfoil input file
 
@@ -151,11 +153,56 @@ function camber_thick_calc(x::Vector,coord_file::String)
         th = parse(Int, coord_file[7:8])/100.
         
         b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
-        for i = 2:ndiv
-            thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
-            thick_slope[i] = 5*th*(b1/(2*sqrt(x[i])) + b2 + 2*b3*x[i] + 3*b4*x[i]^2 + 4*b5*x[i]^3)
+
+        function nacaTh(x)
+            5*th*(b1*sqrt(x) + b2*x + b3*x^2 + b4*x^3 + b5*x^4)
         end
-        thick[1] = 5*th*(b1*sqrt(x[1]) + b2*x[1] + b3*x[1]^2 + b4*x[1]^3 + b5*x[1]^4)
+
+        for i = 1:ndiv
+            thick[i] = nacaTh(x[i])
+            thick_slope[i] = ForwardDiff.derivative(nacaTh, x[i])
+        end
+        rho = 1.1019*th*th*c
+        cam[1:ndiv] .= 0.
+        cam_slope[1:ndiv] .= 0.
+
+    elseif coord_file[1:7] == "NACAcut"
+        m = parse(Int, coord_file[8])/100.
+        p = parse(Int, coord_file[9])/10.
+        th = parse(Int, coord_file[10:11])/100.
+        cut = parse(Int, coord_file[12:13])/100.
+        
+        b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+        for i = 2:ndiv
+            x_mod = x[i]*cut
+            thick[i] = 5*th*(b1*sqrt(x_mod) + b2*x_mod + b3*x_mod^2 + b4*x_mod^3 + b5*x_mod^4)
+            thick_slope[i] = 5*th*(b1/(2*sqrt(x_mod)) + b2 + 2*b3*x_mod + 3*b4*x_mod^2 + 4*b5*x_mod^3)
+        end
+        x1mod = x[1]*cut
+        thick[1] = 5*th*(b1*sqrt(x1mod) + b2*x1mod + b3*x1mod^2 + b4*x1mod^3 + b5*x1mod^4)
+        thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+        rho = 1.1019*th*th*c
+        cam[1:ndiv] .= 0.
+        cam_slope[1:ndiv] .= 0.
+
+    elseif coord_file[1:7] == "NACAwak"
+        m = parse(Int, coord_file[8])/100.
+        p = parse(Int, coord_file[9])/10.
+        th = parse(Int, coord_file[10:11])/100.
+        cut = parse(Int, coord_file[12:13])/100.
+        
+        b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+        for i = 2:Int(ndiv/2)
+            x_mod = x[i]/cut
+            thick[i] = 5*th*(b1*sqrt(x_mod) + b2*x_mod + b3*x_mod^2 + b4*x_mod^3 + b5*x_mod^4)
+            thick_slope[i] = 5*th*(b1/(2*sqrt(x_mod)) + b2 + 2*b3*x_mod + 3*b4*x_mod^2 + 4*b5*x_mod^3)
+        end
+        for i = Int(ndiv/2)+1:ndiv
+            thick[i] = 0.
+            thick_slope[i] = 0.#(thick[i] - thick[i-1])/(x[i] - x[i-1])
+        end
+        x1mod = x[1]*cut
+        thick[1] = 5*th*(b1*sqrt(x1mod) + b2*x1mod + b3*x1mod^2 + b4*x1mod^3 + b5*x1mod^4)
         thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
         rho = 1.1019*th*th*c
         cam[1:ndiv] .= 0.
@@ -229,3 +276,162 @@ function camber_thick_calc(x::Vector,coord_file::String)
     return thick, thick_slope,rho, cam, cam_slope
 end
 
+function secant_method(f, x0, x1, ftol, max_iter)
+
+    iter = 2
+
+    f0 = f(x0)
+    f1 = f(x1)
+
+    m = length(f0)
+    n = length(x0)
+
+    J = zeros(m, n)
+    
+    while iter <= max_iter
+
+        for i = 1:m
+            for j = 1:n
+                J[i,j] = (f1[i] - f0[i])/(x1[j] - x0[j])
+            end
+        end
+
+        #println(det(transpose(J)*J))
+        #println(J[1,:])
+        x = x1 .- inv(transpose(J)*J)*transpose(J)*f1
+        fx = f(x)
+        println(iter, "  ", sqrt(sum(fx.^2)))
+
+        if sqrt(sum(fx.^2)) < ftol
+            break
+        else
+            iter += 1
+            x0 = x1
+            f0 = f1
+            x1 = x
+            f1 = fx
+        end
+    end
+    return x
+end
+
+function getEndCycle(mat, k, str="resultsSummaryEndCycle")
+
+    T = pi/k
+    
+    end_cycle = mat[end,1]
+    
+    #Find number of cycles
+    ncyc = 0
+    for i = 1:1000
+        t_l = real(i)*T
+        if t_l > end_cycle
+            break
+        end
+        ncyc = ncyc + 1
+    end
+    ncol = size(mat)[2]
+    
+    println("Cycles    ", ncyc)
+
+    start_t = real(ncyc-1)*T
+    end_t = real(ncyc)*T
+    start_ind = argmin(abs.(mat[:,1] .- start_t))
+    end_ind = argmin(abs.(mat[:,1] .- end_t))
+
+    nlast = end_ind - start_ind + 1
+
+    newmat = zeros(nlast, ncol)
+    newmat[:,1] = (mat[start_ind:end_ind,1] .- start_t)/T
+    for i = 2:ncol
+        newmat[:,i] = mat[start_ind:end_ind,i]
+    end
+
+    f = open(str, "w")
+    Serialization.serialize(f, ["#t/T \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    writedlm(f, newmat)
+    close(f)
+
+    #Print convergence statistics
+    println("Convergence statistics")
+    for icyc = 1:ncyc-1
+        println("Cycle $(icyc) compared to $ncyc")
+        for i = 2:ncol
+            x_base = newmat[:,1]
+            y_base = newmat[:,i]
+
+            st = real(icyc-1)*T
+            et = real(icyc)*T
+            si = argmin(abs.(mat[:,1] .- st))
+            ei = argmin(abs.(mat[:,1] .- et))
+
+            x_q = (mat[si:ei,1] .- st)/T
+            y_q = mat[si:ei,i]
+            
+            er = errorCalc(x_base, y_base, x_q, y_q)
+            er *= 100
+            println("Col $i  , $er %")
+        end
+    end
+    
+    return newmat
+end
+
+
+function errorCalc(base_x, base_y, quant_x, quant_y; ndiv=1000)
+    
+    xs = maximum([base_x[1]; quant_x[1]])
+    xe = minimum([base_x[end]; quant_x[end]])
+    
+    x = collect(xs:(xe-xs)/(ndiv-1):xe)
+    
+    basespl = Spline1D(base_x, base_y)
+    quantspl = Spline1D(quant_x, quant_y)
+    
+    base_o = evaluate(basespl, x)
+    quant_o = evaluate(quantspl, x)
+    
+    rmserror = sqrt(mean(((quant_o .- base_o)./base_o).^2))
+end       
+
+function smoothEdges!(q::Array{Float64}, nsm::Int)
+    ndiv = length(q)
+    
+    for i = 1:nsm
+        q[nsm-i+1] = 2*q[nsm+2-i] - q[nsm+3-i]
+        q[ndiv-nsm+i] = 2*q[ndiv-nsm+i-1] - q[ndiv-nsm+i-2]
+    end
+
+    return q
+end
+
+function smoothEnd!(q::Array{Float64}, nsm::Int)
+    ndiv = length(q)
+    
+    for i = 1:nsm
+        q[ndiv-nsm+i] = 2*q[ndiv-nsm+i-1] - q[ndiv-nsm+i-2]
+    end
+
+    return q
+end
+
+function smoothStart!(q::Array{Float64}, nsm::Int)
+    ndiv = length(q)
+    
+    for i = 1:nsm
+        q[nsm-i+1] = 2*q[nsm+2-i] - q[nsm+3-i]
+      end
+
+    return q
+end
+
+
+function smoothScaledEnd!(x::Array{Float64}, q::Array{Float64}, nsm::Int)
+    ndiv = length(q)
+    
+    for i = 1:nsm
+        q[ndiv-nsm+i] = q[ndiv-nsm+i-1] + (q[ndiv-nsm+i-1] - q[ndiv-nsm+i-2])*(x[ndiv-nsm+i] - x[ndiv-nsm+i-1])/(x[ndiv-nsm+i-1] - x[ndiv-nsm+i-2])
+    end
+
+    return q
+end

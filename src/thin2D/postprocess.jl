@@ -41,7 +41,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
 
     f = open("timeKinem", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
-    DelimitedFiles.writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
+    writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
     close(f)
 
     f = open("FourierCoeffs", "w")
@@ -49,7 +49,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     matfour = zeros(surf.naterm+1, 2)
     matfour[:,1] = [surf.a0[1];surf.aterm[:]]
     matfour[:,2] = [surf.a0dot[1];surf.adot[:]]
-    DelimitedFiles.writedlm(f, matfour)
+    writedlm(f, matfour)
     close(f)
 
     # f = open("forces", "w")
@@ -65,7 +65,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     for i = 1:length(curfield.tev)
         tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
     end
-    DelimitedFiles.writedlm(f, tevmat)
+    writedlm(f, tevmat)
     close(f)
 
     f = open("lev", "w")
@@ -74,7 +74,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     for i = 1:length(curfield.lev)
         levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
     end
-    DelimitedFiles.writedlm(f, levmat)
+    writedlm(f, levmat)
     close(f)
 
     f = open("boundv", "w")
@@ -83,7 +83,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     for i = 1:length(surf.bv)
         bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
     end
-    DelimitedFiles.writedlm(f, bvmat)
+    writedlm(f, bvmat)
     close(f)
 
     f = open("delcp_edgevel", "w")
@@ -97,7 +97,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     mat[:,4] = delcp_out[:]
     mat[:,5] = qu[:]
     mat[:,6] = ql[:]
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
     
     cd("..")
@@ -179,17 +179,19 @@ function calc_delcp(surf::TwoDSurf, vels::Vector{Float64})
     gam = zeros(surf.ndiv)
     gamint = zeros(surf.ndiv)
     p_com = zeros(surf.ndiv)
-    gammod = zeros(surf.ndiv)
+   
       
     for i = 1:surf.ndiv
         udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
         
-        p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
+        p_in[i] = 2*(4*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i]))
     end
     for i = 2:surf.ndiv
         udash = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[i]*cos(surf.kinem.alpha) - surf.wind[i]*sin(surf.kinem.alpha)
         gam[i] = surf.a0[1]*cot(surf.theta[i]/2)
         gamint[i] = surf.a0dot[1]*(surf.theta[i] + sin(surf.theta[i]))  
+        gammod = zeros(surf.ndiv)
+        
         for n = 1:surf.naterm
             gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
             gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
@@ -203,8 +205,8 @@ function calc_delcp(surf::TwoDSurf, vels::Vector{Float64})
         gammod[i] = gammod[i]*surf.uref
         gamint[i] = gamint[i]*surf.uref*surf.c
         
-        p_out[i] = 2*udash*gam[i] + gamint[i] 
-        p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
+        p_out[i] = 2*(2*udash*gam[i] + gamint[i]) 
+        p_com[i] = 2*(2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + 4*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2))
     end
     
     return p_com, p_in, p_out
@@ -234,39 +236,8 @@ function calc_edgeVel(surf::TwoDSurf, vels::Vector{Float64})
     return q_com_u, q_com_l
 end
 
-function getEndCycle(mat, k)
-
-    T = pi/k
-    
-    end_cycle = mat[end,1]
-    
-    #Find number of cycles
-    ncyc = 0
-    for i = 1:1000
-        t_l = real(i)*T
-        if t_l > end_cycle
-            break
-        end
-        ncyc = ncyc + 1
-    end
-    
-    start_t = real(ncyc-1)*T
-    end_t = real(ncyc)*T
-    start_ind = argmin(abs.(mat[:,1] .- start_t))
-    end_ind = argmin(abs.(mat[:,1] .- end_t))
-
-    nlast = end_ind - start_ind + 1
-    
-    newmat = zeros(nlast, 8)
-    newmat[:,1] = (mat[start_ind:end_ind,1] .- start_t)/T
-    for i = 2:7
-        newmat[:,i] = mat[start_ind:end_ind,i]
-    end
-
-    f = open("resultsSummaryEndCycle", "w")
-    Serialization.serialize(f, ["#t/T \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, newmat)
-    close(f)
-
-    return newmat
+function calc_stag(surf :: TwoDSurf)
+    stag = (surf.kinem.u/(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha)
+                   + surf.uind[1]*cos(surf.kinem.alpha) - surf.wind[1]*sin(surf.kinem.alpha))*surf.a0[1])^2
+    return stag
 end

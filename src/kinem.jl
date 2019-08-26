@@ -21,11 +21,47 @@ struct EldUpDef <: MotionDef
     a :: Float64
 end
 
+struct EldDownDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+end
+
+struct EldUpDownDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+    tstart :: Float64
+    thold :: Float64
+end
+
+
 function (eld::EldUpDef)(t)
     sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
     t1 = 1.
     t2 = t1 + ((eld.amp)/(2*eld.K))
     ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
+end
+
+function (eld::EldDownDef)(t)
+    sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
+    t1 = 1.
+    t2 = t1 + ((eld.amp)/(2*eld.K))
+    eld.amp - ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))-(eld.amp/2)
+end
+
+function (eld::EldUpDownDef)(t)
+    sm = pi*pi*eld.K/(2*(eld.amp)*(1 - eld.a))
+    t1 = eld.tstart
+    t2 = t1 + ((eld.amp)/(2*eld.K))
+    t3 = t2 + eld.thold
+    
+    if t <= t3
+        alpha = ((eld.K/sm)*log(cosh(sm*(t - t1))/cosh(sm*(t - t2))))+(eld.amp/2)
+    else
+        alpha = ((eld.K/sm)*log(cosh(sm*((2*t3-t) - t1))/cosh(sm*((2*t3-t) - t2))))+(eld.amp/2)
+    end
+    return alpha
 end
 
 

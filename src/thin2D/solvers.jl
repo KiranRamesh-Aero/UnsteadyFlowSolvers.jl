@@ -1,4 +1,39 @@
+function qs_utat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015)
 
+    #Update later to handle cambered airfoil and to output pressure
+    
+    mat = zeros(0, 7)
+    t = 0.
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+
+    for istep = 1:nsteps
+        t = t + dt
+        update_kinem(surf, t)
+
+        a = (surf.pvt - surf.c/2)/(surf.c/2)
+        cl = 2*pi*(-surf.kinem.hdot*cos(surf.kinem.alpha) + sin(surf.kinem.alpha) + surf.c*(1/2 - a)*surf.kinem.alphadot/surf.uref)
+
+        a0 = sin(surf.kinem.alpha) -surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref + surf.kinem.alphadot*surf.c*(1/2 - surf.pvt)/surf.uref 
+        
+        stag = (a0/(surf.uref*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha)))^2*surf.c
+
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, a0, cl, stag])
+
+    end
+    
+    mat = mat'
+        
+    f = open("resultsSummary", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "x_stag \n"])
+    writedlm(f, mat)
+    close(f)
+
+    mat, surf, curfield
+end
+
+    
 function theodorsen(theo::TheoDef)
     # Inputs:
     # h_amp = h_amp/c, plunge amplitude, positive up
@@ -32,13 +67,284 @@ function theodorsen(theo::TheoDef)
 
     # total contributions
     Cl_tot = Cl_ss .+ Cl_h .+ Cl_alpha
-
-    return wt/(2*pi), Cl_h, Cl_alpha, Cl_tot
+    
+    alpha = theo.alpha_mean .+ theo.alpha_amp*exp.(im*(wt .+ theo.phi))
+    h = theo.h_amp*exp.(im*wt)
+    
+    return wt/(2*pi), alpha, h, Cl_h, Cl_alpha, Cl_tot
 
 end
 
+function theodorsen_stag(theo::TheoDef, r::Float64)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # reduced frequency
 
-"""
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
+
+    wt = [0:2*pi/360:2*pi;]
+
+    naterm = 40
+    aterm = zeros(Complex, naterm, length(wt))
+    Q = zeros(Complex, naterm)
+    
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
+
+    k = theo.k
+    
+    S = 1/(im*k)/(besselk(1, im*k) + besselk(0, im*k))
+    
+    alpha = theo.alpha_mean .+ theo.alpha_amp*exp.(im*(wt .+ theo.phi))
+    h = theo.h_amp*exp.(im*wt)
+
+    alphadot = im*2*k.*theo.alpha_amp.*exp.(im*(wt .+ theo.phi))
+    hdot = im*2*k.*h
+    
+    w3qc = alpha .- hdot .- alphadot.*(theo.pvt - 3/4) 
+    
+    a0 = C*w3qc - alphadot/4
+
+    aterm[1,:] = alphadot/2 - 2*w3qc*(C - exp(-im*k)*S)
+    Q[1] = besselk(1, im*k) - 1/(im*k)*exp(-im*k)
+    Q[2] = 2/(im*k)*(Q[1] - exp(-im*k)) + besselk(0, im*k)
+    aterm[2,:] = -2*im*k*w3qc*S*Q[2]
+   
+    
+    for i = 3:naterm
+        Q[i] = 2/(im*k)*((i-1)*Q[i-1] - exp(-im*k)) + Q[i-2]
+        aterm[i,:] = -2*im*k*w3qc*S*Q[i]
+    end
+
+    qle = sqrt(2/r)*(C*w3qc - alphadot/4) 
+   
+    #xs = ((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha .- sqrt(2/r)*(1 - C)*w3qc))
+    #xs = (((C*w3qc .- alphadot/4) - 0.25*(1-C)*w3qc)./(1 .+ hdot.*alpha)).^2
+    xs = imag((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha)).^2
+
+    #xs = (((C*w3qc .- alphadot/4))./(1 .+ hdot.*alpha - (1-C)*w3qc*sqrt(2/r))).^2
+    
+    #xs = ((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha)).^2
+    #xs = *(1 - C)*w3qc
+
+    println("here") 
+    return wt/(2*pi), alpha, h, qle, xs, w3qc
+
+end
+
+function theodorsen_stag_nonlinear(theo::TheoDef, r::Float64)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # reduced frequency
+
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
+
+    #Not WORKING
+    
+    wt = [0:2*pi/360:2*pi;]
+
+    naterm = 800
+    aterm = zeros(Complex, naterm)
+    Q = zeros(Complex, naterm)
+    
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
+
+    k = theo.k
+    
+    S = 1/(im*k)/(besselk(1, im*k) + besselk(0, im*k))
+    
+    alpha = theo.alpha_mean .+ theo.alpha_amp*exp.(im*(wt .+ theo.phi))
+    h = theo.h_amp*exp.(im*wt)
+
+    alphadot = im*2*k.*theo.alpha_amp.*exp.(im*(wt .+ theo.phi))
+    hdot = im*2*k.*h
+    
+    w3qc = alpha .- hdot .- alphadot.*(theo.pvt - 3/4) 
+    
+    a0 = C*w3qc - alphadot/4
+
+    qle = sqrt(2/r)*(C*w3qc - alphadot/4) 
+   
+    #xs = ((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha .- sqrt(2/r)*(1 - C)*w3qc))
+    #xs = (((C*w3qc .- alphadot/4) - 0.25*(1-C)*w3qc)./(1 .+ hdot.*alpha)).^2
+
+    xs = zeros(Complex, length(wt))
+    
+    for i = 1:length(wt)
+        alpha_n = alpha[i]
+        hdot_n = hdot[i]
+        alphadot_n = alphadot[i]
+        w3qc_n = w3qc[i]
+        
+        aterm[1] = alphadot_n/2 - 2*w3qc_n*(C - exp(-im*k)*S)
+        Q[1] = besselk(1, im*k) - 1/(im*k)*exp(-im*k)
+        
+        for j = 2:naterm
+            Q[j], err = quadgk((x -> exp(-im*theo.k*cosh(x))*exp(-j*x)), 0, 100, rtol=1e-6)
+            aterm[j] = (-1)^j*2*im*k*w3qc_n*S*Q[j]
+        end
+        
+        function f_r(x_n)
+            theta_n = acos(1. - 2*x_n)
+
+            sum_a = 0
+            for n = 1:naterm
+                sum_a += aterm[n]*sin(n*theta_n)
+            end
+            
+            return real(a0[i]*tan(theta_n/4) - sum_a + sqrt(x_n/(x_n + r/2))*(cos(alpha_n) + hdot_n*sin(alpha_n) - a0[i]/sqrt(x_n)))
+        end
+        
+        function f_i(x_n)
+            theta_n = acos(1. - 2*x_n)
+            
+            sum_a = 0
+            for n = 1:naterm
+                sum_a += aterm[n]*sin(n*theta_n)
+            end
+            
+            return imag(a0[i]*tan(theta_n/4) - sum_a + sqrt(x_n/(x_n + r/2))*(cos(alpha_n) + hdot_n*sin(alpha_n) - a0[i]/sqrt(x_n)))
+        end
+
+        #println(f_i(1e-10))
+
+        #println(f_i(0.004))
+        
+        xs_r = try
+            find_zero(f_r, (1e-10, 1-1e-10), Bisection())
+        catch
+            0.
+        end
+        xs_i = try
+            find_zero(f_i, (1e-16, 0.1), Bisection())
+        catch
+            0.
+        end
+
+        #xs[i] = xs_r + im*xs_i
+        xs[i] = xs_r
+            #xs[i] = find_zero(f_r, (1e-6, 1-1e-6)) + im*find_zero(f_i, (1e-6, 1-1e-6))
+    end
+
+    #xs = (((C*w3qc .- alphadot/4))./(1 .+ hdot.*alpha - (1-C)*w3qc*sqrt(2/r))).^2
+    
+    #xs = ((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha)).^2
+    #xs = *(1 - C)*w3qc
+
+    println("here") 
+    return wt/(2*pi), alpha, h, qle, xs, w3qc
+
+end
+
+function theodorsen_delcp(theo::TheoDef, r::Float64, tbyT::Float64)
+    # Inputs:
+    # h_amp = h_amp/c, plunge amplitude, positive up
+    # alpha_amp = pitch amplitude, positive LE up
+    # phi = phase angle by which pitch leads plunge
+    # pvt = pvt/c, non-dimensional chordwise rotation point (0 to 1)
+    # alpha_mean = mean angle of attack of chord line
+    # alpha_zl = zero-lift angle of attack of airfoil
+    # reduced frequency
+
+    # Motion definitions
+    # h = h_amp*exp(i*wt)
+    # alpha = alpha_mean + alpha_amp*exp(i*(wt + phi))
+
+    wt  = 2*pi*tbyT
+    
+    naterm = 800
+    #naterm = 2
+    aterm = zeros(Complex, naterm)
+    adot = zeros(Complex, naterm)
+    Q = zeros(Complex, naterm)
+    
+    #Theodorsen function
+    C = besselh(1,2,theo.k)./(besselh(1,2,theo.k) + im*besselh(0,2,theo.k))
+    
+    k = theo.k
+    
+    S = 1/(im*k)/(besselk(1, im*k) + besselk(0, im*k))
+    
+    alpha = theo.alpha_mean .+ theo.alpha_amp*exp.(im*(wt .+ theo.phi))
+    h = theo.h_amp*exp.(im*wt)
+    
+    alphadot = im*2*k.*theo.alpha_amp.*exp.(im*(wt .+ theo.phi))
+    hdot = im*2*k.*h
+
+    alphaddot = -4*k*k.*theo.alpha_amp.*exp.(im*(wt .+ theo.phi))
+    hddot = -4*k*k.*h
+    
+    
+    w3qc = alpha .- hdot .- alphadot.*(theo.pvt - 3/4) 
+    wdot = alphadot .- hddot .- alphaddot.*(theo.pvt - 3/4)
+        
+    a0 = C*w3qc - alphadot/4
+    
+    aterm[1] = alphadot/2 - 2*w3qc*(C - exp(-im*k)*S)
+    Q[1] = besselk(1, im*k) - 1/(im*k)*exp(-im*k)
+    
+    for i = 2:naterm
+        println(i)
+        Q[i], err = quadgk((x -> exp(-im*theo.k*cosh(x))*exp(-i*x)), 0, 100, rtol=1e-6)
+        aterm[i] = (-1)^i*2*im*k*w3qc*S*Q[i]
+    end
+
+    a0dot = C*wdot - alphaddot/4
+    adot[1] = alphaddot/2 - 2*wdot*(C - exp(-im*k)*S)
+    for n = 2:naterm
+        adot[n] = (-1)^n*2*im*k*wdot*S*Q[n]
+    end
+    println(Q[:])    
+    #qle = sqrt(2/r)*(C*w3qc - alphadot/4) 
+    
+    #xs = ((C*w3qc .- alphadot/4)./(1 .+ hdot.*alpha .- sqrt(2/r)*(1 - C)*w3qc)).^2
+    
+    theta = [0:pi/760:pi;]
+
+    dphiwdx = 0.
+    #dphiwdx = -im*k*S*w3qc*sum_w
+    #dphiwdx[1] = 2*dphiwdx[2] - dphiwdx[3]
+    
+    sum_a = zeros(length(theta))
+    for n = 1:naterm
+        sum_a += aterm[n]*sin.(n*theta)
+    end
+        
+    udash = 1 + hdot.*alpha + dphiwdx
+    
+    gamint = a0dot*(theta .+ sin.(theta)) + adot[1]*(theta/2 .- sin.(2*theta)/4)
+    for n = 2:naterm
+        gamint += adot[n]/2*(sin.((n-1)*theta)/(n-1) .- sin.((n+1)*theta)/(n+1))
+    end
+
+    delcp_base = 2*imag(2*udash*(a0*cot.(theta/2) .+ sum_a) .+ gamint) 
+    delcp_base[1] = 2*delcp_base[2] - delcp_base[3]
+    delcp_cor = 2*imag(-2*udash*a0*tan.(theta/4) .+ 2*udash*sum_a .+ gamint .+ 4*udash*a0*sin.(theta/2)./(r .+ 2*sin.(theta/2).^2))
+
+    x = (1/2)*(1 .- cos.(theta))
+    delcp_in = 2*imag(+4*a0*sqrt.(x)*udash./(r .+ 2*x) .+ 4*a0dot*sqrt.(x))
+    
+    return theta, x, delcp_base, delcp_cor, delcp_in
+                                    
+end
+    
+    
+    """
     lautat(surf, curfield, nsteps=500, dtstar=0.015, startflag=0,
 writeflag=0, writeInterval=1000., delvort=delNone(), maxwrite=100,
 nround=6)
@@ -89,7 +395,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -174,7 +480,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
 
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
@@ -185,13 +491,13 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 8)
+        mat = zeros(0, 9)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -291,16 +597,18 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
             end
         end
 
+        stag = calc_stag(surf)
+        
         # for writing in resultsSummary
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag])
 
     end
 
     mat = mat'
 
     f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, mat)
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \t", "Stag \n"])
+    writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
@@ -319,7 +627,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -470,7 +778,7 @@ mat = mat'
 
 f = open("resultsSummary", "w")
 Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
-DelimitedFiles.writedlm(f, mat)
+writedlm(f, mat)
 close(f)
 
 mat, surf, curfield
@@ -482,13 +790,13 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 8)
+        mat = zeros(0, 9)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -647,7 +955,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
 
 #Set previous values of aterm to be used for derivatives in next time step
 surf.a0prev[1] = surf.a0[1]
-for ia = 1:3
+for ia = 1:surf.naterm
     surf.aprev[ia] = surf.aterm[ia]
 end
 
@@ -671,8 +979,10 @@ if writeflag == 1
     end
 end
 
-# for writing in resultsSummary
-mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
+        stag = calc_stag(surf)
+
+        # for writing in resultsSummary
+mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag])
 
 end
 
@@ -680,7 +990,7 @@ mat = mat'
 
 f = open("resultsSummary", "w")
 Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-DelimitedFiles.writedlm(f, mat)
+writedlm(f, mat)
 close(f)
 
 mat, surf, curfield
@@ -697,7 +1007,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -814,7 +1124,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
     
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
 
     mat, surf, curfield

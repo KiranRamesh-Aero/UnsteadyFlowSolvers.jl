@@ -25,6 +25,12 @@ function update_kinem(surf::TwoDSurfThick, t)
     elseif (typeof(surf.kindef.alpha) == EldUptstartDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldDownDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldUpDownDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     elseif (typeof(surf.kindef.alpha) == EldRampReturnDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
@@ -48,6 +54,12 @@ function update_kinem(surf::TwoDSurfThick, t)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == EldUptstartDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldDownDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldUpDownDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == EldUpIntDef)
@@ -79,6 +91,14 @@ function update_kinem(surf::TwoDSurfThick, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldDownDef)
+        surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
+        surf.kinem.u = surf.kinem.u*surf.uref
+        surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldUpDownDef)
         surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
         surf.kinem.u = surf.kinem.u*surf.uref
         surf.kinem.udot = surf.kinem.udot*surf.uref*surf.uref/surf.c
@@ -278,6 +298,70 @@ function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float
 
     return surf, xloc_tev, zloc_tev
 end
+
+function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64, xloc_tev::Float64, zloc_tev::Float64)
+    #Calculate the missing column in LHS that depends on last shed vortex location
+
+    ntev = length(curfield.tev)
+
+    dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+
+    uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+    ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
+    for i = 2:surf.ndiv-1
+
+
+        #Sweep all rows (corresponding to ndiv) for lifting equation
+
+        #Sweep columns for aterms
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
+        end
+
+        #Sweep columns for bterm
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
+        end
+
+        #TEV term must be updated in the loop after its location is known
+        #Sweep all rows (corresponding to ndiv) for nonlifting equation
+
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+        end
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+        end
+
+
+        wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                   wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+
+        wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                   wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+
+        wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                   ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+
+        wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                   ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+        surf.LHS[i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+            surf.thick_slope[i]*wlx + wlz
+
+        surf.LHS[surf.ndiv+i-3,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+            surf.thick_slope[i]*wtx + wtz
+
+    end
+
+    #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
+    #uu[1]*sin(surf.kinem.alpha)
+
+
+    return surf
+end
+
 
 # function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
 #     #Calculate the missing column in LHS that depends on last shed vortex location

@@ -144,70 +144,70 @@ function calc_forces(surf::TwoDSurfThick, int_wax_prev::Vector{Float64}, int_c_p
 return cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t
 end
 
-function calc_delcp(surf::TwoDSurfThick, vels::Vector{Float64})
+# function calc_delcp(surf::TwoDSurfThick, vels::Vector{Float64})
 
-    p_in = zeros(surf.ndiv)
-    p_out = zeros(surf.ndiv)
-    gam = zeros(surf.ndiv)
-    gamint = zeros(surf.ndiv)
-    p_com = zeros(surf.ndiv)
-    gammod = zeros(surf.ndiv)
+#     p_in = zeros(surf.ndiv)
+#     p_out = zeros(surf.ndiv)
+#     gam = zeros(surf.ndiv)
+#     gamint = zeros(surf.ndiv)
+#     p_com = zeros(surf.ndiv)
+#     gammod = zeros(surf.ndiv)
 
-    srcval = zeros(surf.ndiv)
-    src_z = zeros(surf.ndiv)
+#     srcval = zeros(surf.ndiv)
+#     src_z = zeros(surf.ndiv)
 
-    for i = 2:surf.ndiv
+#     for i = 2:surf.ndiv
 
-        wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
-                   surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+#         wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
 
-        for n = 1:surf.naterm
-            srcval[i] -= surf.bterm[n]*cos(n*surf.theta[i])
-            src_z[i] += surf.bterm[n]*sin(n*surf.theta[i])
-        end
-        srcval[i] = srcval[i]*surf.uref
-        src_z[i] = src_z[i]*surf.uref
+#         for n = 1:surf.naterm
+#             srcval[i] -= surf.bterm[n]*cos(n*surf.theta[i])
+#             src_z[i] += surf.bterm[n]*sin(n*surf.theta[i])
+#         end
+#         srcval[i] = srcval[i]*surf.uref
+#         src_z[i] = src_z[i]*surf.uref
 
-        udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + wtx + srcval[i]
+#         udash = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) + wtx + srcval[i]
 
-        p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
+#         p_in[i] = 8*surf.uref*sqrt(surf.c)*surf.a0[1]*sqrt(surf.x[i])*udash/(surf.rho*surf.c + 2*surf.x[i]) + 4*surf.uref*sqrt(surf.c)*surf.a0dot[1]*sqrt(surf.x[i])
 
-        for n = 1:surf.naterm
-            gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
-            gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
-            if n == 1
-                gamint[i] += surf.adot[1]*(surf.theta[i]/2 - sin(2*surf.theta[i])/4)
-            else
-                gamint[i] += surf.adot[n]/2*(sin((n-1)*surf.theta[i])/(n-1) - sin((n+1)*surf.theta[i])/(n+1))
-            end
-        end
-        gam[i] = gam[i]*surf.uref
-        gammod[i] = gammod[i]*surf.uref
-        gamint[i] = gamint[i]*surf.uref*surf.c
+#         for n = 1:surf.naterm
+#             gam[i] += surf.aterm[n]*sin(n*surf.theta[i])
+#             gammod[i] += surf.aterm[n]*sin(n*surf.theta[i])
+#             if n == 1
+#                 gamint[i] += surf.adot[1]*(surf.theta[i]/2 - sin(2*surf.theta[i])/4)
+#             else
+#                 gamint[i] += surf.adot[n]/2*(sin((n-1)*surf.theta[i])/(n-1) - sin((n+1)*surf.theta[i])/(n+1))
+#             end
+#         end
+#         gam[i] = gam[i]*surf.uref
+#         gammod[i] = gammod[i]*surf.uref
+#         gamint[i] = gamint[i]*surf.uref*surf.c
 
-        wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
-                   surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
+#         wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
 
-        wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
-                   surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
+#         wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
 
-        wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
-                   surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+#         wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
 
-        wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
-                   surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+#         wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
 
-        t1 = 2*wlx*udash
-        t2 = 2*((surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + wlz + gam[i])*(src_z[i] + wtz)
+#         t1 = 2*wlx*udash
+#         t2 = 2*((surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + wlz + gam[i])*(src_z[i] + wtz)
 
-        #Omit additional app mass terms
-        p_out[i] = 2*udash*gam[i] + gamint[i] + t1 + t2
+#         #Omit additional app mass terms
+#         p_out[i] = 2*udash*gam[i] + gamint[i] + t1 + t2
 
-        p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + t1 + t2 + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
-    end
+#         p_com[i] = 2*udash*surf.uref*surf.a0[1]*(cos(surf.theta[i]/2)-1)/sin(surf.theta[i]/2) + 2*udash*gammod[i] + gamint[i] + t1 + t2 + 8*surf.uref*udash*surf.c*surf.a0[1]*sin(surf.theta[i]/2)/(surf.rho*surf.c + 2*surf.c*(sin(surf.theta[i]/2))^2)
+#     end
 
-    return p_com, p_in, p_out
-end
+#     return p_com, p_in, p_out
+# end
 
 function calc_edgeVel(surf::TwoDSurfThick, vels::Vector{Float64})
 
@@ -234,20 +234,218 @@ function calc_edgeVel(surf::TwoDSurfThick, vels::Vector{Float64})
         w_z_l = surf.uind_l[i]*sin(surf.kinem.alpha) + surf.wind_l[i]*cos(surf.kinem.alpha)
 
         utot_u = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i]) + w_x_u + l_x + t_x
-        wtot_u = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_u + l_z + t_z
+        wtot_u = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_u + l_z + t_z
         utot_l = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i]) + w_x_l - l_x + t_x
-        wtot_l = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_l + l_z - t_z
+        wtot_l = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_l + l_z - t_z
         
         q_u[i] = (1. /sqrt(1. + (surf.cam_slope[i] + surf.thick_slope[i])^2))*(utot_u + (surf.cam_slope[i] + surf.thick_slope[i])*wtot_u)
         q_l[i] = (1. /sqrt(1. + (surf.cam_slope[i] - surf.thick_slope[i])^2))*(utot_l + (surf.cam_slope[i] - surf.thick_slope[i])*wtot_l)
+
+        if i == 1
+            if surf.coord_file[1:4] == "NACA"
+                q_u[1] = wtot_u
+                q_l[1] = wtot_l
+            end
+        end
         
     end
 
+    
     return q_u, q_l
 end
 
+# function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev::Vector{Float64}, phi_l_prev::Vector{Float64}, dt::Float64)
 
-function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::TwoDFlowField)
+#     q_u = zeros(surf.ndiv)
+#     q_l = zeros(surf.ndiv)
+    
+#     phi_u = zeros(surf.ndiv)
+#     phi_l = zeros(surf.ndiv)
+
+#     uphi_u = 0
+#     wphi_u = 0
+#     uphi_l = 0
+#     wphi_l = 0
+
+#     vref_x_u = zeros(surf.ndiv)
+#     vref_x_l = zeros(surf.ndiv)
+#     vref_z = zeros(surf.ndiv)
+    
+#     for i = 1:surf.ndiv
+#         vref_x_u[i] = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i])
+#         vref_x_l[i] = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i])
+#         vref_z[i] = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)
+#     end
+    
+#     for i = 1:surf.ndiv
+
+#         l_x = 0; l_z = 0; t_x = 0; t_z = 0;
+#         for n = 1:surf.naterm
+#             l_x += surf.aterm[n]*sin(n*surf.theta[i])
+#             l_z += surf.aterm[n]*cos(n*surf.theta[i])
+#             t_x -= surf.bterm[n]*cos(n*surf.theta[i])
+#             t_z += surf.bterm[n]*sin(n*surf.theta[i])
+#         end
+#         l_x *= surf.uref
+#         l_z *= surf.uref
+#         t_x *= surf.uref
+#         t_z *= surf.uref
+
+#         w_x_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+#         w_z_u = surf.uind_u[i]*sin(surf.kinem.alpha) + surf.wind_u[i]*cos(surf.kinem.alpha)
+#         w_x_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+#         w_z_l = surf.uind_l[i]*sin(surf.kinem.alpha) + surf.wind_l[i]*cos(surf.kinem.alpha)
+
+#         uphi_u_p = uphi_u
+#         wphi_u_p = wphi_u
+#         uphi_l_p = uphi_l
+#         wphi_l_p = wphi_l
+        
+#         utot_u = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i]) + w_x_u + l_x + t_x
+#         wtot_u = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_u + l_z + t_z
+#         utot_l = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i]) + w_x_l - l_x + t_x
+#         wtot_l = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_l + l_z - t_z
+
+#         uphi_u = w_x_u + l_x + t_x
+#         wphi_u = w_z_u + l_z + t_z
+#         uphi_l = w_x_l - l_x + t_x
+#         wphi_l = w_z_l + l_z - t_z
+        
+#         # q_u[i] = (1. /sqrt(1. + (surf.cam_slope[i] + surf.thick_slope[i])^2))*(utot_u + (surf.cam_slope[i] + surf.thick_slope[i])*wtot_u)
+#         # q_l[i] = (1. /sqrt(1. + (surf.cam_slope[i] - surf.thick_slope[i])^2))*(utot_l + (surf.cam_slope[i] - surf.thick_slope[i])*wtot_l)
+#         q_u[i] = sqrt(utot_u^2 + wtot_u^2)
+#         q_l[i] = sqrt(utot_l^2 + wtot_l^2)
+        
+
+#         if i == 1
+#             if surf.coord_file[1:4] == "NACA"
+#                 q_u[1] = wtot_u
+#                 q_l[1] = wtot_l
+#             end
+#         end
+        
+#         if i != 1
+#             dx = surf.x[i] - surf.x[i-1]
+#             val1 = 0.5*(uphi_u/sqrt(1. + (surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+#             val2 = 0.5*(wphi_u*(surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_u_p*(surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            
+#             phi_u[i] = phi_u[i-1] + val1*dx + val2*dx
+            
+#             val1 = 0.5*(uphi_l/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+#             val2 = 0.5*(wphi_l*(-surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_u_p*(-surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            
+#             phi_l[i] = phi_l[i-1] + val1*dx + val2*dx
+            
+#         end
+
+#         if i == 2
+#             if surf.coord_file[1:4] == "NACA"
+#                 phi_u[2] = 0.5*(wphi_u + wphi_u_p)*dx
+#                 phi_l[2] = 0.5*(wphi_l + wphi_l_p)*dx
+#             end
+#         end
+#     end
+#     dphiudt = (phi_u .- phi_u_prev)./dt
+#     dphildt = (phi_l .- phi_l_prev)./dt
+#     #println(dphiudt, "   ", dphildt)
+    
+#     #cpu = (-0.5*q_u.^2 - dphiudt)/(0.5*surf.uref^2)
+#     #cpl = (-0.5*q_l.^2 - dphildt)/(0.5*surf.uref^2)
+
+#     vrefsq_u = vref_x_u.^2 .+ vref_z.^2
+#     vrefsq_l = vref_x_l.^2 .+ vref_z.^2
+    
+    
+#     cpu = (vrefsq_u .- q_u.^2)/surf.uref^2 - 2. *dphiudt/surf.uref^2
+#     cpl = (vrefsq_l .- q_l.^2)/surf.uref^2 - 2. *dphildt/surf.uref^2
+    
+#     return q_u, q_l, phi_u, phi_l, cpu, cpl
+# end
+
+function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev::Vector{Float64}, phi_l_prev::Vector{Float64}, dt::Float64)
+
+    q_u = zeros(surf.ndiv)
+    q_l = zeros(surf.ndiv)
+    
+    phi_u = zeros(surf.ndiv)
+    phi_l = zeros(surf.ndiv)
+
+    uphi_u = 0
+    wphi_u = 0
+    uphi_l = 0
+    wphi_l = 0
+
+    cpu = zeros(surf.ndiv)
+    cpl = zeros(surf.ndiv)
+    
+    for i = 1:surf.ndiv
+        vref_x_u = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i])
+        vref_x_l = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i])
+        vref_z = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)
+
+        l_x = 0; l_z = 0; t_x = 0; t_z = 0;
+        for n = 1:surf.naterm
+            l_x += surf.aterm[n]*sin(n*surf.theta[i])
+            l_z += surf.aterm[n]*cos(n*surf.theta[i])
+            t_x -= surf.bterm[n]*cos(n*surf.theta[i])
+            t_z += surf.bterm[n]*sin(n*surf.theta[i])
+        end
+        l_x *= surf.uref
+        l_z *= surf.uref
+        t_x *= surf.uref
+        t_z *= surf.uref
+
+        w_x_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+        w_z_u = surf.uind_u[i]*sin(surf.kinem.alpha) + surf.wind_u[i]*cos(surf.kinem.alpha)
+        w_x_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+        w_z_l = surf.uind_l[i]*sin(surf.kinem.alpha) + surf.wind_l[i]*cos(surf.kinem.alpha)
+
+        uphi_u_p = uphi_u
+        wphi_u_p = wphi_u
+        uphi_l_p = uphi_l
+        wphi_l_p = wphi_l
+        
+        uphi_u = w_x_u + l_x + t_x
+        wphi_u = w_z_u + l_z + t_z
+        uphi_l = w_x_l - l_x + t_x
+        wphi_l = w_z_l + l_z - t_z
+        
+        q_u[i] = sqrt((uphi_u + vref_x_u)^2 + (wphi_u + vref_z)^2)
+        q_l[i] = sqrt((uphi_l + vref_x_l)^2 + (wphi_l + vref_z)^2)
+                
+        if i != 1
+            dx = surf.x[i] - surf.x[i-1]
+            val1 = 0.5*(uphi_u/sqrt(1. + (surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            val2 = 0.5*(wphi_u*(surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_u_p*(surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            
+            phi_u[i] = phi_u[i-1] + val1*dx + val2*dx
+            
+            val1 = 0.5*(uphi_l/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            val2 = 0.5*(wphi_l*(-surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_u_p*(-surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            
+            phi_l[i] = phi_l[i-1] + val1*dx + val2*dx
+
+            if i == 2
+                if surf.coord_file[1:4] == "NACA"
+                    phi_u[2] = 0.5*(wphi_u + wphi_u_p)*dx
+                    phi_l[2] = 0.5*(wphi_l + wphi_l_p)*dx
+                end
+            end
+            
+            dphiudt = (phi_u[i] - phi_u_prev[i])/dt
+            dphildt = (phi_l[i] - phi_l_prev[i])/dt
+            
+            cpu[i] = -(uphi_u^2 + wphi_u^2 + 2*(uphi_u*vref_x_u + wphi_u*vref_z) + 2*dphiudt)/surf.uref^2 
+            cpl[i] = -(uphi_l^2 + wphi_l^2 + 2*(uphi_l*vref_x_l + wphi_l*vref_z) + 2*dphildt)/surf.uref^2 
+        end
+        
+    end
+    
+    return q_u, q_l, phi_u, phi_l, cpu, cpl
+end
+
+
+function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::TwoDFlowField, qu::Vector{Float64}, ql::Vector{Float64}, cpu::Vector{Float64}, cpl::Vector{Float64})
     dirvec = readdir()
     if dirname in dirvec
         rm(dirname, recursive=true)
@@ -257,7 +455,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
 
     f = open("timeKinem", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t"])
-    DelimitedFiles.writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
+    writedlm(f, [t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u]')
     close(f)
 
     f = open("FourierCoeffsA", "w")
@@ -265,14 +463,14 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     mat = zeros(surf.naterm+1, 2)
     mat[:,1] = [surf.a0[1];surf.aterm[:]]
     mat[:,2] = [surf.a0dot[1];surf.adot[:]]
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
 
     f = open("FourierCoeffsB", "w")
     Serialization.serialize(f, ["#Fourier coeffs (0-n) \t", "d/dt (Fourier coeffs) \n"])
     mat = zeros(surf.naterm, 1)
     mat[:,1] = surf.bterm[:]
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
 
     # f = open("forces", "w")
@@ -288,7 +486,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     for i = 1:length(curfield.tev)
         tevmat[i,:] = [curfield.tev[i].s curfield.tev[i].x curfield.tev[i].z]
     end
-    DelimitedFiles.writedlm(f, tevmat)
+    writedlm(f, tevmat)
     close(f)
 
     f = open("lev", "w")
@@ -297,7 +495,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     for i = 1:length(curfield.lev)
         levmat[i,:] = [curfield.lev[i].s curfield.lev[i].x curfield.lev[i].z]
     end
-    DelimitedFiles.writedlm(f, levmat)
+    writedlm(f, levmat)
     close(f)
 
     f = open("boundv", "w")
@@ -306,7 +504,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     for i = 1:length(surf.bv)
         bvmat[i,:] = [surf.bv[i].s surf.bv[i].x surf.bv[i].z]
     end
-    DelimitedFiles.writedlm(f, bvmat)
+    writedlm(f, bvmat)
     close(f)
 
     f = open("src", "w")
@@ -315,8 +513,18 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurfThick, curfield::
     for i = 1:length(surf.src)
         bvmat[i,:] = [surf.src[i].s surf.src[i].x surf.src[i].z]
     end
-   DelimitedFiles.writedlm(f, bvmat)
+    writedlm(f, bvmat)
     close(f)
 
+    f = open("cp_edgevel", "w")
+    Serialization.serialize(f, ["#x \t", "cp_us \t", "cp_ls \t", "qu \t", "ql \n"])
+    mat = zeros(length(surf.x), 5)
+    mat[:,1] = surf.x[:]
+    mat[:,2] = cpu[:]
+    mat[:,3] = cpl[:]
+    mat[:,4] = qu[:]
+    mat[:,5] = ql[:]
+    writedlm(f, mat)
+    close(f)
     cd("..")
 end

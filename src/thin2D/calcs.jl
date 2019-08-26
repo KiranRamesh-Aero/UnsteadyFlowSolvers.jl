@@ -156,6 +156,10 @@ function update_kinem(surf::TwoDSurf, t)
     if (typeof(surf.kindef.u) == EldUpDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldDownDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+
     elseif (typeof(surf.kindef.u) == EldRampReturnDef)
         surf.kinem.u, surf.kinem.udot = surf.kindef.u(t)
         surf.kinem.u = surf.kinem.u*surf.uref

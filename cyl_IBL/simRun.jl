@@ -1,4 +1,4 @@
-#test
+geometry = "NACAwak001250"#test
 
 push!(LOAD_PATH,"../src/")
 using UnsteadyFlowSolvers
@@ -14,7 +14,8 @@ full_kinem = KinemDef(alphadef, hdef, udef)
 
 pvt = 0.25
 
-geometry = "Cylinder"
+#geometry = "Cylinder"
+geometry = "NACAcut001290"
 
 lespcrit = [10.25;]
 
@@ -22,12 +23,11 @@ surf = TwoDSurfThickBL(geometry, pvt, full_kinem, ndiv=140, naterm=136, nfvm=80)
 
 curfield = TwoDFlowField()
 
-dtstar = 0.0075
+dtstar = 0.005
 
 t_tot = 1.
 
 nsteps = 100#500#Int(round(t_tot/dtstar))+1
-
 println("nsteps ", nsteps)
 
 startflag = 0
@@ -39,7 +39,7 @@ writeInterval = 0.1
 #delvort = delSpalart(500, 12, 1e-5)
 delvort = delNone()
 
-mat, surf, curfield = IBLsheddisp(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
+mat, surf, curfield = IBL_simul(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 
 #mat, surf, curfield = transpTogetherWake(surf, curfield, 200, nsteps, dtstar, startflag, writeflag, writeInterval, delvort)
 

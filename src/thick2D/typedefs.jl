@@ -142,8 +142,8 @@ mutable struct TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(2*ndiv-2,naterm*2+2)
-        RHS = zeros(2*ndiv-2)
+        LHS = zeros(2*ndiv-1,naterm*2+2)
+        RHS = zeros(2*ndiv-1)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
         for i = 2:ndiv-1
@@ -172,21 +172,22 @@ mutable struct TwoDSurfThick
         end
 
         #Terms for Kelvin condition
-LHS[2*ndiv-3,1] = 100*pi/2
+        LHS[2*ndiv-3,1] = 100*pi/2
 
-LHS[2*ndiv-3,2*naterm+1] = 100.
-#LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
+        LHS[2*ndiv-3,2*naterm+1] = 100.
+        #LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
 
         # #Kutta
-for n = 1:naterm
-    LHS[2*ndiv-2,n] = ((-1)^n)*100.
-end
+        for n = 1:naterm
+            LHS[2*ndiv-2,n] = ((-1)^n)*100.
+        end
 
-        # #LE Kutta condition
-
-        # LHS[2*ndiv-2,1] = 1000.
-
-
+        #Boundary conditions
+        for n = 1:naterm
+            LHS[2*ndiv-1,n+naterm] = ((-1)^n)*100.
+        end
+        
+        
         # LHS[2*ndiv-1,1] = sqrt(2. /rho) + 1.
         # for n = 1:naterm
         #     LHS[2*ndiv-1,n+1] = -1.

@@ -39,6 +39,9 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
     int_c = zeros(surf.ndiv)
     int_t = zeros(surf.ndiv)
 
+    phi_u = zeros(surf.ndiv)
+    phi_l = zeros(surf.ndiv)
+    
     for istep = 1:nsteps
 
         #Udpate current time
@@ -64,7 +67,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
         
         #Now solve the matrix problem
         #soln = surf.LHS[[1:surf.ndiv*2-3;2*surf.ndiv-1], 1:surf.naterm*2+2] \ surf.RHS[[1:surf.ndiv*2-3; 2*surf.ndiv-1]]
-        soln = surf.LHS[1:surf.ndiv*2-2, 1:surf.naterm*2+1] \ surf.RHS[1:surf.ndiv*2-2]
+        soln = surf.LHS[1:surf.ndiv*2-3, 1:surf.naterm*2+1] \ surf.RHS[1:surf.ndiv*2-3]
         
         #Assign the solution
         for i = 1:surf.naterm
@@ -94,19 +97,20 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
 
         #Force calculation
         cnc, cnnc, cn, cs, cl, cd, int_wax, int_c, int_t = calc_forces(surf, int_wax, int_c, int_t, dt)
-
+        #println(phi_u)
+        qu, ql, phi_u, phi_l, cpu, cpl = calc_edgeVel_cp(surf, [curfield.u[1]; curfield.w[1]], phi_u, phi_l, dt)
+        #println(phi_l)
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
                 dirname = "$(round(t,sigdigits=nround))"
-                writeStamp(dirname, t, surf, curfield)
+                writeStamp(dirname, t, surf, curfield, qu, ql, cpu, cpl)
             end
         end
 
         #LE velocity and stagnation point location
         #vle = (surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha) + (curfield.w[1] - surf.kinem.hdot)*cos(surf.kinem.alpha) - surf.kinem.alphadot*surf.pvt*surf.c + sum(surf.aterm) + surf.wind_u[1]  
-
-        qu, ql = calc_edgeVel(surf, [curfield.u[1]; curfield.w[1]])
+        
 
         vle = qu[1]
 
@@ -135,7 +139,7 @@ function lautat(surf::TwoDSurfThick, curfield::TwoDFlowField, nsteps::Int64 = 50
     
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (rad) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    DelimitedFiles.writedlm(f, mat)
+    writedlm(f, mat)
     close(f)
 
     mat, surf, curfield

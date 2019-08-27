@@ -1,2 +1,32 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · UNSflow Documentation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>UNSflow Documentation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li class="current"><a class="toctext" href>-</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>-</a></li></ul><a class="edit-page" href="https://github.com/KiranUofG/UnsteadyFlowSolvers.jl/blob/master/docs/src/index.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>-</span><a class="fa fa-bars" href="#"></a></div></header><footer><hr/></footer></article></body></html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · UNSflow Documentation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>UNSflow Documentation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li class="current"><a class="toctext" href>-</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>-</a></li></ul><a class="edit-page" href="https://github.com/KiranUofG/UnsteadyFlowSolvers.jl/blob/master/docs/src/index.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>-</span><a class="fa fa-bars" href="#"></a></div></header><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="UnsteadyFlowSolvers.lautat" href="#UnsteadyFlowSolvers.lautat"><code>UnsteadyFlowSolvers.lautat</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-julia">lautat(surf, curfield, nsteps=500, dtstar=0.015, startflag=0,</code></pre><p>writeflag=0, writeInterval=1000., delvort=delNone(), maxwrite=100, nround=6)</p><p>Simulates potential flow for an airfoil undergoing unsteady motion     using Large-Angle Unsteady Thin-Airfoil Theory.</p><pre><code class="language-none">Inputs required:
+- `TwoDSurf` : based on airfoil geometry and kinematics
+- `TwoDFlowField` : initial flowfield
+
+`dtstar` should be in accordance with the kinematics; see `?find_tstep`.
+
+`nsteps` should be calculated according to total run time required and
+dtstar.
+
+`startflag=1` can be used to continue a simulation using the
+*resultsSummary* file in current directory.
+
+`writeflag=1` along with a suitable writeInterval is used to write flow
+data at intervals. These can be used to create plots and movies of the
+flowfield.
+
+`delvort` is used to control the vortex count. The simulation cost
+increases as O(n``^2``) with number of vortices in the flow field and so
+long run times can get very computationally expensive. Look at
+`?delVortDef` for algorthims to control vortex count.
+
+`maxwrite` is the maximum number of timestamps/directories that may be
+written.
+
+`nround` is the number of digits to which the output timestamps are
+rounded off to.
+
+The Large-Angle Unsteady Thin-Airfoil theory is described in: Ramesh,
+K. et al., &quot;An unsteady airfoil theory applied to pitching motions
+validated against experiment and computation&quot;, Theor. Comput. Fluid
+Dyn. (2013) 27: 843. [Weblink](https://doi.org/10.1007/s00162-012-0292-8)</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/KiranUofG/UnsteadyFlowSolvers.jl/blob/99700ffaa0406b4cb9d6f3f8368a00c40300f28d/src/thin2D/solvers.jl#L347-L387">source</a></section><footer><hr/></footer></article></body></html>

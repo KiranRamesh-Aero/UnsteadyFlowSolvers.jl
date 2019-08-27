@@ -178,8 +178,8 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     # elseif (typeof(surf.kindef.u) == VAWTuDef)
-    #     surf.kinem.u = surf.kindef.u(t)*surf.uref
-    #     surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+        #     surf.kinem.u = surf.kindef.u(t)*surf.uref
+        #     surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     end
     # ---------------------------------------------------------------------------------------------
     return surf

@@ -1,0 +1,4 @@
+using Documenter, UnsteadyFlowSolvers
+
+makedocs(sitename="UNSflow Documentation")
+

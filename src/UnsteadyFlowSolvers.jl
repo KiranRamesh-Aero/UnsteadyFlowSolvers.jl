@@ -62,6 +62,7 @@ export
     EldUpInttstartDef,
     SinDef,
     CosDef,
+    #VAWTalphaDef,
 
     # 2D low-order solver types
     TheoDef,
@@ -148,7 +149,9 @@ export
     IBL_shape_attached,
     IBL_vel_attached,
     find_nacaCoef,
-    smoothScaledEnd!
+    smoothScaledEnd!,
+    ldvmLin_varU,
+    refreshMonitor
 
 
 

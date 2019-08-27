@@ -625,5 +625,48 @@ function makeKinemVelVortPlots2D()
     end
 end
 
+function refreshMonitor(mat, surf::TwoDSurf, curfield::TwoDFlowField)
 
-            
+    clf()
+    
+    t_cur = mat[end,1]
+
+    t = mat[:,1]
+    alpha = mat[:,2]*180/pi
+    h = mat[:,3]
+    u = mat[:,4]
+    cl = mat[:,6]
+    
+    subplot2grid((6, 2), (0, 0))
+    plot(t, alpha)
+    #plot([t_cur; t_cur], [-10000; 10000], "k-")
+    xlabel(L"$t^*$")
+    xticks([])
+    ylabel(L"$\alpha (deg)$")
+    
+    subplot2grid((6, 2), (1, 0))
+    plot(t, h)
+    #plot([t_cur; t_cur], [-10000; 10000], "k-")
+    xlabel(L"$t^*$")
+    xticks([])
+    ylabel(L"$h$")
+    
+    subplot2grid((6, 2), (2, 0))
+    plot(t, u)
+    #plot([t_cur; t_cur], [-10000; 10000], "k-")
+    xlabel(L"$t^*$")
+    ylabel(L"$u$")
+    
+    subplot2grid((6, 2), (0, 1), rowspan=3)
+    plot(t, cl)
+    #plot([t_cur; t_cur], [-10000; 10000], "k-")
+    xlabel(L"$t^*$")
+    ylabel(L"$C_l$")
+    
+    subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
+    viewVort2D(curfield.tev, curfield.lev, surf.bv)
+    #axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
+    
+    tight_layout()
+
+end

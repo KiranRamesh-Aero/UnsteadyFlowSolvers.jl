@@ -667,15 +667,23 @@ function refresh_vortex(surf::TwoDSurf,vor_loc)
     return surf
 end
 
-function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt)
-    vorx = map(q -> q.x,surf.bv)
-    vorz = map(q -> q.z,surf.bv)
+function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt,t)
+    TE_x, TE_z = IFR(surf,surf.x[end],surf.cam[end],t)
+    #=
     if size(field.tev,1) == 0
         xloc = surf.bv[end].x + 0.5*surf.kinem.u*dt
         zloc = surf.bv[end].z
     else
         xloc = surf.bv[end].x + (1. /3.)*(field.tev[end].x - surf.bv[end].x)
         zloc = surf.bv[end].z + (1. /3.)*(field.tev[end].z - surf.bv[end].z)
+    end
+    =#
+    if size(field.tev,1) == 0
+        xloc = TE_x + 0.5*surf.kinem.u*dt
+        zloc = TE_z + 0.5*surf.kinem.hdot*dt
+    else
+        xloc = TE_x + (1. /3.)*(field.tev[end].x - TE_x)
+        zloc = TE_z + (1. /3.)*(field.tev[end].z - TE_z)
     end
     push!(field.tev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
     return field
@@ -705,19 +713,11 @@ function vor_BFR(surf::TwoDSurf,t,IFR_field::TwoDFlowField,curfield::TwoDFlowFie
     return curfield
 end
 
-function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt)
+function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt,x_w,z_w)
     # With the surface and flowfield, determine the influence matrix "a"
     a = zeros(surf.ndiv,surf.ndiv)
     a[end,:] .= 1. # for wake portion
     vc = surf.bv[1].vc
-
-    if size(curfield.tev,1) == 0 # calculate TEV placement location
-        xloc = surf.bv[end].x + 0.5*surf.kinem.u*dt*cos(surf.kinem.alpha)
-        zloc = surf.bv[end].z + 0.5*surf.kinem.u*dt*sin(surf.kinem.alpha)
-    else
-        xloc = surf.bv[end].x + (1. /3.)*(curfield.tev[end].x - surf.bv[end].x)
-        zloc = surf.bv[end].z + (1. /3.)*(curfield.tev[end].z - surf.bv[end].z)
-    end
 
     for i = 1:surf.ndiv-1, j = 1:surf.ndiv
         # i is test location, j is vortex source
@@ -728,14 +728,18 @@ function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt)
             src = surf.bv[j]
             xdist = src.x .- t_x
             zdist = src.z .- t_z
-        else # Wake vorticy (a_iw)
-            xdist = xloc .- t_x
-            zdist = zloc .- t_z
-        end
 
-        distsq = xdist.*xdist + zdist.*zdist
-        u = -zdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
-        w = xdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+            distsq = xdist.*xdist + zdist.*zdist # dist_type 1
+            u = -zdist./(2*pi*distsq)
+            w = xdist./(2*pi*distsq)
+        else # Wake vorticy (a_iw)
+            xdist = x_w .- t_x
+            zdist = z_w .- t_z
+
+            distsq = xdist.*xdist + zdist.*zdist # dist type 2
+            u = -zdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+            w = xdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+        end
 
         a[i,j] = u*n[i,1] + w*n[i,2]
     end

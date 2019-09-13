@@ -24,10 +24,11 @@ end
 #amp = amp * pi / 180
 if case != 4
 a = (pi^2 * k*180 )/(2*amp*pi *(1-0.1))
+#a = .1
 end
 
-alpha = 10
-alphadef = UnsteadyFlowSolvers.ConstDef(alpha *pi/180)#EldUptstartDef(amp,k,a,1)#tstart)
+#alpha = 10
+alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,1)#tstart)
 hdef = UnsteadyFlowSolvers.ConstDef(0)
 udef = UnsteadyFlowSolvers.ConstDef(1)
 full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
@@ -35,7 +36,7 @@ full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
 pvt = 0.25 ;
 geometry = "FlatPlate"#"bin/sd7003.dat"
 lespcrit = [10000;]
-surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 70, camberType = "linear")
+surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
 curfield = UnsteadyFlowSolvers.TwoDFlowField()
 # Iteration Parameters
 dtstar = UnsteadyFlowSolvers.find_tstep(alphadef)
@@ -55,9 +56,9 @@ while alpha <= amp - .05 || alpha >= amp + .05 # Timestep is outside .05 degrees
 end
 t_tot = ceil(t)
 =#
-t_tot = 9
+t_tot = 12
 nsteps = Int(round(t_tot/dtstar))
-#nsteps = 3 #DEBUG
+#nsteps = 1 #DEBUG
 
 println("Running LVE")
 frames, ifr_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
@@ -68,7 +69,7 @@ println("Running LDVM")
 startflag = 0
 writeflag = 0
 writeInterval = t_tot/18.
-surf2 = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 4)
+surf2 = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101,rho = 1.225)
 curfield2 = UnsteadyFlowSolvers.TwoDFlowField()
 delvort = UnsteadyFlowSolvers.delNone()
 
@@ -116,10 +117,18 @@ plot(x,circ1)
 plot(mat[:,1],mat[:,6],color = :black) # cl vs AoA
 plot!(mat2[:,1],mat2[:,6],color = :red)
 =#
-alpha = Int(alpha)
+#alpha = Int(alpha)
 #plot(mat2[:,1],mat2[:,2], xlabel = "t*", ylabel = "AoA")
 #savefig("RameshData_Motion_$alpha")
 
-UnsteadyFlowSolvers.subPlotForces(mat,1,"t*","MyData_$alpha")
+#UnsteadyFlowSolvers.subPlotForces(mat,1,"t*","MyData_$alpha")
 
-plot(mat[:,1],test[1:end-1], xlabel = "t*", ylabel = "TEV Strength")
+#plot(mat[:,1],test[1:end-1], xlabel = "t*", ylabel = "TEV Strength")
+
+using DelimitedFiles
+
+#writedlm("dp_$nsteps.txt",test)
+writedlm("mat_$nsteps.txt",mat)
+writedlm("mat2_$nsteps.txt",mat2)
+tevCirc = map(q -> q.s,ifr_field.tev)
+#writedlm("TEV_circ_$nsteps.txt",tevCirc)

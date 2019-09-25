@@ -689,6 +689,26 @@ function place_tev2(surf::TwoDSurf,field::TwoDFlowField,dt,t)
     return field
 end
 
+# Places a leading edge vortex
+function place_lev2(surf::TwoDSurf,field::TwoDFlowField,dt,t)
+    LE_x, LE_z = IFR(surf,surf.x[1],surf.cam[1],t)
+
+    le_vel_x = surf.kinem.u - surf.kinem.alphadot*sin(surf.kinem.alpha)*surf.pvt*surf.c + surf.uind[1]
+    le_vel_z = -surf.kinem.alphadot*cos(surf.kinem.alpha)*surf.pvt*surf.c- surf.kinem.hdot + surf.wind[1]
+
+    if (surf.levflag[1] == 0)
+        xloc = LE_x + 0.5*le_vel_x*dt
+        zloc = LE_z + 0.5*le_vel_z*dt
+    else
+        xloc = LE_x + (1. /3.)*(field.lev[end].x - LE_x)
+        zloc = LE_z + (1. /3.)*(field.lev[end].z - LE_z)
+    end
+
+    push!(field.lev,TwoDVort(xloc,zloc,0.,0.02*surf.c,0.,0.))
+
+    return field
+end
+
 function vor_BFR(surf::TwoDSurf,t,IFR_field::TwoDFlowField,curfield::TwoDFlowField)
     # finds and updates the BFR positions of the vortexes in IFR_field to
     #   curfield
@@ -744,4 +764,55 @@ function influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt,x_
         a[i,j] = u*n[i,1] + w*n[i,2]
     end
     return a
+end
+
+function mod_influence_coeff(surf::TwoDSurf,curfield::TwoDFlowField,coll_loc,n,dt,x_w,z_w,x_lev,z_lev)
+    # With the surface and flowfield, determine the influence matrix "a" including the
+    # modifications needed to calculate the LEV strength
+    a = zeros(surf.ndiv,surf.ndiv)
+    a[end,:] .= 1. # for wake portion
+    vc = surf.bv[1].vc
+
+    for i = 1:surf.ndiv-1, j = 1:surf.ndiv
+        # i is test location, j is vortex source
+        t_x = coll_loc[i,1]
+        t_z = coll_loc[i,2]
+
+        if j < surf.ndiv # Bound vortices (a_ij)
+            src = surf.bv[j]
+            xdist = src.x .- t_x
+            zdist = src.z .- t_z
+
+            distsq = xdist.*xdist + zdist.*zdist # dist_type 1
+            u = -zdist./(2*pi*distsq)
+            w = xdist./(2*pi*distsq)
+        else # Wake vorticy (a_iw)
+            xdist = x_w .- t_x
+            zdist = z_w .- t_z
+
+            distsq = xdist.*xdist + zdist.*zdist # dist type 2
+            u = -zdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+            w = xdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+        end
+
+        a[i,j] = u*n[i,1] + w*n[i,2]
+    end
+    a1 = a[:,1]
+    a[:,1:end-1] = a[:,2:end] # shift over a matrix
+
+    for i = 1:surf.ndiv-1 # calc LEV terms
+        t_x = coll_loc[i,1]
+        t_z = coll_loc[i,2]
+
+        xdist = x_lev .- t_x
+        zdist = z_lev .- t_z
+
+        distsq = xdist.*xdist + zdist.*zdist # dist type 2
+        u = -zdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+        w = xdist./(2*pi*sqrt.(vc*vc*vc*vc .+ distsq.*distsq))
+
+        a[i,end] = u*n[i,1] + w*n[i,2]
+    end
+
+    return a,a1
 end

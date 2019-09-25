@@ -28,14 +28,14 @@ a = (pi^2 * k*180 )/(2*amp*pi *(1-0.1))
 end
 
 #alpha = 10
-alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,1)#tstart)
+alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,1)#tstart) ConstDef(alpha*pi/180)#
 hdef = UnsteadyFlowSolvers.ConstDef(0)
 udef = UnsteadyFlowSolvers.ConstDef(1)
 full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
 # Geometry
 pvt = 0.25 ;
 geometry = "FlatPlate"#"bin/sd7003.dat"
-lespcrit = [10000;]
+lespcrit = [.3;]
 surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
 curfield = UnsteadyFlowSolvers.TwoDFlowField()
 # Iteration Parameters
@@ -56,15 +56,15 @@ while alpha <= amp - .05 || alpha >= amp + .05 # Timestep is outside .05 degrees
 end
 t_tot = ceil(t)
 =#
-t_tot = 12
+t_tot = 9
 nsteps = Int(round(t_tot/dtstar))
-#nsteps = 1 #DEBUG
+#nsteps = 150 #DEBUG
 
 println("Running LVE")
-frames, ifr_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
-#circ,a,RHS = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar)
+frames, IFR_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,100,"longwake")
+#gamma_crit_use = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar)
 
-#
+#=
 println("Running LDVM")
 startflag = 0
 writeflag = 0
@@ -75,13 +75,13 @@ delvort = UnsteadyFlowSolvers.delNone()
 
 mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
 #mat2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
-#
+=#
 # mat = [t , alpha , h , u , LESP , cl , cd , cm] for each timestep
 
 # Velocity plot
 using Plots
 pyplot()
-single = "none" ;
+single = "false" ;
 if single == "true"
     mesh = frames[end]
 
@@ -127,8 +127,8 @@ plot!(mat2[:,1],mat2[:,6],color = :red)
 
 using DelimitedFiles
 
-#writedlm("dp_$nsteps.txt",test)
+#writedlm("circChange_$nsteps.txt",test)
 writedlm("mat_$nsteps.txt",mat)
 writedlm("mat2_$nsteps.txt",mat2)
-tevCirc = map(q -> q.s,ifr_field.tev)
+#tevCirc = map(q -> q.s,IFR_field)
 #writedlm("TEV_circ_$nsteps.txt",tevCirc)

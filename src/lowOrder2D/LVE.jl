@@ -3,7 +3,7 @@ LVE.jl
     Written by Matthew White
     5/21/2019
 =#
-function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::Float64 = 0.015,frameCnt = 20,view = "square")
+function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::Float64 = 0.015,frameCnt = 20,view = "square",LEV_Stop = 1000)
     ## Initialize variables
     mat = zeros(8 ,0) # loads output matrix
     prevCirc = zeros(surf.ndiv-1)
@@ -40,6 +40,11 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     coll_loc[:,1] = surf.x[1:end-1] + .75 .* ds .* cosd.(cam_slope)
     coll_loc[:,2] = surf.cam[1:end-1] + .75 .* ds .* sind.(cam_slope)
 
+    ## Critical gamma (LEV)
+    x = 1 - 2*ds[1] / surf.c
+    gamma_crit = surf.lespcrit / 1.13 * ( surf.kinem.u * surf.c * ( acos(x) + sin(acos(x) )))
+    gamma_crit = gamma_crit[1]
+
     ## Refresh vortex values
     refresh_vortex(surf,vor_loc)
 
@@ -68,8 +73,6 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         # u_w, w_w
         if length(curfield.tev) > 0 # Trailing edge vortexs exist
             surf.uind[1:end-1], surf.wind[1:end-1] = ind_vel([curfield.tev; curfield.lev],coll_loc[:,1],coll_loc[:,2])
-            #surf.uind[end-1] = surf.uind[end-2]
-            #surf.wind[end-1] = surf.wind[end-2]
         end
         for j = 1:surf.ndiv-1
             alpha = surf.kinem.alpha
@@ -86,13 +89,60 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
 
         ## Circulation changes before each panel
         for j = 1:surf.ndiv-1
-            gamma1, gamma2 = 0,0
-            for k = 1:j-1
-                gamma1 += prevCirc[k]
-                gamma2 += circ[k]
-            end
+            gamma1 = sum(prevCirc[1:j-1])
+            gamma2 = sum(circ[1:j-1])
             circChange[j] = (gamma2-gamma1) ./ dtstar
         end
+
+        ## LEV Ejection
+        LEV_shed = false ; # true if LEV is shed in step
+        # Test for LEV criteria
+        if abs(circ[1]) > gamma_crit
+            if surf.levflag[1] == 0 && t < LEV_Stop # if lev is first in batch
+                gamma_crit_use = abs(circ[1])/circ[1] * gamma_crit # = gamma_crit w/ sign of circ[1]
+                global t_start = t
+                println("LEV start batch:")
+            else # if lev sheds but is not first in batch
+                m_slp = -surf.lespcrit / (LEV_Stop - t_start)
+                c_slp = surf.lespcrit - (m_slp*t_start)
+                LESP_crit_use = (m_slp*t) + c_slp
+                x = 1 - 2*ds[1] / surf.c
+                gamma_crit_use = LESP_crit_use / 1.13 * ( surf.kinem.u * surf.c * ( acos(x) + sin(acos(x) )))
+            end
+            println("LEV Ejection: Step $i, time $t")
+            gamma_crit_use = gamma_crit_use[1]
+            LEV_shed = true
+
+            # Place LEV
+            place_lev2(surf,IFR_field,dtstar,t)
+            # Convert coords to BFR
+            x_lev, z_lev = BFR(surf, IFR_field.lev[end].x, IFR_field.lev[end].z, t)
+            global a,a1 = mod_influence_coeff(surf,curfield,coll_loc,n,dtstar,x_w,z_w,x_lev,z_lev)
+
+            # Recalculate RHS
+            # u_w, w_w
+            if length(curfield.tev) > 0 # Trailing edge vortexs exist
+                surf.uind[1:end-1], surf.wind[1:end-1] = ind_vel([curfield.tev; curfield.lev],coll_loc[:,1],coll_loc[:,2])
+            end
+            for j = 1:surf.ndiv-1
+                # RHS = -[U_t + u_w , W_t + w_w] dot n
+                global RHS[j] = -((relVel[j,1] + surf.uind[j])*n[j,1] + (relVel[j,2] + surf.wind[j])*n[j,2]) - gamma_crit_use*a1[j]
+            end
+            RHS[end] -= gamma_crit_use # first RHS - gamma_crit_use*a1[end] (which is always 1)
+
+            global circ = a\RHS # Solve new circluations
+
+            IFR_field.lev[end].s = circ[end] #store LEV strength
+
+            circ[2:end] = circ[1:end-1] # shift circs
+            circ[1] = gamma_crit_use
+        end
+        if LEV_shed == true # track constant stream of LEVs
+            surf.levflag[1] = 1
+        else
+            surf.levflag[1] = 0
+        end
+
         prevCirc = circ[1:end-1]
 
         for j = 1:surf.ndiv-1 # Set bv circs
@@ -104,7 +154,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         end
 
         # Position mesh
-        if i % aniStep == 0.
+        if i % aniStep == 0. && Int(i / aniStep) < frameCnt
 
             temp = Int(i / aniStep) + 1
             now = Dates.format(Dates.now(), "HH:MM")
@@ -115,7 +165,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             end
             prevNow = now
             # Velocities at mesh points
-            vorts = IFR_field.tev[:]
+            vorts = [IFR_field.tev;IFR_field.lev]
             global mesh = meshgrid(surf,vorts,.25,t,100,view)
             vorts = [vorts ; IFR_surf.bv]
             for j = 1:size(vorts,1)
@@ -161,12 +211,15 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         ## Wake Rollup
         IFR_field = wakeroll(IFR_surf,IFR_field,dtstar)
 
-        # Convert IFR_field values to curfield (IFR to BFR)
+        # Convert IFR_field values to curfield (IFR -> BFR)
         push!(curfield.tev,TwoDVort(0,0,IFR_field.tev[end].s,0.02*surf.c,0.,0.))
+        if size(IFR_field.lev,1) > 0
+            push!(curfield.lev,TwoDVort(0,0,IFR_field.lev[end].s,0.02*surf.c,0.,0.))
+        end
         vor_BFR(surf,t+dtstar,IFR_field,curfield) # Calculate IFR positions for next iteration
 
     end
     mat = mat'
-    test = dp
+    test = circChange
     return frames,IFR_field,mat,test
 end

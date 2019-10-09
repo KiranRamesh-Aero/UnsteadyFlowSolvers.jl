@@ -254,6 +254,52 @@ function calc_edgeVel(surf::TwoDSurfThick, vels::Vector{Float64})
     return q_u, q_l
 end
 
+function calc_edgeVel_newFourier(surf::TwoDSurfThick, vels::Vector{Float64}, aterm::Vector{Float64}, bterm::Vector{Float64})
+
+    q_u = zeros(surf.ndiv)
+    q_l = zeros(surf.ndiv)
+
+    for i = 1:surf.ndiv
+
+        l_x = 0; l_z = 0; t_x = 0; t_z = 0;
+        for n = 1:surf.naterm
+            l_x += aterm[n]*sin(n*surf.theta[i])
+            l_z += aterm[n]*cos(n*surf.theta[i])
+            t_x -= bterm[n]*cos(n*surf.theta[i])
+            t_z += bterm[n]*sin(n*surf.theta[i])
+        end
+        l_x *= surf.uref
+        l_z *= surf.uref
+        t_x *= surf.uref
+        t_z *= surf.uref
+
+        w_x_u = surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha)
+        w_z_u = surf.uind_u[i]*sin(surf.kinem.alpha) + surf.wind_u[i]*cos(surf.kinem.alpha)
+        w_x_l = surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha)
+        w_z_l = surf.uind_l[i]*sin(surf.kinem.alpha) + surf.wind_l[i]*cos(surf.kinem.alpha)
+
+        utot_u = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] + surf.thick[i]) + w_x_u + l_x + t_x
+        wtot_u = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_u + l_z + t_z
+        utot_l = (surf.kinem.u + vels[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - vels[2])*sin(surf.kinem.alpha) - surf.kinem.alphadot*(surf.cam[i] - surf.thick[i]) + w_x_l - l_x + t_x
+        wtot_l = (surf.kinem.u + vels[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - vels[2])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c) + w_z_l + l_z - t_z
+        
+        q_u[i] = (1. /sqrt(1. + (surf.cam_slope[i] + surf.thick_slope[i])^2))*(utot_u + (surf.cam_slope[i] + surf.thick_slope[i])*wtot_u)
+        q_l[i] = (1. /sqrt(1. + (surf.cam_slope[i] - surf.thick_slope[i])^2))*(utot_l + (surf.cam_slope[i] - surf.thick_slope[i])*wtot_l)
+
+        if i == 1
+            if surf.coord_file[1:4] == "NACA"
+                q_u[1] = wtot_u
+                q_l[1] = wtot_l
+            end
+        end
+        
+    end
+
+    
+    return q_u, q_l
+end
+
+
 # function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev::Vector{Float64}, phi_l_prev::Vector{Float64}, dt::Float64)
 
 #     q_u = zeros(surf.ndiv)
@@ -412,7 +458,12 @@ function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev:
         
         q_u[i] = sqrt((uphi_u + vref_x_u)^2 + (wphi_u + vref_z)^2)
         q_l[i] = sqrt((uphi_l + vref_x_l)^2 + (wphi_l + vref_z)^2)
-                
+        
+        # uphi_u = l_x + t_x
+        # wphi_u = l_z + t_z
+        # uphi_l = l_x + t_x
+        # wphi_l = l_z - t_z
+        
         if i != 1
             dx = surf.x[i] - surf.x[i-1]
             val1 = 0.5*(uphi_u/sqrt(1. + (surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
@@ -420,8 +471,8 @@ function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev:
             
             phi_u[i] = phi_u[i-1] + val1*dx + val2*dx
             
-            val1 = 0.5*(uphi_l/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_u_p/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
-            val2 = 0.5*(wphi_l*(-surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_u_p*(-surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            val1 = 0.5*(uphi_l/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + uphi_l_p/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
+            val2 = 0.5*(wphi_l*(-surf.thick_slope[i] + surf.cam_slope[i])/sqrt(1. + (-surf.thick_slope[i] + surf.cam_slope[i])^2) + wphi_l_p*(-surf.thick_slope[i-1] + surf.cam_slope[i-1])/sqrt(1. + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2))  
             
             phi_l[i] = phi_l[i-1] + val1*dx + val2*dx
 
@@ -434,6 +485,8 @@ function calc_edgeVel_cp(surf::TwoDSurfThick, vels::Vector{Float64}, phi_u_prev:
             
             dphiudt = (phi_u[i] - phi_u_prev[i])/dt
             dphildt = (phi_l[i] - phi_l_prev[i])/dt
+
+            #println(dphiudt - dphildt)
             
             cpu[i] = -(uphi_u^2 + wphi_u^2 + 2*(uphi_u*vref_x_u + wphi_u*vref_z) + 2*dphiudt)/surf.uref^2 
             cpl[i] = -(uphi_l^2 + wphi_l^2 + 2*(uphi_l*vref_x_l + wphi_l*vref_z) + 2*dphildt)/surf.uref^2 

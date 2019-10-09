@@ -246,6 +246,209 @@ function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float
     uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
     ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
 
+    surf.LHS[surf.ndiv*2-3,:] .= 0.
+
+    for i = 2:surf.ndiv-1
+
+        #Sweep all rows (corresponding to ndiv) for lifting equation
+
+        #Sweep columns for aterms
+        for n = 1:surf.naterm
+            surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
+        end
+        
+        #Sweep columns for bterm
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
+        end
+
+        #TEV term must be updated in the loop after its location is known
+        #Sweep all rows (corresponding to ndiv) for nonlifting equation
+
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+        end
+        for n = 1:surf.naterm
+            surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+        end
+        
+        
+        wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                   wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+        
+        wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                   wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+
+        wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                   ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+
+        wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                   ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+        surf.LHS[i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+            surf.thick_slope[i]*wlx + wlz
+
+        surf.LHS[surf.ndiv+i-3,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+            surf.thick_slope[i]*wtx + wtz
+    end
+    
+    for n = 1:surf.naterm
+        s1 = 0. ; s2 = 0. ; s3 = 0. ; s4 = 0. ; s5 = 0. ; s6 = 0.
+        for i = 2:surf.ndiv
+            #dx is ds
+            dx = sqrt((surf.x[i] - surf.x[i-1])^2 + (surf.cam[i] + surf.thick[i] - surf.cam[i-1] - surf.thick[i-1])^2)
+            den_pl = sqrt(1 + (surf.thick_slope[i] + surf.cam_slope[i])^2)
+            den_mi = sqrt(1 + (-surf.thick_slope[i] + surf.cam_slope[i])^2)
+            den_pl_p = sqrt(1 + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2)
+            den_mi_p = sqrt(1 + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2)
+            
+            s1 += 0.5*dx*(sin(n*surf.theta[i])/den_pl + sin(n*surf.theta[i])/den_mi + sin(n*surf.theta[i-1])/den_pl_p + sin(n*surf.theta[i-1])/den_mi_p)
+            s2 += 0.5*dx*(surf.cam_slope[i]*cos(n*surf.theta[i])/den_pl - surf.cam_slope[i]*cos(n*surf.theta[i])/den_mi + surf.cam_slope[i-1]*cos(n*surf.theta[i-1])/den_pl_p - surf.cam_slope[i-1]*cos(n*surf.theta[i-1])/den_mi_p)
+            s3 += 0.5*dx*(surf.thick_slope[i]*cos(n*surf.theta[i])/den_pl + surf.thick_slope[i]*cos(n*surf.theta[i])/den_mi + surf.thick_slope[i-1]*cos(n*surf.theta[i-1])/den_pl_p + surf.thick_slope[i-1]*cos(n*surf.theta[i-1])/den_mi_p)
+
+            dx = sqrt((surf.x[i] - surf.x[i-1])^2 + (surf.cam[i] - surf.thick[i] - surf.cam[i-1] + surf.thick[i-1])^2)
+
+            s4 -= 0.5*dx*(cos(n*surf.theta[i])/den_pl - cos(n*surf.theta[i])/den_mi + cos(n*surf.theta[i-1])/den_pl_p - cos(n*surf.theta[i-1])/den_mi_p)
+            s5 += 0.5*dx*(surf.cam_slope[i]*sin(n*surf.theta[i])/den_pl + surf.cam_slope[i]*sin(n*surf.theta[i])/den_mi + surf.cam_slope[i-1]*sin(n*surf.theta[i-1])/den_pl_p + surf.cam_slope[i-1]*sin(n*surf.theta[i-1])/den_mi_p)
+            s6 += 0.5*dx*(surf.thick_slope[i]*sin(n*surf.theta[i])/den_pl - surf.thick_slope[i]*sin(n*surf.theta[i])/den_mi + surf.thick_slope[i-1]*sin(n*surf.theta[i-1])/den_pl_p - surf.thick_slope[i-1]*sin(n*surf.theta[i-1])/den_mi_p)
+        end
+        surf.LHS[2*surf.ndiv-3, n] = surf.uref*(s1 + s2 + s3)
+        surf.LHS[2*surf.ndiv-3, n+surf.naterm] = surf.uref*(s4 + s5 + s6)
+        surf.LHS[2*surf.ndiv-3, 2*surf.naterm+1] = 1.
+    end 
+        
+    return surf, xloc_tev, zloc_tev
+end
+
+    
+    # function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
+    #     #Calculate the missing column in LHS that depends on last shed vortex location
+    
+    #     ntev = length(curfield.tev)
+    
+    #     if ntev == 0
+    #         xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+#         zloc_tev = surf.bnd_z_chord[surf.ndiv]
+    #     else
+    #         xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+    #         zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+#     end
+
+#     dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+
+#     uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+#     ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
+#     for i = 1:surf.ndiv-1
+
+#         #Sweep all rows (corresponding to ndiv) for lifting equation
+
+#         #Sweep columns for aterms
+#         for n = 1:surf.naterm
+#             surf.LHS[i,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
+#         end
+
+#         #Sweep columns for bterm
+#         for n = 1:surf.naterm
+#             surf.LHS[i,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
+#         end
+        
+#         #TEV term must be updated in the loop after its location is known
+#         #Sweep all rows (corresponding to ndiv) for nonlifting equation
+        
+#         for n = 1:surf.naterm
+#             surf.LHS[surf.ndiv+i-1,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+#         end
+        
+#         for n = 1:surf.naterm
+#             surf.LHS[surf.ndiv+i-1,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+#         end
+
+        
+#         wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+#                    wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+        
+#         wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+#                    wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+        
+#         wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+#                    ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+        
+#         wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+#                    ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+        
+#         surf.LHS[i,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+#             surf.thick_slope[i]*wlx + wlz
+        
+#         surf.LHS[surf.ndiv+i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+#             surf.thick_slope[i]*wtx + wtz        
+#     end
+    
+#     surf.LHS[2*surf.ndiv,:] .= 0.
+    
+#     for n = 1:surf.naterm
+#         surf.LHS[2*surf.ndiv, n] = (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])*(-1)^n/sqrt(1. + (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])^2) - (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])*(-1)^n/sqrt(1. + (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])^2)
+#         surf.LHS[2*surf.ndiv, n+surf.naterm] = (-1)^n/sqrt(1. + (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])^2) - (-1)^n/sqrt(1. + (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])^2)
+#     end
+    
+#     wzu = wu[surf.ndiv]*cos(surf.kinem.alpha) + uu[surf.ndiv]*sin(surf.kinem.alpha)
+#     wzl = wl[surf.ndiv]*cos(surf.kinem.alpha) + ul[surf.ndiv]*sin(surf.kinem.alpha)     
+#     wxu = uu[surf.ndiv]*cos(surf.kinem.alpha) - wu[surf.ndiv]*sin(surf.kinem.alpha)
+#     wxl = ul[surf.ndiv]*cos(surf.kinem.alpha) - wl[surf.ndiv]*sin(surf.kinem.alpha)
+    
+#     #Add BCs at TE and LE
+    
+#     surf.LHS[2*surf.ndiv, 2*surf.naterm+1] = (wxu + (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])*wzu)/sqrt(1. + (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])^2) - (wxl + (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])*wzl)/sqrt(1. + (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])^2)  
+    
+#     # #     #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
+# # #     #uu[1]*sin(surf.kinem.alpha)
+
+#     #Nonlifting equations at the trailing edge
+#     i = surf.ndiv
+#     for n = 1:surf.naterm
+#         surf.LHS[2*surf.ndiv+1,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+#     end
+    
+#     for n = 1:surf.naterm
+#         surf.LHS[2*surf.ndiv+1,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+#     end
+    
+#     wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+#                        wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+    
+#     wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+#                    wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+    
+#     wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+#                    ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+    
+#     wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+#                    ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+    
+#     surf.LHS[2*surf.ndiv+1,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+#             surf.thick_slope[i]*wtx + wtz        
+
+#     return surf, xloc_tev, zloc_tev
+# end
+
+function update_thickLHS_kutta(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
+    #Calculate the missing column in LHS that depends on last shed vortex location
+
+    ntev = length(curfield.tev)
+
+    if ntev == 0
+        xloc_tev = surf.bnd_x_l[surf.ndiv] + 0.5*surf.kinem.u*dt
+        zloc_tev = surf.bnd_z_l[surf.ndiv]
+    else
+        xloc_tev = surf.bnd_x_l[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_l[surf.ndiv])
+        zloc_tev = surf.bnd_z_l[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_l[surf.ndiv])
+    end
+
+    dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+    
+    uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+    ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
     for i = 2:surf.ndiv-1
 
 
@@ -355,13 +558,29 @@ function update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float
 
     end
 
-    #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
-    #uu[1]*sin(surf.kinem.alpha)
-
-
+    for n = 1:surf.naterm
+        s1 = 0. ; s2 = 0. ; s3 = 0. ; s4 = 0. ; s5 = 0. ; s6 = 0.
+        for i = 2:surf.ndiv
+            dx = surf.x[i] - surf.x[i-1]
+            den_pl = sqrt(1 + (surf.thick_slope[i] + surf.cam_slope[i])^2)
+            den_mi = sqrt(1 + (-surf.thick_slope[i] + surf.cam_slope[i])^2)
+            den_pl_p = sqrt(1 + (surf.thick_slope[i-1] + surf.cam_slope[i-1])^2)
+            den_mi_p = sqrt(1 + (-surf.thick_slope[i-1] + surf.cam_slope[i-1])^2)
+            
+            s1 += 0.5*dx*(sin(n*surf.theta[i])/den_pl + sin(n*surf.theta[i])/den_mi + sin(n*surf.theta[i-1])/den_pl_p + sin(n*surf.theta[i-1])/den_mi_p)
+            s2 += 0.5*dx*(surf.cam_slope[i]*cos(n*surf.theta[i])/den_pl - surf.cam_slope[i]*cos(n*surf.theta[i])/den_mi + surf.cam_slope[i-1]*cos(n*surf.theta[i-1])/den_pl_p - surf.cam_slope[i-1]*cos(n*surf.theta[i-1])/den_mi_p)
+            s3 += 0.5*dx*(surf.thick_slope[i]*cos(n*surf.theta[i])/den_pl + surf.thick_slope[i]*cos(n*surf.theta[i])/den_mi + surf.thick_slope[i-1]*cos(n*surf.theta[i-1])/den_pl_p + surf.thick_slope[i-1]*cos(n*surf.theta[i-1])/den_mi_p)
+            s4 -= 0.5*dx*(cos(n*surf.theta[i])/den_pl - cos(n*surf.theta[i])/den_mi + cos(n*surf.theta[i-1])/den_pl_p - cos(n*surf.theta[i-1])/den_mi_p)
+            s5 += 0.5*dx*(surf.cam_slope[i]*sin(n*surf.theta[i])/den_pl + surf.cam_slope[i]*sin(n*surf.theta[i])/den_mi + surf.cam_slope[i-1]*sin(n*surf.theta[i-1])/den_pl_p + surf.cam_slope[i-1]*sin(n*surf.theta[i-1])/den_mi_p)
+            s6 += 0.5*dx*(surf.thick_slope[i]*sin(n*surf.theta[i])/den_pl - surf.thick_slope[i]*sin(n*surf.theta[i])/den_mi + surf.thick_slope[i-1]*sin(n*surf.theta[i-1])/den_pl_p - surf.thick_slope[i-1]*sin(n*surf.theta[i-1])/den_mi_p)
+        end
+        surf.LHS[2*surf.ndiv-3, n] = surf.uref*(s1 + s2 + s3)
+        surf.LHS[2*surf.ndiv-3, n+surf.naterm] = surf.uref*(s4 + s5 + s6)
+        surf.LHS[2*surf.ndiv-3, 2*surf.naterm+1] = 1.
+    end 
     return surf
 end
-
+    
 
 # function update_thickLHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
 #     #Calculate the missing column in LHS that depends on last shed vortex location
@@ -455,6 +674,7 @@ end
 # end
 
 function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+
     for i = 2:surf.ndiv-1
         #RHS for lifting equation
 
@@ -482,26 +702,86 @@ function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
             surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
                                  (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
                                  surf.kinem.alphadot*surf.cam[i]) - wtz
+        
     end
 
-    #RHS for Kelvin condition (negative strength of all previously shed vortices)
-    surf.RHS[2*surf.ndiv-3] = -100*(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
-
-    #Kutta condition
-    surf.RHS[2*surf.ndiv-2] = 0.
-    #surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
-
-        #RHS for LE velocity condition
-    #surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
-    #surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
-    #   (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref
-
-
-   # surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
-
-    #surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
-
+    #surf.RHS[2*surf.ndiv-3] = bound_circ
 end
+
+# function update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+#     for i = 1:surf.ndiv-1
+#         #RHS for lifting equation
+
+#         wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
+
+#         wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
+
+#         wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+
+#         wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+
+#         surf.RHS[i] = -(surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha)/surf.uref -
+#             surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)/surf.uref +
+#             (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha)/surf.uref - wlz/surf.uref +
+#             surf.cam_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+#                                (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+#                                surf.kinem.alphadot*surf.cam[i]) +
+#                                surf.thick_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i])
+#         surf.RHS[surf.ndiv+i-1] = surf.cam_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i]) +
+#             surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+#                                  (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+#                                  surf.kinem.alphadot*surf.cam[i]) - wtz
+#     end
+
+#     #RHS for Kelvin condition (negative strength of all previously shed vortices)
+#     surf.RHS[2*surf.ndiv-1] = -100*(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+    
+#     wzu = surf.wind_u[surf.ndiv]*cos(surf.kinem.alpha) + surf.uind_u[surf.ndiv]*sin(surf.kinem.alpha)
+#     wzl = surf.wind_l[surf.ndiv]*cos(surf.kinem.alpha) + surf.uind_l[surf.ndiv]*sin(surf.kinem.alpha)
+#     wxu = surf.uind_u[surf.ndiv]*cos(surf.kinem.alpha) - surf.wind_u[surf.ndiv]*sin(surf.kinem.alpha)
+#     wxl = surf.uind_l[surf.ndiv]*cos(surf.kinem.alpha) - surf.wind_l[surf.ndiv]*sin(surf.kinem.alpha)
+
+#     #Kutta condition
+#     surf.RHS[2*surf.ndiv] = ((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + surf.kinem.alphadot*(surf.cam[end] - surf.thick[end]) + wxl + (surf.cam_slope[end] - surf.thick_slope[end])*((surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[surf.ndiv] - surf.pvt*surf.c) + wzl))/sqrt(1. + (surf.cam_slope[surf.ndiv] - surf.thick_slope[surf.ndiv])^2) - ((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + surf.kinem.alphadot*(surf.cam[end] + surf.thick[end]) + wxu + (surf.cam_slope[end] + surf.thick_slope[end])*((surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha) + surf.kinem.alphadot*(surf.x[surf.ndiv] - surf.pvt*surf.c) + wzu))/sqrt(1. + (surf.cam_slope[surf.ndiv] + surf.thick_slope[surf.ndiv])^2) 
+
+#     i = surf.ndiv
+#     wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+#                        surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
+    
+#     wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
+    
+#     wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+    
+#     wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+#                    surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+
+
+#     surf.RHS[2*surf.ndiv+1] = surf.cam_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i]) +
+#         surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+#                              (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+#                              surf.kinem.alphadot*surf.cam[i]) - wtz
+    
+
+    
+#     #surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
+
+#         #RHS for LE velocity condition
+#     #surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
+#     #surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
+#     #   (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref
+
+
+#    # surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
+#     #surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
+# end
 
 # function update_thickRHSLEV(surf::TwoDSurfThick, curfield::TwoDFlowField)
 #     for i = 2:surf.ndiv-1
@@ -591,4 +871,125 @@ function ind_vel_src(src::Vector{TwoDSource},t_x,t_z)
         end
     end
     return uind, wind
+end
+
+
+function wkg_update_thickLHS(surf::TwoDSurfThick, curfield::TwoDFlowField, dt::Float64, vcore::Float64)
+    #Calculate the missing column in LHS that depends on last shed vortex location
+
+    ntev = length(curfield.tev)
+
+    if ntev == 0
+        xloc_tev = surf.bnd_x_chord[surf.ndiv] + 0.5*surf.kinem.u*dt
+        zloc_tev = surf.bnd_z_chord[surf.ndiv]
+    else
+        xloc_tev = surf.bnd_x_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].x - surf.bnd_x_chord[surf.ndiv])
+        zloc_tev = surf.bnd_z_chord[surf.ndiv] + (1. /3.)*(curfield.tev[ntev].z - surf.bnd_z_chord[surf.ndiv])
+    end
+
+    dummyvort = TwoDVort(xloc_tev, zloc_tev, 1., vcore, 0., 0.)
+
+    uu, wu = ind_vel([dummyvort], surf.bnd_x_u, surf.bnd_z_u)
+    ul, wl = ind_vel([dummyvort], surf.bnd_x_l, surf.bnd_z_l)
+
+    for i = 2:surf.ndiv-1
+
+
+        #Sweep all rows (corresponding to ndiv) for lifting equation
+
+        #Sweep columns for aterms
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n] = cos(n*surf.theta[i]) - surf.thick_slope[i]*sin(n*surf.theta[i])
+        end
+
+        #Sweep columns for bterm
+        for n = 1:surf.naterm
+           surf.LHS[i-1,n+surf.naterm] = surf.cam_slope[i]*cos(n*surf.theta[i])
+        end
+
+        #TEV term must be updated in the loop after its location is known
+        #Sweep all rows (corresponding to ndiv) for nonlifting equation
+
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,n]  = -surf.cam_slope[i]*sin(n*surf.theta[i])
+        end
+        for n = 1:surf.naterm
+           surf.LHS[surf.ndiv+i-3,surf.naterm+n] = sin(n*surf.theta[i]) + surf.thick_slope[i]*cos(n*surf.theta[i])
+        end
+
+
+        wlz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) +
+                   wl[i]*cos(surf.kinem.alpha) + ul[i]*sin(surf.kinem.alpha))
+
+        wtz = 0.5*(wu[i]*cos(surf.kinem.alpha) + uu[i]*sin(surf.kinem.alpha) -
+                   wl[i]*cos(surf.kinem.alpha) - ul[i]*sin(surf.kinem.alpha))
+
+        wtx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) +
+                   ul[i]*cos(surf.kinem.alpha) - wl[i]*sin(surf.kinem.alpha))
+
+        wlx = 0.5*(uu[i]*cos(surf.kinem.alpha) - wu[i]*sin(surf.kinem.alpha) -
+                   ul[i]*cos(surf.kinem.alpha) + wl[i]*sin(surf.kinem.alpha))
+
+        surf.LHS[i-1,1+2*surf.naterm] = -surf.cam_slope[i]*wtx -
+            surf.thick_slope[i]*wlx + wlz
+
+        surf.LHS[surf.ndiv+i-3,1+2*surf.naterm] = -surf.cam_slope[i]*wlx -
+            surf.thick_slope[i]*wtx + wtz
+
+    end
+
+    #surf.LHS[2*surf.ndiv-1,2+2*surf.naterm] = -wu[1]*cos(surf.kinem.alpha) -
+    #uu[1]*sin(surf.kinem.alpha)
+
+
+    return surf, xloc_tev, zloc_tev
+end
+
+function wkg_update_thickRHS(surf::TwoDSurfThick, curfield::TwoDFlowField)
+    for i = 2:surf.ndiv-1
+        #RHS for lifting equation
+
+        wlz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) +
+                   surf.wind_l[i]*cos(surf.kinem.alpha) + surf.uind_l[i]*sin(surf.kinem.alpha))
+
+        wtz = 0.5*(surf.wind_u[i]*cos(surf.kinem.alpha) + surf.uind_u[i]*sin(surf.kinem.alpha) -
+                   surf.wind_l[i]*cos(surf.kinem.alpha) - surf.uind_l[i]*sin(surf.kinem.alpha))
+
+        wtx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) +
+                   surf.uind_l[i]*cos(surf.kinem.alpha) - surf.wind_l[i]*sin(surf.kinem.alpha))
+
+        wlx = 0.5*(surf.uind_u[i]*cos(surf.kinem.alpha) - surf.wind_u[i]*sin(surf.kinem.alpha) -
+                   surf.uind_l[i]*cos(surf.kinem.alpha) + surf.wind_l[i]*sin(surf.kinem.alpha))
+
+        surf.RHS[i-1] = -(surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha)/surf.uref -
+            surf.kinem.alphadot*(surf.x[i] - surf.pvt*surf.c)/surf.uref +
+            (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha)/surf.uref - wlz/surf.uref +
+            surf.cam_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                               (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                               surf.kinem.alphadot*surf.cam[i]) +
+                               surf.thick_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i])
+
+        surf.RHS[surf.ndiv+i-3] = surf.cam_slope[i]*(wlx - surf.kinem.alphadot*surf.thick[i]) +
+            surf.thick_slope[i]*((surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) +
+                                 (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) + wtx -
+                                 surf.kinem.alphadot*surf.cam[i]) - wtz
+    end
+
+    #RHS for Kelvin condition (negative strength of all previously shed vortices)
+    surf.RHS[2*surf.ndiv-3] = -100*(sum(map(q->q.s, curfield.tev)) + sum(map(q->q.s, curfield.lev)))/(surf.uref*surf.c)
+
+    #Kutta condition
+    surf.RHS[2*surf.ndiv-2] = 0.
+    #surf.RHS[2*surf.ndiv-3] = pi*(surf.a0prev[1] + 0.5*surf.aprev[1])
+
+        #RHS for LE velocity condition
+    #surf.RHS[2*surf.ndiv-1] = sin(surf.kinem.alpha) - surf.kinem.hdot*cos(surf.kinem.alpha)/surf.uref -
+    #surf.kinem.alphadot*surf.pvt*surf.c/surf.uref +
+    #   (surf.wind_u[1]*cos(surf.kinem.alpha) + surf.uind_u[1]*sin(surf.kinem.alpha))/surf.uref
+
+
+   # surf.RHS[2*surf.ndiv-2] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
+    #surf.RHS[2*surf.ndiv-1] = -(surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) - (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha)
+
 end

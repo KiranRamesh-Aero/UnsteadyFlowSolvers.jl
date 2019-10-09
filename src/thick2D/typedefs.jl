@@ -51,7 +51,7 @@ mutable struct TwoDSurfThick
         theta = zeros(ndiv); x = zeros(ndiv); cam = zeros(ndiv); cam_slope = zeros(ndiv)
         thick = zeros(ndiv); thick_slope = zeros(ndiv); bnd_x_u = zeros(ndiv); bnd_z_u = zeros(ndiv)
         bnd_x_l = zeros(ndiv); bnd_z_l = zeros(ndiv); bnd_x_chord = zeros(ndiv); bnd_z_chord = zeros(ndiv)
-
+        
         kinem = KinemPar(0, 0, 0, 0, 0, 0)
 
         dtheta = pi/(ndiv-1)
@@ -142,7 +142,7 @@ mutable struct TwoDSurfThick
             push!(src, TwoDSource(xsrc, 0, 2*uref*thder*dx))
         end
 
-        LHS = zeros(2*ndiv-1,naterm*2+2)
+        LHS = zeros(2*ndiv-1,naterm*2+1)
         RHS = zeros(2*ndiv-1)
 
         #Construct constant columns in LHS (all except the last one involving shed vortex)
@@ -172,9 +172,9 @@ mutable struct TwoDSurfThick
         end
 
         #Terms for Kelvin condition
-        LHS[2*ndiv-3,1] = 100*pi/2
+        #LHS[2*ndiv-3,1] = 100*pi/2
 
-        LHS[2*ndiv-3,2*naterm+1] = 100.
+        #LHS[2*ndiv-3,2*naterm+1] = 100.
         #LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
 
         # #Kutta
@@ -182,10 +182,52 @@ mutable struct TwoDSurfThick
             LHS[2*ndiv-2,n] = ((-1)^n)*100.
         end
 
+        
+        
+        # LHS = zeros(2*ndiv+2,naterm*2+2)
+        # RHS = zeros(2*ndiv+2)
+
+        # #Construct constant columns in LHS (all except the last one involving shed vortex)
+        # for i = 1:ndiv-1
+            
+        #     #Sweep all rows (corresponding to ndiv) for lifting equation
+            
+        #     #Sweep columns for aterms
+        #     for n = 1:naterm
+        #         LHS[i,n] = cos(n*theta[i]) - thick_slope[i]*sin(n*theta[i]) 
+        #     end
+
+        #     #Sweep columns for bterm
+        #     for n = 1:naterm
+        #         LHS[i,n+naterm] = cam_slope[i]*cos(n*theta[i]) 
+        #     end
+
+        #     #TEV term must be updated in the loop after its location is known
+        #     #Sweep all rows (corresponding to ndiv) for nonlifting equation
+         
+        #     for n = 1:naterm
+        #         LHS[ndiv+i-1,n]  = -cam_slope[i]*sin(n*theta[i])
+        #     end
+        #     for n = 1:naterm
+        #         LHS[ndiv+i-1,naterm+n] = sin(n*theta[i]) + thick_slope[i]*cos(n*theta[i]) 
+        #     end
+        # end
+        
+        # #Terms for Kelvin condition
+        # LHS[2*ndiv-1,1] = 100*pi/2
+        
+        # LHS[2*ndiv-1,2*naterm+1] = 100.
+        #LHS[2*ndiv-3,2*naterm+3] = 1.   #FOR LEV
+        
+        # #Kutta
+        #for n = 1:naterm
+        #    LHS[2*ndiv-2,n] = ((-1)^n)*100.
+        #end
+
         #Boundary conditions
-        for n = 1:naterm
-            LHS[2*ndiv-1,n+naterm] = ((-1)^n)*100.
-        end
+        #for n = 1:naterm
+        #    LHS[2*ndiv-1,n+naterm] = ((-1)^n)*100.
+        #end
         
         
         # LHS[2*ndiv-1,1] = sqrt(2. /rho) + 1.
@@ -194,7 +236,7 @@ mutable struct TwoDSurfThick
         #     LHS[2*ndiv-1,n+naterm+1] = 1.
         # end
         levflag = [0;]
-
+        
         new(c, uref, coord_file, pvt, ndiv, naterm, kindef, cam, cam_slope, thick, thick_slope, theta, x, kinem, bnd_x_u, bnd_z_u, bnd_x_l, bnd_z_l, bnd_x_chord, bnd_z_chord, uind_u, uind_l, wind_u, wind_l, downwash, a0, aterm, a0dot, adot, a0prev, aprev, bterm, bv, src, lespcrit, levflag, initpos, rho, LHS, RHS)
     end
 end

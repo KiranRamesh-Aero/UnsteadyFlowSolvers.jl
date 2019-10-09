@@ -84,11 +84,12 @@ struct EldRampReturnDef <: MotionDef
     amp :: Float64
     K :: Float64
     a :: Float64
+    tstart :: Float64
 end
 
 function (eld::EldRampReturnDef)(tt)
     fr = eld.K/(pi*abs(eld.amp));
-    t1 = 1.
+    t1 = eld.tstart
     t2 = t1 + (1. /(2*pi*fr));
     t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
     t4 = t3 + (1. /(2*pi*fr));
@@ -107,7 +108,7 @@ function (eld::EldRampReturnDef)(tt)
     gg = log((cosh(eld.a*(tt - t1))*cosh(eld.a*(tt - t4)))/(cosh(eld.a*(tt - t2))*cosh(eld.a*(tt - t3))))
 
     return eld.amp*gg/(maxg);
-
+    
 end
 
 

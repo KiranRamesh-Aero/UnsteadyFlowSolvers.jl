@@ -191,13 +191,13 @@ function separationJ(lamb1::Array{Float64,1}, lamb2::Array{Float64,1}, dt::Float
     N1 = length(lamb1)
     lambj1 = sum(lamb1)/N1
     J1Sep = (dt)./(dx[2:end]) .* (lamb1[1:end-1] - lamb1[2:end])./ (lambj1*N1)
-
+    
     for i = 2:N1-1
         if lamb1[i] .< 0.0
             J1Sep[i] =  (dt)/(dx[i]) .* (lamb1[i+1] - lamb1[i-1])./ (lambj1*N1)
         end
     end
-
+    
     N2 = length(lamb2)
     lambj2 = sum(lamb2)/N2
     J2Sep = (dt)/(dx[2:end]) .* (lamb2[1:end-1] - lamb2[2:end])./ (lambj2*N2)
@@ -256,12 +256,20 @@ function FVMIBLgridvar(w, U, Ut, Ux, dx, t, t_tot)
         #     println("Separation identified", "    csep=$csepmax", "   i_s=$(argmax(csep))")
         #     i_s = argmax(csep) 
         # end
+
+        E = w[:,2]./w[:,1] .- 1.
+        for i = 1:length(E)
+            if E[i] < -0.155
+                println("Separation at : ", i)
+            end
+        end
         
         j1, j2 = separationJ(lamb1, lamb2, dt, dx)
         jmax = maximum(j1)
         if jmax > 1e-4
-            println("Separation identified", "    jsep=$jmax", "   i_s=$(argmax(j1))")
-            i_s = argmax(j1) 
+            #println("Separation identified", "    jsep=$jmax", "   i_s=$(argmax(j1))")
+            i_s = argmax(j1)
+            #println("E : ", w[i_s,2]/w[i_s,1] - 1)
         else
             i_s = 0
         end

@@ -790,7 +790,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 9)
+        mat = zeros(0, 10)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
@@ -889,7 +889,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         for ia = 1:surf.naterm
             surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
         end
-
+        
         #Check if LEV shedding is true
         if abs(surf.a0[1]) > surf.lespcrit[1]
             if (surf.a0[1] >= 0.)
@@ -980,9 +980,12 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         end
         
         stag = calc_stag(surf)
+
+        t_w = surf.uind[1]*cos(surf.kinem.alpha) - surf.wind[1]*sin(surf.kinem.alpha)
+        small_stag = (surf.kinem.u/(surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + t_w)*surf.a0[1])^2*surf.c
         
         # for writing in resultsSummary
-        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag])
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag, small_stag])
 
         #Update monitor if required
         if monitorflag == 1
@@ -1011,7 +1014,7 @@ function ldvmLin_varU(surf::TwoDSurf, curfield::TwoDFlowField, lespcalib::String
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = zeros(0, 9)
+        mat = zeros(0, 10)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
@@ -1046,6 +1049,7 @@ function ldvmLin_varU(surf::TwoDSurf, curfield::TwoDFlowField, lespcalib::String
     T2 = zeros(surf.ndiv)
     T3 = zeros(surf.ndiv)
 
+    lespcalib = readdlm(lespcalib)
     lespspl = Spline1D(lespcalib[:,1], lespcalib[:,2])
     
     # time stepping
@@ -1113,7 +1117,7 @@ function ldvmLin_varU(surf::TwoDSurf, curfield::TwoDFlowField, lespcalib::String
             surf.adot[ia] = (surf.aterm[ia]-surf.aprev[ia])/dt
         end
         
-        le_u = le_vel_x = surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[1]
+        le_u =  surf.kinem.u*cos(surf.kinem.alpha) + surf.kinem.hdot*sin(surf.kinem.alpha) + surf.uind[1]
         le_w = surf.kinem.u*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.pvt*surf.c - surf.kinem.hdot*cos(surf.kinem.alpha) + surf.wind[1]
         vmag = sqrt(le_u^2 + le_w^2)
         re_le = re_ref*vmag
@@ -1179,52 +1183,53 @@ function ldvmLin_varU(surf::TwoDSurf, curfield::TwoDFlowField, lespcalib::String
                 surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) +
                                       tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
             end
-
+            
             surf.levflag[1] = 0
         end
-
-#Set previous values of aterm to be used for derivatives in next time step
-surf.a0prev[1] = surf.a0[1]
-for ia = 1:surf.naterm
-    surf.aprev[ia] = surf.aterm[ia]
-end
-
-#Calculate bound vortex strengths
-update_bv(surf)
-
-# Delete or merge vortices if required
-controlVortCount(delvort, surf.bnd_x[Int(round(surf.ndiv/2))], surf.bnd_z[Int(round(surf.ndiv/2))], curfield)
         
-# free wake rollup
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        for ia = 1:surf.naterm
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+        
+        #Calculate bound vortex strengths
+        update_bv(surf)
+        
+        # Delete or merge vortices if required
+        controlVortCount(delvort, surf.bnd_x[Int(round(surf.ndiv/2))], surf.bnd_z[Int(round(surf.ndiv/2))], curfield)
+        
+        # free wake rollup
         wakeroll(surf, curfield, dt)
-
-# Calculate force and moment coefficients
-cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
-
-# write flow details if required
-if writeflag == 1
-    if istep in writeArray
-        dirname = "$(round(t,sigdigits=nround))"
-        writeStamp(dirname, t, surf, curfield)
-    end
-end
-
+        
+        # Calculate force and moment coefficients
+        cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
+        
+        # write flow details if required
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(t,sigdigits=nround))"
+                writeStamp(dirname, t, surf, curfield)
+            end
+        end
+        
         stag = calc_stag(surf)
-
+        
         # for writing in resultsSummary
-mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag])
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, stag, vmag])
 
-end
-
-mat = mat'
-
-f = open("resultsSummary", "w")
-Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-writedlm(f, mat)
-close(f)
-
-mat, surf, curfield
-
+    end
+    
+    mat = mat'
+    
+    f = open("resultsSummary", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \t", "vmag \t"])
+    
+    writedlm(f, mat)
+    close(f)
+    
+    mat, surf, curfield
+    
 end
 
 

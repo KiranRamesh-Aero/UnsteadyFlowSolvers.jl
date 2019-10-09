@@ -104,33 +104,66 @@ function camber_calc(x::Vector,airfoil::String)
     ndiv = length(x);
     c = x[ndiv];
 
-
     cam = zeros(ndiv)
     cam_slope = zeros(ndiv)
-    in_air = readdlm(airfoil, Float64);
-    xcoord = in_air[:,1];
-    ycoord = in_air[:,2];
-    ncoord = length(xcoord);
-    xcoord_sum = zeros(ncoord);
-
-    xcoord_sum[1] = 0;
-    for i = 1:ncoord-1
-        xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
+    
+    coord = readdlm(airfoil)
+    ncoord = length(coord[:,1])
+    if (0. in coord[:,1]) == false
+        error("Airfoil file must contain leading edge coordinate (0,0)")
+    else
+        nle = findfirst(x -> x==0, coord[:,1])
+        if coord[nle,2] != 0.
+            error("Airfoil leading edge must be at (0,0)")
+        end
     end
-    y_spl = Spline1D(xcoord_sum,ycoord);
-
-    y_ans = zeros(2*ndiv);
-
+    
+    zu_spl = Spline1D(reverse(coord[1:nle,1]), reverse(coord[1:nle,2]))
+    zl_spl = Spline1D(coord[nle:ncoord,1], coord[nle:ncoord,2])
+    
+    zu = zeros(ndiv)
+    zl = zeros(ndiv)
+    
     for i=1:ndiv
-        y_ans[i] = evaluate(y_spl,x[i]/c);
+        zu[i] = evaluate(zu_spl,x[i]/c)
+        zl[i] = evaluate(zl_spl,x[i]/c)
     end
-    for i=ndiv+1:2*ndiv
-        y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c));
-    end
-    cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1];
-    cam[1] = 0;
-    cam_spl = Spline1D(x,cam);
-    cam_slope[1:ndiv] = derivative(cam_spl,x);
+    
+    cam[1:ndiv] = [(zu[i] + zl[i])*c/2 for i = 1:ndiv]
+    cam_spl = Spline1D(x,cam)
+    cam_slope[1:ndiv] = derivative(cam_spl,x)
+    #cam_slope[1] = 0.
+    # ndiv = length(x);
+    # c = x[ndiv];
+
+
+    # cam = zeros(ndiv)
+    # cam_slope = zeros(ndiv)
+    # in_air = readdlm(airfoil, Float64);
+    # xcoord = in_air[:,1];
+    # ycoord = in_air[:,2];
+    # ncoord = length(xcoord);
+    # xcoord_sum = zeros(ncoord);
+
+    # xcoord_sum[1] = 0;
+    # for i = 1:ncoord-1
+    #     xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
+    # end
+    # y_spl = Spline1D(xcoord_sum,ycoord);
+
+    # y_ans = zeros(2*ndiv);
+    
+    # for i=1:ndiv
+    #     y_ans[i] = evaluate(y_spl,x[i]/c);
+    # end
+    # for i=ndiv+1:2*ndiv
+    #     y_ans[i] = evaluate(y_spl,(x[ndiv]/c) + (x[i-ndiv]/c));
+    # end
+    # cam[1:ndiv] = [(y_ans[i] + y_ans[(2*ndiv) + 1 - i])*c/2 for i = ndiv:-1:1];
+    # cam[1] = 0;
+    # cam_spl = Spline1D(x,cam);
+    # cam_slope[1:ndiv] = derivative(cam_spl,x);
+    
     return cam, cam_slope
 end
 
@@ -157,11 +190,16 @@ function camber_thick_calc(x::Vector,coord_file::String)
         function nacaTh(x)
             5*th*(b1*sqrt(x) + b2*x + b3*x^2 + b4*x^3 + b5*x^4)
         end
-
+        
         for i = 1:ndiv
             thick[i] = nacaTh(x[i])
             thick_slope[i] = ForwardDiff.derivative(nacaTh, x[i])
         end
+        if thick_slope[1] == Inf
+            thick_slope[1] = 1e16
+        end
+        thick_slope[end] = 0.
+        
         rho = 1.1019*th*th*c
         cam[1:ndiv] .= 0.
         cam_slope[1:ndiv] .= 0.

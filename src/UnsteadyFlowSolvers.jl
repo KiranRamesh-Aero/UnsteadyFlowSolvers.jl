@@ -151,7 +151,9 @@ export
     find_nacaCoef,
     smoothScaledEnd!,
     ldvmLin_varU,
-    refreshMonitor
+    refreshMonitor,
+    lautat_kutta,
+    wkg_lautat
 
 
 

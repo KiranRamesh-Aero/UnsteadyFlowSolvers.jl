@@ -1,6 +1,8 @@
 function viewVort2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matrix{Float64})
-    scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
+    #scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
+    scatter(tev[:,2], tev[:,3], s=5, c="r", edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
+    sc = scatter(lev[:,2], lev[:,3], s=5, c="b", edgecolors="none")
     sc2 = scatter(bv[:,2], bv[:,3], s=5, c=bv[:,1], edgecolors="none")
     #plot(bv[:,2], bv[:,3], color = "black", linewidth=1.0)
 end

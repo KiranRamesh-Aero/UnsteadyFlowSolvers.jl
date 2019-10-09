@@ -201,7 +201,13 @@ function IBL_shape_attached(Re, surf::TwoDSurfThick, curfield::TwoDFlowField, ns
             
             del_iter[:] = wsoln[:,1]
             E_iter[:] = wsoln[:,2]./wsoln[:,1] .- 1.
-
+            
+            if i_sep != 0
+                #println("E at sep:  ", E_iter[i_sep])
+                figure(1)
+                plot(surf.x[2:end], E_iter)
+            end
+            
             smoothScaledEnd!(suc, del_iter, 10)
             
             #Find suitable naca coefficients to fit the modified airfoil
@@ -241,15 +247,15 @@ function IBL_shape_attached(Re, surf::TwoDSurfThick, curfield::TwoDFlowField, ns
                 push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
             end
 
-            if iter == 3 && mod(istep,10) == 0
-                figure(1)
-                plot(surf.x, qu)
-                figure(2)
-                plot(surf.x, surf.thick)
-                axis("equal")
-                figure(3)
-                plot(surf.x[2:end], delu)
-            end
+            # if iter == 3 && mod(istep,10) == 0
+            #     figure(1)
+            #     plot(surf.x, qu)
+            #     figure(2)
+            #     plot(surf.x, surf.thick)
+            #     axis("equal")
+            #     figure(3)
+            #     plot(surf.x[2:end], delu)
+            # end
             
         end
         

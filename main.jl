@@ -1,9 +1,8 @@
 include("src/UnsteadyFlowSolvers.jl")
-using Revise
 ## Define Geometry and Kinematics
 # Kinematics
 case = 2 # kinematics case to run
-if case == 1
+if case == 1 
     amp = 35 #degrees
     k = .005
     tstart = 60 # non-dimensional time
@@ -20,15 +19,34 @@ elseif case == 4
     k = .11
     a = 11
     tstart = 1
+elseif case == 5
+    amp = 45
+    k = 0.4
+    a = 11
+    tstart = 1
+elseif case == 6
+    mean = 0
+    amp = 30
+    k = 0.1
+    phi = 0
+elseif case == 7
+    mean = 0
+    amp = 30
+    k = 0.4
+    phi = 0
 end
 #amp = amp * pi / 180
-if case != 4
+if case < 4
 a = (pi^2 * k*180 )/(2*amp*pi *(1-0.1))
-#a = .1
 end
 
 #alpha = 10
-alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,1)#tstart) ConstDef(alpha*pi/180)#
+if case < 6
+    alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,tstart) # ConstDef(alpha*pi/180)#
+else
+    alphadef = UnsteadyFlowSolvers.SinDef(mean,amp*pi/180,k,phi)
+    tstart = 0
+end
 hdef = UnsteadyFlowSolvers.ConstDef(0)
 udef = UnsteadyFlowSolvers.ConstDef(1)
 full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
@@ -56,7 +74,7 @@ while alpha <= amp - .05 || alpha >= amp + .05 # Timestep is outside .05 degrees
 end
 t_tot = ceil(t)
 =#
-t_tot = 9
+t_tot = 9 + tstart
 nsteps = Int(round(t_tot/dtstar))
 #nsteps = 150 #DEBUG
 
@@ -128,7 +146,7 @@ plot!(mat2[:,1],mat2[:,6],color = :red)
 using DelimitedFiles
 
 #writedlm("circChange_$nsteps.txt",test)
-writedlm("mat_$nsteps.txt",mat)
-writedlm("mat2_$nsteps.txt",mat2)
+#writedlm("mat_$nsteps.txt",mat)
+#writedlm("mat2_$nsteps.txt",mat2)
 #tevCirc = map(q -> q.s,IFR_field)
 #writedlm("TEV_circ_$nsteps.txt",tevCirc)

@@ -106,6 +106,9 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.alpha) == EldRampReturnDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
+    elseif (typeof(surf.kindef.alpha) == EldRampReturntstartDef)
+        surf.kinem.alpha = surf.kindef.alpha(t)
+        surf.kinem.alphadot = ForwardDiff.derivative(surf.kindef.alpha,t)*surf.uref/surf.c
     elseif (typeof(surf.kindef.alpha) == ConstDef)
         surf.kinem.alpha = surf.kindef.alpha(t)
         surf.kinem.alphadot = 0.
@@ -137,6 +140,9 @@ function update_kinem(surf::TwoDSurf, t)
     elseif (typeof(surf.kindef.h) == EldRampReturnDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
+    elseif (typeof(surf.kindef.h) == EldRampReturntstartDef)
+        surf.kinem.h = surf.kindef.h(t)*surf.c
+        surf.kinem.hdot = ForwardDiff.derivative(surf.kindef.h,t)*surf.uref
     elseif (typeof(surf.kindef.h) == ConstDef)
         surf.kinem.h = surf.kindef.h(t)*surf.c
         surf.kinem.hdot = 0.
@@ -157,6 +163,9 @@ function update_kinem(surf::TwoDSurf, t)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == EldRampReturnDef)
+        surf.kinem.u = surf.kindef.u(t)*surf.uref
+        surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
+    elseif (typeof(surf.kindef.u) == EldRampReturntstartDef)
         surf.kinem.u = surf.kindef.u(t)*surf.uref
         surf.kinem.udot = ForwardDiff.derivative(surf.kindef.u,t)*surf.uref*surf.uref/surf.c
     elseif (typeof(surf.kindef.u) == ConstDef)

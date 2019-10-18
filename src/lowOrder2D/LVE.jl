@@ -101,15 +101,15 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             if surf.levflag[1] == 0 && t < LEV_Stop # if lev is first in batch
                 gamma_crit_use = abs(circ[1])/circ[1] * gamma_crit # = gamma_crit w/ sign of circ[1]
                 global t_start = t
-                println("LEV start batch:")
+                #println("LEV start batch:")
             else # if lev sheds but is not first in batch
                 m_slp = -surf.lespcrit / (LEV_Stop - t_start)
                 c_slp = surf.lespcrit - (m_slp*t_start)
                 LESP_crit_use = (m_slp*t) + c_slp
                 x = 1 - 2*ds[1] / surf.c
-                gamma_crit_use = LESP_crit_use / 1.13 * ( surf.kinem.u * surf.c * ( acos(x) + sin(acos(x) )))
+                gamma_crit_use = abs(circ[1])/circ[1] * LESP_crit_use / 1.13 * ( surf.kinem.u * surf.c * ( acos(x) + sin(acos(x) ))) # abs(circ[1])/circ[1] keeps sign of original LEV
             end
-            println("LEV Ejection: Step $i, time $t")
+            #println("LEV Ejection: Step $i, time $t")
             gamma_crit_use = gamma_crit_use[1]
             LEV_shed = true
 

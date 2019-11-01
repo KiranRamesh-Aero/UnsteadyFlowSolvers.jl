@@ -280,7 +280,7 @@ function FVMIBLgridvar(w, U, Ut, Ux, dx, t, t_tot)
 end
 
 
-function find_nacaCoef(surf::TwoDSurfThick, thick::Array{Float64}, bstart)
+function find_nacaThickCoef(surf::TwoDSurfThick, thick::Array{Float64}, bstart)
 
     th = parse(Int, surf.coord_file[7:8])/100.
     
@@ -295,5 +295,15 @@ function find_nacaCoef(surf::TwoDSurfThick, thick::Array{Float64}, bstart)
     return b
 end
 
+function find_nacaCamCoef(surf::TwoDSurfThick, cam::Array{Float64}, bstart)
+
+    @. nacacam(x, b) = b[1]*x + b[2]*x^2 + b[3]*x^3 + b[4]*x^4
+    
+    fit = curve_fit(nacacam, surf.x, cam, bstart)
+    
+    b = coef(fit)
+
+    return b
+end
 
     

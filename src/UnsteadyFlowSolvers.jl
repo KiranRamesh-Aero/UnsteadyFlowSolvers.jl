@@ -10,7 +10,7 @@ import DelimitedFiles: writedlm, readdlm
 
 import Serialization
 
-import NLsolve: nlsolve, not_in_place
+import NLsolve: nlsolve, not_in_place, only_fj!
 
 import Statistics: mean
 
@@ -41,11 +41,15 @@ import Roots: find_zero, Bisection
 
 using LeastSquaresOptim
 
-import Optim: optimize, BFGS
+import Optim: optimize, BFGS, NelderMead, LBFGS
 
 import LsqFit: curve_fit
 
 using LsqFit
+
+using MINPACK
+
+using IterativeSolvers
 
 export
     # kinematics types and funtions
@@ -67,6 +71,7 @@ export
     # 2D low-order solver types
     TheoDef,
     TwoDSurf,
+    TwoDSurfKutta,
     TwoDOFPar,
     KinemPar2DOF,
     TwoDVort,
@@ -131,8 +136,8 @@ export
     IBL_simul,
     IBL_simul_iter,
     IBL_simul_iter_shed,
-    update_thickLHS,
-    update_thickRHS,
+    update_LHSRHS,
+    update_RHS,
     update_kinem,
     update_externalvel,
     update_boundpos,
@@ -147,12 +152,15 @@ export
     TwoDSource,
     ind_vel_src,
     IBL_shape_attached,
+    IBL_shape_attached_dblwk,
     IBL_vel_attached,
     find_nacaCoef,
     smoothScaledEnd!,
     ldvmLin_varU,
     refreshMonitor,
-    lautat_kutta,
+    lautat_iter,
+    lautat_iter_kutta,
+    lautat_iter_kuttajac,
     wkg_lautat
 
 

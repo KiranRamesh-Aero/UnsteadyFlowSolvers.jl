@@ -179,8 +179,61 @@ function camber_thick_calc(x::Vector,coord_file::String)
     cam_slope = zeros(ndiv)
     thick = zeros(ndiv)
     thick_slope = zeros(ndiv)
+    
+    if coord_file[1:4] == "NACA"
+        m = parse(Int, coord_file[5])/100.
+        p = parse(Int, coord_file[6])/10.
+        th = parse(Int, coord_file[7:8])/100.
 
-    if coord_file[1:6] == "NACA00"
+        b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
+
+        #yt = zeros(ndiv)
+        #yc = zeros(ndiv)
+        n = 1000
+
+        xt = collect(range(0, length=n, stop=1))
+        xu = zeros(n)
+        xl = zeros(n)
+        yu = zeros(n)
+        yl = zeros(n)
+        
+        function nacaTh(x)
+            5*th*(b1*sqrt(x) + b2*x + b3*x^2 + b4*x^3 + b5*x^4)
+        end
+
+        for i = 1:n
+            yt = nacaTh(xt[i])
+            if xt[i] < p
+                yc = m/(p^2)*(2*p*xt[i] - xt[i]^2)
+                dyc = 2*m/(p^2)*(p - xt[i])
+            else
+                yc = m/((1-p)^2)*((1 - 2*p) + 2*p*xt[i] - xt[i]^2)
+                dyc = 2*m/((1-p)^2)*(p - xt[i])
+            end
+            thet = atan(dyc)
+            xu[i] = xt[i] - yt*sin(thet)
+            xl[i] = xt[i] + yt*sin(thet)  
+            yu[i] = yc + yt*cos(thet)
+            yl[i] = yc - yt*cos(thet)
+        end
+        
+        uppery = Spline1D(xu, yu)
+        lowery = Spline1D(xu, yu)
+
+        yuf = evaluate(uppery, x/c)
+        ylf = evaluate(lowery, x/c)
+
+        for i = 1:ndiv
+            thick[i] = 0.5*(yuf[i] + ylf[i])*c
+            cam[i] = 0.5*(yuf[i] - ylf[i])*c
+        end
+
+        thickspl = Spline1D(x, thick)
+        camspl = Spline1D(x, cam)
+        thick_slope = derivative(thickspl, x)
+        cam_slope = derivative(camspl, x)
+
+    elseif coord_file[1:6] == "NACA00"
         m = parse(Int, coord_file[5])/100.
         p = parse(Int, coord_file[6])/10.
         th = parse(Int, coord_file[7:8])/100.
@@ -198,9 +251,8 @@ function camber_thick_calc(x::Vector,coord_file::String)
         if thick_slope[1] == Inf
             thick_slope[1] = 1e16
         end
-        thick_slope[end] = 0.
         
-        rho = 1.1019*th*th*c
+        #rho = 1.1019*th*th*c
         cam[1:ndiv] .= 0.
         cam_slope[1:ndiv] .= 0.
 
@@ -256,16 +308,14 @@ function camber_thick_calc(x::Vector,coord_file::String)
         cam[1:ndiv] .= 0.
         cam_slope[1:ndiv] .= 0.
         rho = 0.5*c
-    elseif coord_file[1:9] == "FlatPlate"
-        th = parse(Int, coord_file[10:13])/10000.
+
+    elseif coord_file[1:12] == "FlatPlateRLE"
+        th = parse(Int, coord_file[13:16])/10000.
         r = th*c/2
         for i = 2:ndiv-1
             if x[i] <= r
                 thick[i] = sqrt(r^2 - (x[i] - r)^2)
                 thick_slope[i] = -(x[i] - r)/(sqrt(r^2 - (x[i] - r)^2))
-            elseif  x[i] >= c-r
-                thick[i] = sqrt(r^2 - (x[i] - c + r)^2)
-                thick_slope[i] = -(x[i] - c + r)/sqrt(r^2 - (x[i] - c + r)^2)
             else
                 thick[i] = r
             end
@@ -280,13 +330,38 @@ function camber_thick_calc(x::Vector,coord_file::String)
             cam[i] = 0.
             cam_slope[i] = 0.
         end
+
+    # elseif coord_file[1:14] == "FlatPlateRLETE"
+    #     th = parse(Int, coord_file[15:18])/10000.
+    #     r = th*c/2
+    #     for i = 2:ndiv-1
+    #         if x[i] <= r
+    #             thick[i] = sqrt(r^2 - (x[i] - r)^2)
+    #             thick_slope[i] = -(x[i] - r)/(sqrt(r^2 - (x[i] - r)^2))
+    #         elseif  x[i] >= c-r
+    #             thick[i] = sqrt(r^2 - (x[i] - c + r)^2)
+    #             thick_slope[i] = -(x[i] - c + r)/sqrt(r^2 - (x[i] - c + r)^2)
+    #         else
+    #             thick[i] = r
+    #         end
+    #     end
+    #     thick[1] = sqrt(r^2 - (x[1] - r)^2)
+    #     thick_slope[1] = 2*thick_slope[2] - thick_slope[3]
+    #     thick[ndiv] = sqrt(r^2 - (x[ndiv] - c + r)^2)
+    #     thick_slope[ndiv] = 2*thick_slope[ndiv-1] - thick_slope[ndiv-2]
+
+    #     rho = r
+    #     for i = 1:ndiv
+    #         cam[i] = 0.
+    #         cam_slope[i] = 0.
+    #     end
     else
         coord = readdlm(coord_file)
         ncoord = length(coord[:,1])
         if (0. in coord[:,1]) == false
             error("Airfoil file must contain leading edge coordinate (0,0)")
         else
-            nle = find(x->x==0, coord[:,1])[1]
+            nle = findall(x->x==0, coord[:,1])[1]
             if coord[nle,2] != 0.
                 error("Airfoil leading edge must be at (0,0)")
             end
@@ -295,8 +370,8 @@ function camber_thick_calc(x::Vector,coord_file::String)
         zu_spl = Spline1D(reverse(coord[1:nle,1]), reverse(coord[1:nle,2]),k=1)
         zl_spl = Spline1D(coord[nle:ncoord,1], coord[nle:ncoord,2],k=1)
 
-        zu = Array{Float64}(ndiv)
-        zl = Array{Float64}(ndiv)
+        zu = zeros(ndiv)
+        zl = zeros(ndiv)
 
         for i=1:ndiv
             zu[i] = evaluate(zu_spl,x[i]/c)
@@ -309,9 +384,10 @@ function camber_thick_calc(x::Vector,coord_file::String)
         thick_spl = Spline1D(x,thick)
         cam_slope[1:ndiv] = derivative(cam_spl,x)
         thick_slope[1:ndiv] = derivative(thick_spl,x)
-        rho = readdlm("rho")[1]
+        rho = 0.#readdlm("rho")[1]
     end
-    return thick, thick_slope,rho, cam, cam_slope
+    rho = 0.
+    return thick, thick_slope, rho, cam, cam_slope
 end
 
 function secant_method(f, x0, x1, ftol, max_iter)

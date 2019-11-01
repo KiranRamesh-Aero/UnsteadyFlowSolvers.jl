@@ -487,6 +487,167 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
 
 end
 
+function lautat(surf::TwoDSurfKutta, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6, wakerollup=1)
+
+    # If a restart directory is provided, read in the simulation data
+    if startflag == 0
+        mat = zeros(0, 9)
+        t = 0.
+    elseif startflag == 1
+        dirvec = readdir()
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
+        latestTime = maximum(dirresults)
+        mat = readdlm("resultsSummary")
+        t = mat[end,1]
+    else
+        throw("invalid start flag, should be 0 or 1")
+    end
+    mat = mat'
+
+    dt = dtstar*surf.c/surf.uref
+    
+    # if writeflag is on, determine the timesteps to write at
+    if writeflag == 1
+        writeArray = Int64[]
+        tTot = nsteps*dt
+        for i = 1:maxwrite
+            tcur = writeInterval*real(i)
+            if t > tTot
+                break
+            else
+                push!(writeArray, Int(round(tcur/dt)))
+            end
+        end
+    end
+
+    #Intialise flowfield
+    for istep = 1:nsteps
+        #Udpate current time
+        t = t + dt
+        
+        #Update kinematic parameters
+        update_kinem(surf, t)
+
+        #Update bound vortex positions
+        update_boundpos(surf, dt)
+
+
+        ntev = length(curfield.tev)
+        if ntev == 0
+            xloc = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt*cos(surf.kinem.alpha)
+            zloc = surf.bnd_z[surf.ndiv] - 0.5*surf.kinem.u*dt*sin(surf.kinem.alpha)
+        else
+            xloc = surf.bnd_x[surf.ndiv]+(1. /3.)*(curfield.tev[ntev].x - surf.bnd_x[surf.ndiv])
+            
+            zloc = surf.bnd_z[surf.ndiv]+(1. /3.)*(curfield.tev[ntev].z - surf.bnd_z[surf.ndiv])
+        end
+        
+        
+        function tev_iter!(F, x)
+
+            i = surf.ndiv-1
+            vref_x = (surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) - surf.kinem.alphadot*surf.cam[i]
+            println(vref_x)
+            
+            nlev = length(curfield.lev)
+            ntev = length(curfield.tev)
+            
+            downwash = zeros(surf.ndiv)
+            
+            dummyvort = TwoDVort(xloc, zloc, x[1], 0.02, 0., 0.) 
+            ate = x[2]
+
+            u, w = ind_vel([dummyvort], surf.bnd_x, surf.bnd_z)
+            
+            uind = surf.uind .+ u
+            wind = surf.wind .+ w
+
+            for ib = 1:surf.ndiv
+                downwash[ib] = -(surf.kinem.u + curfield.u[1])*sin(surf.kinem.alpha) - uind[ib]*sin(surf.kinem.alpha) + (surf.kinem.hdot - curfield.w[1])*cos(surf.kinem.alpha) - wind[ib]*cos(surf.kinem.alpha) - surf.kinem.alphadot*(surf.x[ib] - surf.pvt*surf.c) + surf.cam_slope[ib]*(uind[ib]*cos(surf.kinem.alpha) + (surf.kinem.u + curfield.u[1])*cos(surf.kinem.alpha) + (surf.kinem.hdot - curfield.w[1])*sin(surf.kinem.alpha) - wind[ib]*sin(surf.kinem.alpha))
+            end
+            
+            a0minusate = -simpleTrapz(downwash,surf.theta)/(surf.uref*pi)
+            a1 = 2*simpleTrapz(downwash.*cos.(surf.theta),surf.theta)/(surf.uref*pi)
+            a0 = a0minusate + ate
+            
+            F[1] = surf.uref*surf.c*pi*(a0 + ate + a1/2.) - surf.uref*surf.c*pi*(surf.a0prev[1] + surf.ateprev[1] + surf.aprev[1]/2.) + x[1]
+            F[2] = x[1] - 2*dt*vref_x*ate*tan(surf.theta[surf.ndiv-1]/2)
+
+        end
+
+        # F = zeros(2)
+        # x = [1;2]
+        # tev_iter!(F, x)
+        # println(F)
+        # error("here")
+        
+        xstart = [-0.01; -0.01]
+        soln = nlsolve(tev_iter!, xstart, method=:newton)
+        soln = soln.zero
+        #Assign solution
+        push!(curfield.tev, TwoDVort(xloc, zloc, soln[1], 0.02, 0., 0.))
+        surf.ate[1] = soln[2]
+        
+        add_indbound_lasttev(surf, curfield)
+        
+        #Calculate downwash
+        update_downwash(surf, [curfield.u[1], curfield.w[1]])
+        
+        #Calculate first two fourier coefficients
+        update_a0anda1(surf)
+        
+        #Update adot
+        update_a2a3adot(surf,dt)
+
+        #Set previous values of aterm to be used for derivatives in next time step
+        surf.a0prev[1] = surf.a0[1]
+        surf.ateprev[1] = surf.ate[1]
+        for ia = 1:3
+            surf.aprev[ia] = surf.aterm[ia]
+        end
+
+        #Update rest of Fourier terms
+        update_a2toan(surf)
+
+        #Calculate bound vortex strengths
+        update_bv(surf)
+
+        # Delete or merge vortices if required
+        controlVortCount(delvort, surf.bnd_x[Int(round(surf.ndiv/2))], surf.bnd_z[Int(round(surf.ndiv/2))], curfield)
+
+        #Wake rollup if flag on
+        if wakerollup == 1
+            wakeroll(surf, curfield, dt)
+        end
+        
+        # Calculate force and moment coefficients
+        cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
+
+        # write flow details if required
+        if writeflag == 1
+            if istep in writeArray
+                dirname = "$(round(t, sigdigits=nround))"
+                writeStamp(dirname, t, surf, curfield)
+            end
+        end
+
+        # for writing in resultsSummary
+        mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm, surf.ate[1]])
+
+    end
+
+    mat = mat'
+
+    f = open("resultsSummary", "w")
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    writedlm(f, mat)
+    close(f)
+
+    mat, surf, curfield
+
+end
+
+
 function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
 
     # If a restart directory is provided, read in the simulation data

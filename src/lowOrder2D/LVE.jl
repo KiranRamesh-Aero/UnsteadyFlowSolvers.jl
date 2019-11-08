@@ -23,7 +23,6 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     LEVhist = hcat([],[])
     TEVhist = hcat([],[])
 
-
     #   length of each panel
     ds = sqrt.(( surf.x[1:end-1]-surf.x[2:end]).^2 + (surf.cam[1:end-1]-surf.cam[2:end]).^2)
     #   Surf cam_slope does not give the correct panel locations

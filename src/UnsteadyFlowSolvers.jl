@@ -74,6 +74,7 @@ export
     # 2D plot output functions
     makeForcePlots2D,
     makeVortPlots2D,
+    subPlot,
 
     # XFOIL Wrapper
     xfoilWrapper

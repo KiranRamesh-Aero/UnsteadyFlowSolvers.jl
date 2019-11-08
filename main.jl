@@ -1,39 +1,46 @@
 include("src/UnsteadyFlowSolvers.jl")
 ## Define Geometry and Kinematics
 # Kinematics
-case = 2 # kinematics case to run
-if case == 1 
+case = 6 # kinematics case to run
+if case == 1 # ~ 8 hours to run, Ramshes @ 4 hrs
     amp = 35 #degrees
     k = .005
     tstart = 60 # non-dimensional time
+    t_tot = 277 # 138.525 for up only, 277 for full
 elseif case == 2
     amp = 45
     k = .05
     tstart = 20
+    t_tot = 60.15 # 29.5 for up only, 60.15 for full
 elseif case == 3
     amp = 90
     k = .4
     tstart = 10
+    t_tot = 25 # 12.5 for up only, 25 for full
 elseif case == 4
     amp = 25
     k = .11
     a = 11
     tstart = 1
+    t_tot = 7.09 # 3.55 for up only, 7.09 for full
 elseif case == 5
     amp = 45
     k = 0.4
     a = 11
     tstart = 1
+    t_tot = 4.52 # 2.26 for up only, 4.52 for full
 elseif case == 6
     mean = 0
     amp = 30
     k = 0.1
     phi = 0
+    t_tot = 31.4 #roughly
 elseif case == 7
     mean = 0
     amp = 30
     k = 0.4
     phi = 0
+    t_tot = 7.85
 end
 #amp = amp * pi / 180
 if case < 4
@@ -42,10 +49,9 @@ end
 
 #alpha = 10
 if case < 6
-    alphadef = UnsteadyFlowSolvers.EldUptstartDef(amp*pi/180,k,a,tstart) # ConstDef(alpha*pi/180)#
+    alphadef = UnsteadyFlowSolvers.EldRampReturntstartDef(amp*pi/180,k,a,tstart) # ConstDef(alpha*pi/180)#
 else
     alphadef = UnsteadyFlowSolvers.SinDef(mean,amp*pi/180,k,phi)
-    tstart = 0
 end
 hdef = UnsteadyFlowSolvers.ConstDef(0)
 udef = UnsteadyFlowSolvers.ConstDef(1)
@@ -53,48 +59,18 @@ full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
 # Geometry
 pvt = 0.25 ;
 geometry = "FlatPlate"#"bin/sd7003.dat"
-lespcrit = [.3;]
+lespcrit = [.2;]
+
 surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
 curfield = UnsteadyFlowSolvers.TwoDFlowField()
 # Iteration Parameters
-dtstar = UnsteadyFlowSolvers.find_tstep(alphadef)
+dtstar = .015 #UnsteadyFlowSolvers.find_tstep(alphadef)
 
-#=Solve for time needed to acheive maximum AoA with a proportional loop
-global t = tstart
-global alpha = alphadef(t) *180/pi
-P = 10
-while alpha <= amp - .05 || alpha >= amp + .05 # Timestep is outside .05 degrees
-    global alpha = alphadef(t) *180/pi
-    error = amp - alpha
-    global t += P*error
-    #println(alpha )#* 180 / pi)
-    if t > 10000
-        break
-    end
-end
-t_tot = ceil(t)
-=#
-t_tot = 9 + tstart
 nsteps = Int(round(t_tot/dtstar))
-#nsteps = 150 #DEBUG
+#nsteps = 1 #DEBUG
 
 println("Running LVE")
-frames, IFR_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,100,"longwake")
-#gamma_crit_use = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar)
-
-#=
-println("Running LDVM")
-startflag = 0
-writeflag = 0
-writeInterval = t_tot/18.
-surf2 = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101,rho = 1.225)
-curfield2 = UnsteadyFlowSolvers.TwoDFlowField()
-delvort = UnsteadyFlowSolvers.delNone()
-
-mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
-#mat2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
-=#
-# mat = [t , alpha , h , u , LESP , cl , cd , cm] for each timestep
+frames, IFR_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
 
 # Velocity plot
 using Plots
@@ -119,34 +95,3 @@ elseif single == "false" # Make full list of images in folder
         savefig("$dir/$i")
     end
 end
-#
-#= Plot circ vs alpha
-circ = map(q -> q.circ[1],frames)
-alpha = map(q -> q.alpha,frames)
-plot(alpha,circ)
-circ1 = frames[1].circ
-x = (1:length(circ1))/length(circ1)
-plot(x,circ1)
-=#
-
-#= Force plots
-#UnsteadyFlowSolvers.makeForcePlots2D()
-
-plot(mat[:,1],mat[:,6],color = :black) # cl vs AoA
-plot!(mat2[:,1],mat2[:,6],color = :red)
-=#
-#alpha = Int(alpha)
-#plot(mat2[:,1],mat2[:,2], xlabel = "t*", ylabel = "AoA")
-#savefig("RameshData_Motion_$alpha")
-
-#UnsteadyFlowSolvers.subPlotForces(mat,1,"t*","MyData_$alpha")
-
-#plot(mat[:,1],test[1:end-1], xlabel = "t*", ylabel = "TEV Strength")
-
-using DelimitedFiles
-
-#writedlm("circChange_$nsteps.txt",test)
-#writedlm("mat_$nsteps.txt",mat)
-#writedlm("mat2_$nsteps.txt",mat2)
-#tevCirc = map(q -> q.s,IFR_field)
-#writedlm("TEV_circ_$nsteps.txt",tevCirc)

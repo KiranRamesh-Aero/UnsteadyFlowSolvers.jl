@@ -20,6 +20,9 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     aniStep < 1 ? aniStep = 1 : aniStep
     frames = 0
     prevNow = 0
+    LEVhist = hcat([],[])
+    TEVhist = hcat([],[])
+
 
     #   length of each panel
     ds = sqrt.(( surf.x[1:end-1]-surf.x[2:end]).^2 + (surf.cam[1:end-1]-surf.cam[2:end]).^2)
@@ -81,7 +84,6 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
 
             # RHS = -[U_t + u_w , W_t + w_w] dot n
             global RHS[j] = -((relVel[j,1] + surf.uind[j])*n[j,1] + (relVel[j,2] + surf.wind[j])*n[j,2])
-
         end
 
         ## Vortex Strenghths a*circ = RHS
@@ -95,8 +97,7 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         end
 
         ## LEV Ejection
-        LEV_shed = false ; # true if LEV is shed in step
-        # Test for LEV criteria
+        #   Test for LEV criteria
         if abs(circ[1]) > gamma_crit
             if surf.levflag[1] == 0 && t < LEV_Stop # if lev is first in batch
                 gamma_crit_use = abs(circ[1])/circ[1] * gamma_crit # = gamma_crit w/ sign of circ[1]
@@ -111,10 +112,12 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             end
             #println("LEV Ejection: Step $i, time $t")
             gamma_crit_use = gamma_crit_use[1]
-            LEV_shed = true
 
             # Place LEV
             place_lev2(surf,IFR_field,dtstar,t)
+
+            surf.levflag[1] = 1 # Set LEV flag to track constant LEV streams
+
             # Convert coords to BFR
             x_lev, z_lev = BFR(surf, IFR_field.lev[end].x, IFR_field.lev[end].z, t)
             global a,a1 = mod_influence_coeff(surf,curfield,coll_loc,n,dtstar,x_w,z_w,x_lev,z_lev)
@@ -136,9 +139,10 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
 
             circ[2:end] = circ[1:end-1] # shift circs
             circ[1] = gamma_crit_use
-        end
-        if LEV_shed == true # track constant stream of LEVs
-            surf.levflag[1] = 1
+
+            # LEV history data [t,s]
+            stamp = hcat(t,IFR_field.lev[end].s)
+            LEVhist = vcat(LEVhist,stamp)
         else
             surf.levflag[1] = 0
         end
@@ -152,6 +156,10 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         if length(IFR_field.tev) > 1 # Set TEV circ
             IFR_field.tev[end].s = circ[end]
         end
+
+        # LEV history data [t,s]
+        stamp = hcat(t,IFR_field.tev[end].s)
+        TEVhist = vcat(TEVhist,stamp)
 
         # Position mesh
         if i % aniStep == 0. && Int(i / aniStep) < frameCnt
@@ -213,13 +221,14 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
 
         # Convert IFR_field values to curfield (IFR -> BFR)
         push!(curfield.tev,TwoDVort(0,0,IFR_field.tev[end].s,0.02*surf.c,0.,0.))
-        if size(IFR_field.lev,1) > 0
+        if size(IFR_field.lev,1) > 0 && surf.levflag[1] == 1
             push!(curfield.lev,TwoDVort(0,0,IFR_field.lev[end].s,0.02*surf.c,0.,0.))
         end
         vor_BFR(surf,t+dtstar,IFR_field,curfield) # Calculate IFR positions for next iteration
 
     end
     mat = mat'
-    test = circChange
-    return frames,IFR_field,mat,test
+    test1 = TEVhist
+    test2 = LEVhist
+    return frames,IFR_field,mat,test1,test2
 end

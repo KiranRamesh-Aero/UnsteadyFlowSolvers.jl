@@ -2,10 +2,10 @@ include("src/UnsteadyFlowSolvers.jl")
 using DelimitedFiles
 
 dir0 = "Full Run"
-#mkdir(dir0)
+mkdir(dir0)
 for case = 2:7 # For each case
     dir1 = "$dir0/Case $case"
-    #mkdir(dir1)
+    mkdir(dir1)
     println("Case $case")
     for levToggle = 1:2 # for LEV on and off
         if levToggle == 1 # LEV on
@@ -15,7 +15,7 @@ for case = 2:7 # For each case
             dir2 = "$dir1/LEV off"
             lespcrit = [10000;]
         end
-        #mkdir(dir2)
+        mkdir(dir2)
         for pvt = [0,.25,1] # for each pivot point
             if pvt == 0
                 pvtType = "LE"

@@ -140,7 +140,7 @@ function makeVortPlots2D()
     end
 end
 
-function makeForcePlots2D()
+function makeForcePlots2D(mat = [])
     dirvec = readdir()
     if "forcePlots" in dirvec
         rm("forcePlots", recursive=true)

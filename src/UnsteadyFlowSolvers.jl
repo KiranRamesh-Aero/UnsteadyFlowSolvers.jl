@@ -26,8 +26,7 @@ import Plots: @layout
 
 import LaTeXStrings: @L_str
 
-#For use in development and debugging
-import Revise
+import DataStructures
 
 export
     # kinematics types and funtions
@@ -77,7 +76,10 @@ export
     subPlot,
 
     # XFOIL Wrapper
-    xfoilWrapper
+    xfoilWrapper,
+
+    # User Interface
+    runUI
 
 ### source files
 
@@ -102,5 +104,11 @@ include("plots/plots2D.jl")
 
 # XFOIL Wrapper
 include("xfoil/XfoilWrapper.jl")
+
+# User Interface
+include("UI/UI_main.jl")
+include("UI/UI_utils.jl")
+include("UI/s1Cmds.jl")
+include("UI/s2Cmds.jl")
 
 end

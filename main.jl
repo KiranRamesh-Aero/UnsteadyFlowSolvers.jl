@@ -1,7 +1,7 @@
 include("src/UnsteadyFlowSolvers.jl")
 ## Define Geometry and Kinematics
 # Kinematics
-case = 6 # kinematics case to run
+case = 3 # kinematics case to run
 if case == 1 # ~ 8 hours to run, Ramshes @ 4 hrs
     amp = 35 #degrees
     k = .005
@@ -58,7 +58,7 @@ udef = UnsteadyFlowSolvers.ConstDef(1)
 full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
 # Geometry
 pvt = 0.25 ;
-geometry = "FlatPlate"#"bin/sd7003.dat"
+geometry = "bin/sd7003.dat"#"FlatPlate"#
 lespcrit = [.2;]
 
 surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
@@ -70,13 +70,14 @@ nsteps = Int(round(t_tot/dtstar))
 #nsteps = 1 #DEBUG
 
 println("Running LVE")
-frames, IFR_field, mat, test = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
+frames, IFR_field, mat, test1, test2 = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
+writedlm("myMat.txt",mat)
 
 # Velocity plot
 using Plots
 pyplot()
 single = "false" ;
-if single == "true"
+if single == "none"
     mesh = frames[end]
 
     contour(mesh.x[1,:],mesh.z[:,1], mesh.velMag,fill=true,levels = 200,c = :lightrainbow_r)

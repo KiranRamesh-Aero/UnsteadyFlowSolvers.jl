@@ -25,7 +25,7 @@ for case = 2:7 # For each case
                 pvtType = "TE"
             end
             dir3 = "$dir2/$pvtType"
-            #mkdir(dir3)
+            mkdir(dir3)
 
             ## Define Geometry and Kinematics
             # Kinematics
@@ -85,20 +85,20 @@ for case = 2:7 # For each case
             udef = UnsteadyFlowSolvers.ConstDef(1)
             full_kinem = UnsteadyFlowSolvers.KinemDef(alphadef, hdef, udef)
             # Geometry
-            geometry = "FlatPlate"#"bin/sd7003.dat"
-            global surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
-            global curfield = UnsteadyFlowSolvers.TwoDFlowField()
+            geometry = "bin/sd7003.dat"#"FlatPlate"#
+            surf = UnsteadyFlowSolvers.TwoDSurf(geometry,pvt,full_kinem,lespcrit; ndiv = 101, camberType = "linear", rho = 1.225)
+            curfield = UnsteadyFlowSolvers.TwoDFlowField()
             # Iteration Parameters
             dtstar = .015 #UnsteadyFlowSolvers.find_tstep(alphadef)
 
             nsteps = Int(round(t_tot/dtstar))
             #nsteps = 150 #DEBUG
-
+            
             println("Running LVE")
-            global frames, IFR_field, mat, test1, test2 = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
-            writedlm("$dir3/myMat.txt",mat)
+            frames, IFR_field, mat, test1, test2 = UnsteadyFlowSolvers.LVE(surf,curfield,nsteps,dtstar,40,"longwake")
+            writedlm("myMat.txt",mat)
 
-            #=
+            #
             println("Running LDVM")
             startflag = 0
             writeflag = 0
@@ -107,10 +107,10 @@ for case = 2:7 # For each case
             curfield2 = UnsteadyFlowSolvers.TwoDFlowField()
             delvort = UnsteadyFlowSolvers.delNone()
 
-            global mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
+            mat2, surf2, curfield2 = UnsteadyFlowSolvers.ldvm(surf2, curfield2, nsteps, dtstar,startflag, writeflag, writeInterval, delvort)
             # mat = [t , alpha , h , u , LESP , cl , cd , cm] for each timestep
-            #writedlm("$dir3/ramMat.txt",mat2)
-            =#
+            writedlm("$dir3/ramMat.txt",mat2)
+            #
         end
     end
 end

@@ -413,9 +413,8 @@ end
 mutable struct meshgrid
     t :: Float64
     alpha :: Float64
-    circ :: Vector{Float64}
-    vorX :: Vector{Float64}
-    vorZ :: Vector{Float64}
+    tev :: Array{Float64}
+    lev :: Array{Float64}
     camX :: Vector{Float64}
     camZ :: Vector{Float64}
     x :: Array{Float64}
@@ -424,7 +423,7 @@ mutable struct meshgrid
     wMat :: Array{Float64}
     velMag :: Array{Float64}
 
-    function meshgrid(surf::TwoDSurf,vorts::Vector{TwoDVort},offset,t,width::Int64 = 100,view::String = "square")
+    function meshgrid(surf::TwoDSurf,tevs::Vector{TwoDVort},levs::Vector{TwoDVort},offset,t,width::Int64 = 100,view::String = "square")
         farBnd = surf.x[end] + surf.c*offset
         nearBnd = surf.x[1] - surf.c*offset
         zBnd = ( farBnd - nearBnd ) / 2
@@ -436,6 +435,9 @@ mutable struct meshgrid
         elseif view == "longwake"
             farBnd = 5*farBnd
             zBnd = 2*zBnd
+        elseif view == "UI Window"
+            farBnd = 2*farBnd
+            zBnd = 3/4*farBnd
         end
 
         # Global frame translation
@@ -467,19 +469,35 @@ mutable struct meshgrid
         alpha = surf.kinem.alpha
         circ = zeros(surf.ndiv-1)
 
-        vorX = []
-        vorZ = []
-        for i = 1:length(vorts)
-            vx = vorts[i].x
-            vz = vorts[i].z
+        tevX = []
+        tevZ = []
+        for i = 1:length(tevs)
+            vx = tevs[i].x
+            vz = tevs[i].z
             if vx >= lowX && vx <= uppX
                 if vz >= lowZ && vz <= uppZ
-                    vorX = [vorX;vx]
-                    vorZ = [vorZ;vz]
+                    tevX = [tevX;vx]
+                    tevZ = [tevZ;vz]
                 end
             end
         end
+        tev = hcat(tevX,tevZ)
+        levX = []
+        levZ = []
+        if length(levs) > 0
+            for i = 1:length(levs)
+                vx = levs[i].x
+                vz = levs[i].z
+                if vx >= lowX && vx <= uppX
+                    if vz >= lowZ && vz <= uppZ
+                        levX = [levX;vx]
+                        levZ = [levZ;vz]
+                    end
+                end
+            end
+        end
+        lev = hcat(levX,levZ)
 
-        new(t,alpha,circ,vorX,vorZ,camX, camZ, x, z, uMat, wMat, velMag)
+        new(t,alpha,tev,lev,camX, camZ, x, z, uMat, wMat, velMag)
     end
 end

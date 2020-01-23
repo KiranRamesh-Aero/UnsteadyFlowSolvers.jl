@@ -4,12 +4,22 @@
 Clears all timestamp directories in the current folder
 """
 function cleanWrite()
+
     dirvec = readdir()
-    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
-    for i =1:length(dirresults)
-        rm("$(dirresults[i])", force=true, recursive=true)
+    if "Step Files" in dirvec
+        try
+            rm("Step Files", recursive=true)
+        catch
+            println(" ERROR: Unable to reset 'Step Files' directory")
+        end
+    else
+        dirvec = readdir()
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
+        for i =1:length(dirresults)
+            rm("$(dirresults[i])", force=true, recursive=true)
+        end
+        # rm("*~", force=true)
     end
-    rm("*~", force=true)
 end
 
 
@@ -98,7 +108,7 @@ function simpleTrapz(y::Vector{T}, x::Vector{T}) where {T<:Real}
 end
 
 # Aerofoil camber calculation from coordinate file
-function camber_calc(x::Vector,airfoil::String)
+function camber_calc(x::Vector,airfoil::Union{String,SubString{String}})
     #Determine camber and camber slope on airfoil from airfoil input file
 
     ndiv = length(x);

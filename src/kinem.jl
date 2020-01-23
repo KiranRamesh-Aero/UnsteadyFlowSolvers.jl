@@ -101,7 +101,7 @@ function (eld::EldRampReturntstartDef)(tt)
 
     gg = log((cosh(eld.a*(tt - t1))*cosh(eld.a*(tt - t4)))/(cosh(eld.a*(tt - t2))*cosh(eld.a*(tt - t3))))
 
-    return eld.amp*gg/(maxg), t5
+    return eld.amp*gg/(maxg);
 
 end
 
@@ -110,8 +110,7 @@ struct ConstDef <: MotionDef
 end
 
 function (cons::ConstDef)(t)
-    o = cons.amp
-    return o, "---"
+    cons.amp
 end
 
 
@@ -124,13 +123,12 @@ end
 
 function (lin::LinearDef)(t)
     if t < lin.tstart
-        o = lin.vstart
+        lin.vstart
     elseif t > lin.tstart + lin.len
-        o = lin.vend
+        lin.vend
     else
-        o = lin.vstart + (lin.vend - lin.vstart)/lin.len*(t - lin.tstart)
+        lin.vstart + (lin.vend - lin.vstart)/lin.len*(t - lin.tstart)
     end
-    return o, lin.tstart + lin.len
 end
 
 struct BendingDef <: MotionDef
@@ -149,8 +147,7 @@ struct SinDef <: MotionDef
 end
 
 function (kin::SinDef)(t)
-  o = (kin.mean) + (kin.amp)*sin(2*kin.k*t + kin.phi)
-  return o, pi/kin.k
+  (kin.mean) + (kin.amp)*sin(2*kin.k*t + kin.phi)
 end
 
 
@@ -162,8 +159,7 @@ struct CosDef <: MotionDef
 end
 
 function (kin::CosDef)(t)
-  o = (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
-  return o, pi/kin.k
+  (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
 end
 
 struct StepGustDef <: MotionDef

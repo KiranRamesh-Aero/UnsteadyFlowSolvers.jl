@@ -5,7 +5,6 @@ s1Cmds.jl
 =#
 function loadGeo(geo = "")
     # Assign airfoil file data
-    exts = ["dat","txt","csv"] # valid file extensions
     while true
         if geo == "" # if no secondary command given
             geo = ask("Enter an airfoil geometry file: ")
@@ -16,33 +15,26 @@ function loadGeo(geo = "")
         if lowercase(geo) == "flatplate"
             return "FlatPlate"
         end
-        if geo[1] == '/'
+        if geo[1] == '/' # remove any beginning slash
             geo = geo[2:end]
-        end
-        if occursin(".",geo) # check for approproite file extension
-            usrExt = split(geo,".")
-            usrExt = usrExt[end]
-            if sum(usrExt .== exts) == 0 # if not a valid extension
-                errorHandler(geo,"'$usrExt' is not a valid file extension.")
-                geo = ""
-                continue
-            end
-        else
-            errorHandler(geo,"File must have an extension.")
-            geo = ""
-            continue
         end
         if occursin("/",geo) # Check if file exsists
             path = split(geo,"/")
             fn = path[end]
             path =join(path[1:end-1],"/")
-            files = cd(readdir, path)
+            try
+                files = cd(readdir, path)
+            catch
+                errorHandler(path,"'$path' is not a valid directory.")
+                geo = ""
+                continue
+            end
         else
             files = readdir()
             fn = geo
         end
         if sum(files .== fn) == 0 # file does not exist in directory
-            errorHandler(fn,"'$fn' does not exist.")
+            errorHandler(fn,"File '$fn' does not exist.")
             geo = ""
             continue
         end
@@ -51,7 +43,7 @@ function loadGeo(geo = "")
 end
 
 function modef(motype = "")
-    # Create alphadef/hdef/udef motion vectors
+    # Create alphadef/pdef/udef motion vectors
 
     modefs = ["const","lin","eld","sin","cos"]#,"gust"]
     outVar = []
@@ -68,9 +60,7 @@ function modef(motype = "")
             break # next question
         else
             # Error message
-            prompt = join(modefs[1:end-1], ", ")
-            prompt = "Motion options are $prompt, and $(modefs[end])"
-            errorHandler(motype,prompt)
+            errorHandler(modefs,"list")
         end
         motype = ""
     end
@@ -84,7 +74,7 @@ function modef(motype = "")
         if sm == nothing ; return nothing end
         fm = svPrompt("f","Final Magnitude: ")
         if fm == nothing ; return nothing end
-        l = svPrompt("f","Line Length: ")
+        l = svPrompt("f","Rise Time: ")
         if l == nothing ; return nothing end
         ynAsk("Change start time?") ? tstart = svPrompt("f","Start Time: ") : tstart = 1
         if tstart == nothing ; return nothing end

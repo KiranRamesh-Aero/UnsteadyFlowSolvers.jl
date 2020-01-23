@@ -6,24 +6,37 @@ UI_main.jl
 function runUI()
     println("\33[2J") # clear command window
     commandHist = [] # User command history log
-    hdef = ConstDef(0) # pre-define kinematics
+    pdef = ConstDef(0) # pre-define kinematics
     udef = ConstDef(1)
+    alphadef = ConstDef(0)
     alphadef = ConstDef(0)
     curfield = UnsteadyFlowSolvers.TwoDFlowField()
     delvort = UnsteadyFlowSolvers.delNone()
-    nsteps = 0
+    nsteps = 0 # pre-define global vars
+    trange = collect(1:10)
     mat = []
     frames = []
 
     ## Dictonary of Cmdmands
     # Stage 1 commands
-    list1 = ["airfoil","ndiv","lespcrit","alphadef","oper","pvt","runtime","hdef","veldef","dt","rho","cambercalc"]
+    list1 = ["airfoil","ndiv","lespcrit","alphadef","oper","pvt","runtime","pdef","veldef","dt","rho","cambercalc"]
+    help1 = ["Define airfoil designation: coordinate file or FlatPlate","Define airfoil panel division count","Define critical LESP value for LEV shedding","Define pitch motion parameters","Change to operation phase","Define airfoil pivot location","Define simulation run time","Define plunge motion parameters","Define velocity profile parameters","Define time step","Define operating density","Define camber calculation method"]
+    help1 = hcat(list1,help1)
+    help1[1,1] = "load" # overwrite to show command
+    help1 = sortslices(help1,dims = 1)
+
     # Stage 2 commands
-    list2 = ["wflag","sflag","wcount","lve","ldvm","save"]
+    list2 = ["wflag","sflag","wcount","run","save","anim","animstep","plot","vortplot","infoplot"]
+    help2 = ["If enabled, writes out iteration files to default save location","If enabled, start simulation from previous output files","Define number of output files","Run a simulation","Save the polar data to a file","If enabled, shows an animation of polars and motion during LVE simulation","Define step count between animation frames","Plot simulation output data","Plot vortex location data for each write step (Must have wflag enabled)","Plot step parameters for each write step (Must have wflag enabled)"]
+    help2 = sortslices(hcat(list2,help2),dims = 1)
+
     commandDict = commands(list1,list2)
     commandDict = setDefaults(commandDict)
 
     stage = 1 # set preliminary stage
+
+    # Run 'HELP' on startup
+    helpMe(stage,help1,help2)
 
     while true # Loop forever or unitl user exit
         if stage == 1 # Set stage prompts
@@ -55,10 +68,18 @@ function runUI()
 
         ## Top level Commands
         if stage == 1 && usrCmd == "exit"
+            close("all")
+            dirvec = readdir() # Clear step files if prompted
+            if "Step Files" in dirvec
+                if ynAsk("Clear step file cache?")
+                    cleanWrite()
+                end
+            end
             break # exit program
         end
         if stage == 2 && (usrCmd == "" || usrCmd == "back")
             stage = 1
+            close("all")
             continue # return to stage 1
         end
         if usrCmd == "?"
@@ -69,11 +90,15 @@ function runUI()
             println("\33[2J") # clear command window
             continue # clear screen
         end
+        if usrCmd == "help"
+            helpMe(stage,help1,help2)
+            continue
+        end
 
         if stage == 1 && usrCmd == "load" # change from load command
             usrCmd = "airfoil"
         end
-        if stage == 2 && (usrCmd == "ldvm" || usrCmd == "lve") # Calculate surf and curfield
+        if stage == 2 && (usrCmd == "run") # Calculate surf and curfield
             global surf = UnsteadyFlowSolvers.TwoDSurf(commandDict.s1["airfoil"],commandDict.s1["pvt"],kinem,[commandDict.s1["lespcrit"];]; ndiv = commandDict.s1["ndiv"], camberType = commandDict.s1["cambercalc"], rho = commandDict.s1["rho"])
             curfield = UnsteadyFlowSolvers.TwoDFlowField()
         end
@@ -86,12 +111,15 @@ function runUI()
                     o = loadGeo(subCmd)
                     if o != nothing
                         commandDict.s1[usrCmd] = o
-                        println(" Airfoil successfuly loaded.")
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
                     end
 
                 elseif usrCmd == "ndiv" # Set panel divsions
                     o = svPrompt("i", "Panel Count: ", subCmd)
-                    if o != nothing ; commandDict.s1[usrCmd] = o end
+                    if o != nothing
+                        commandDict.s1[usrCmd] = o
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
+                    end
 
                 elseif usrCmd == "lespcrit" # Set panel divsions
                     o = svPrompt("f", "LESP Critical: ", subCmd)
@@ -106,7 +134,8 @@ function runUI()
                     if o != nothing
                         commandDict.s1[usrCmd] = o
                         if commandDict.s1["runtime"] != "---"
-                            println(" The simulation will take $(Int(ceil(commandDict.s1["runtime"]/o))) iterations.")
+                            nsteps, trange = iterCalc(commandDict.s1["runtime"],o)
+                            println(" The simulation will take $nsteps iterations.")
                         end
                     end
 
@@ -114,7 +143,8 @@ function runUI()
                      o = svPrompt("f", "Total Time: ", subCmd)
                      if o != nothing
                          commandDict.s1[usrCmd] = o
-                         println(" The simulation will take $(Int(ceil(o/commandDict.s1["dt"]))) iterations.")
+                         nsteps, trange = iterCalc(o,commandDict.s1["dt"])
+                         println(" The simulation will take $nsteps iterations.")
                      end
 
                 elseif usrCmd == "rho" # Set density
@@ -123,7 +153,10 @@ function runUI()
 
                 elseif usrCmd == "cambercalc" # Set camber calculation method
                     o = setCamberCalc(subCmd)
-                    if o != nothing ; commandDict.s1[usrCmd] = o end
+                    if o != nothing
+                        commandDict.s1[usrCmd] = o
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
+                    end
 
                 elseif usrCmd == "alphadef" # Set alpha definition
                     alphavec = modef(subCmd)
@@ -131,11 +164,17 @@ function runUI()
                         alphadef = alphaCorr(alphavec)
                         param = join(alphavec[2:end], ", ")
                         commandDict.s1[usrCmd] = "$(alphavec[1])($param)"
-                        temp, rt = alphadef(0)
-                        commandDict.s1["runtime"] = rt
+                        rt = endTime(alphadef)
+                        if rt != "---"
+                            if  commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"]
+                                commandDict.s1["runtime"] = rt
+                                nsteps, trange = iterCalc(commandDict.s1["runtime"],commandDict.s1["dt"])
+                            end
+                        end
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
                     end
 
-                elseif usrCmd == "hdef" || usrCmd == "veldef"# Set height and velocity definition
+                elseif usrCmd == "pdef" || usrCmd == "veldef"# Set height and velocity definition
                     o = modef(subCmd)
                     if o != nothing
                         if o[1] == "const"
@@ -154,24 +193,30 @@ function runUI()
                         param = join(o[2:end], ", ")
                         commandDict.s1[usrCmd] = "$(o[1])($param)"
 
-                        temp, rt = odef(0)
+                        rt = endTime(odef)
 
-                        commandDict.s1["runtime"] = rt
+                        if rt != "---"
+                            if commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"]
+                                commandDict.s1["runtime"] = rt
+                                nsteps, trange = iterCalc(commandDict.s1["runtime"],commandDict.s1["dt"])
+                            end
+                        end
 
-                        if usrCmd == "hdef"
-                            hdef = odef
+                        if usrCmd == "pdef"
+                            pdef = odef
                         else
                             udef = odef
                         end
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
                     end
 
                 elseif usrCmd == "oper" # Change to stage 2
                     o = gotoOper(commandDict.s1)
                     if o
                         stage = 2
-                        global kinem = KinemDef(alphadef, hdef, udef)
-                        nsteps = Int(ceil(commandDict.s1["runtime"]/commandDict.s1["dt"]))
+                        global kinem = KinemDef(alphadef, pdef, udef)
                     end
+                    close()
                 end
 
             elseif stage == 2 # Operation Stage
@@ -180,27 +225,27 @@ function runUI()
                     if o != nothing ; commandDict.s2[usrCmd] = o end
 
                 elseif usrCmd == "wflag" # Write step output during sim
-                    o = ynAsk("Write step output?")
-                    o ? commandDict.s2[usrCmd] = 1 : commandDict.s2[usrCmd] = 0
+                    commandDict.s2[usrCmd] = ynAsk("Write step output?",subCmd)
 
                 elseif usrCmd == "sflag" # Start from previous step output
-                    o = ynAsk("Start from previous step output?")
-                    o ? commandDict.s2[usrCmd] = 1 : commandDict.s2[usrCmd] = 0
+                    commandDict.s2[usrCmd] = ynAsk("Start from previous step output?",subCmd)
 
-                elseif usrCmd == "lve" # Run LVE
-                    println()
-                    println(" Running LVE Simulation...")
-                    frames, IFR_field, mat = LVE(surf,curfield,nsteps,commandDict.s1["dt"],commandDict.s2["wcount"],"longwake")
-                    println("\t Done!")
-                    println()
+                elseif usrCmd == "anim" # Set LVE animation state
+                    commandDict.s2[usrCmd] = ynAsk("Display LVE Animation?", subCmd)
 
-                elseif usrCmd == "ldvm" # Run LDVM
-                    println()
-                    println(" Running LDVM Simulation...")
-                    writeInterval = commandDict.s1["runtime"]/commandDict.s2["wcount"]
-                    mat, surf, curfield = ldvm(surf, curfield, nsteps, commandDict.s1["dt"],commandDict.s2["sflag"], commandDict.s2["wflag"], writeInterval, delvort)
-                    println("\t Done!")
-                    println()
+                elseif usrCmd == "animstep" # set animation step
+                    o = svPrompt("i", "Animation Step: ", subCmd)
+                    if o != nothing ; commandDict.s2[usrCmd] = o end
+
+                elseif usrCmd == "run" # Run simulation
+                    if commandDict.s2["wflag"]
+                        cleanWrite()
+                    end
+                    o = runSim(commandDict,surf,curfield,nsteps,delvort,subCmd)
+                    if o != nothing ; mat = o end
+
+                elseif usrCmd == "plot"
+                    plotResults(mat,subCmd)
 
                 elseif usrCmd == "save" # Set step output file count
                     if mat != [] # mat has been defined
@@ -209,12 +254,25 @@ function runUI()
                         errorHandler(mat,"A simulation must be ran before saving the results.")
                     end
 
+                elseif usrCmd == "infoplot"
+                    if mat != []
+                        tt = plotTime(subCmd)
+                        makeKinemClVortPlots2D(mat,tt)
+                    else
+                        errorHandler(1,"A simulation must be ran before infoplots can be generated.")
+                    end
+
+                elseif usrCmd == "vortplot"
+                    tt = plotTime(subCmd)
+                    makeVortPlots2D(tt)
+
                 end
             end
         elseif usrCmd != "" # return error message
             errorHandler(usrCmd)
             continue
         end
+
     end
     #return commandDict
 end

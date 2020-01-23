@@ -32,6 +32,14 @@ function calc_forces(surf::TwoDSurf, vels::Vector{Float64})
 end
 
 function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDFlowField)
+
+    try
+        cd("Step Files")
+    catch
+        mkdir("Step Files")
+        cd("Step Files")
+    end
+
     dirvec = readdir()
     if dirname in dirvec
         rm(dirname, recursive=true)
@@ -100,6 +108,7 @@ function writeStamp(dirname::String, t::Float64, surf::TwoDSurf, curfield::TwoDF
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
+    cd("..")
     cd("..")
 end
 

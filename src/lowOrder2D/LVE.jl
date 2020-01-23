@@ -3,7 +3,7 @@ LVE.jl
     Written by Matthew White
     5/21/2019
 =#
-function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::Float64 = 0.015,frameCnt = 20,view = "square",LEV_Stop = 1000)
+function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::Float64 = 0.015,frameCnt = 20,view = "square",LEV_Stop = 1000,anim = false,animStep = 30,wflag = false,writeInterval = 50)
     ## Initialize variables
     mat = zeros(8 ,0) # loads output matrix
     prevCirc = zeros(surf.ndiv-1)
@@ -16,12 +16,13 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
     IFR_field = TwoDFlowField()
     IFR_surf = TwoDSurf(surf.coord_file,surf.pvt,surf.kindef,surf.lespcrit; ndiv = surf.ndiv, camberType = "linear")
     global dp = zeros(surf.ndiv-1,1) # change in panel pressure
-    aniStep = round((nsteps-1) / frameCnt) # Frames to capture animation on
-    aniStep < 1 ? aniStep = 1 : aniStep
+    frameStep = round((nsteps-1) / frameCnt) # Frames to capture animation on
+    frameStep < 1 ? frameStep = 1 : frameStep
     frames = 0
     prevNow = 0
     LEVhist = hcat([],[])
     TEVhist = hcat([],[])
+    animMat = hcat([],[],[],[],[],[],[],[])
 
     #   length of each panel
     ds = sqrt.(( surf.x[1:end-1]-surf.x[2:end]).^2 + (surf.cam[1:end-1]-surf.cam[2:end]).^2)
@@ -160,10 +161,10 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         stamp = hcat(t,IFR_field.tev[end].s)
         TEVhist = vcat(TEVhist,stamp)
 
-        # Position mesh
-        if i % aniStep == 0. && Int(i / aniStep) < frameCnt
+        #= Position mesh
+        if i % frameStep == 0. && Int(i / frameStep) < frameCnt
 
-            temp = Int(i / aniStep) + 1
+            temp = Int(i / frameStep) + 1
             now = Dates.format(Dates.now(), "HH:MM")
             if prevNow == now
                 println("$temp / $frameCnt")
@@ -172,16 +173,14 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             end
             prevNow = now
             # Velocities at mesh points
-            vorts = [IFR_field.tev;IFR_field.lev]
-            global mesh = meshgrid(surf,vorts,.25,t,100,view)
-            vorts = [vorts ; IFR_surf.bv]
+            global mesh = meshgrid(surf,IFR_field.tev,IFR_field.lev,.25,t,100,view)
+            vorts = [IFR_field.tev ; IFR_field.lev ; IFR_surf.bv]
             for j = 1:size(vorts,1)
                 u,w = ind_vel(vorts[j],mesh.x,mesh.z)
                 global mesh.uMat = mesh.uMat .+ u
                 global mesh.wMat = mesh.wMat .+ w
                 global mesh.velMag = sqrt.(mesh.uMat.^2 + mesh.wMat.^2)
                 global mesh.t = t
-                global mesh.circ = circ
             end
             if frames == 0
                 frames = [mesh;]
@@ -189,7 +188,8 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
                 push!(frames,mesh)
             end
         end
-        if i > 0
+        =#
+        if i > 0 # Force Calculation
             ## Pressures (Change in pressure for each panel)
             for j = 1:length(dp)
                 global dp[j] = surf.rho * ( ( (relVel[j,1] + surf.uind[j])*tau[j,1] + (relVel[j,2] + surf.wind[j])*tau[j,2] ) * circ[j]/ds[j] + circChange[j])
@@ -225,7 +225,75 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
         end
         vor_BFR(surf,t+dtstar,IFR_field,curfield) # Calculate IFR positions for next iteration
 
+
+        # Draw animation forces and vorticies alonglside calculation
+        if anim
+            if i % animStep == 0. && i > 0
+                clf()
+                # Force Data
+                animMat = [animMat;mat[:,end]']
+                cl = animMat[:,6]
+                cd = animMat[:,7]
+                cm = animMat[:,8]
+                tvec = animMat[:,1]
+                tmax = nsteps*dtstar
+
+                # Vorticies
+                animMesh = meshgrid(surf,IFR_field.tev,IFR_field.lev,.25,t,100,view)
+
+                #   Calculate velocities
+
+                # Plotting
+                subplot2grid((3,3),(0,0)) # Top left (Cl)
+                plot(tvec,cl,color = "black")
+                xlim(0,tmax)
+                ylabel("Cl")
+
+                subplot2grid((3,3),(1,0)) # Middle left (Cd)
+                plot(tvec,cd,color = "black")
+                xlim(0,tmax)
+                ylabel("Cd")
+
+                subplot2grid((3,3),(2,0)) # Bottom left (Cm)
+                plot(tvec,cm,color = "black")
+                xlim(0,tmax)
+                ylabel("Cm")
+
+                subplot2grid((3,3),(0,1), colspan=2,rowspan=3,aspect=1) # Vortex plot
+
+                if length(animMesh.tev) > 0
+                    scatter(animMesh.tev[:,1], animMesh.tev[:,2],c = "red", marker = "o", s = 1)
+                end
+                if length(animMesh.lev) > 0
+                    scatter(animMesh.lev[:,1], animMesh.lev[:,2],c = "blue", marker = "o", s = 1)
+                end
+                plot(animMesh.camX,animMesh.camZ,color = "black", linewidth = 3)
+                xmin = animMesh.x[1,1]
+                xmax = animMesh.x[1,end]
+                zmin = animMesh.z[end,1]
+                zmax = animMesh.z[1,1]
+                xlim(xmin,xmax)
+                ylim(zmin,zmax)
+                axis("off")
+
+                tight_layout()
+                pause(0.0001)
+                show(block = false)
+                print("") # needed becasue for some reason the plot wont update without printing to terminal
+            end
+        end
+
+        # Write iteration step variables out if wflag == true
+        if wflag
+            if i % writeInterval == 0 && i > 0
+                dirname = "$(round(t, sigdigits=6))"
+                writeStamp(dirname, t, IFR_surf, IFR_field)
+            end
+        end
+
+
     end
+
     mat = mat'
     test1 = TEVhist
     test2 = LEVhist

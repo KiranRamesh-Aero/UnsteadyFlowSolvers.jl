@@ -247,3 +247,16 @@ function (eld::EldUpInttstartDef)(t)
     end
     amp
 end
+
+# Takes a vector of time-ordered data from an input file
+struct FileDef <: MotionDef
+    tvec :: Vector{Float64}
+    var :: Vector{Float64}
+end
+
+function (file::FileDef)(t)
+    # Find index of closest t to tvec
+    idx = argmin(abs.(file.tvec.- t))
+    # return var at index
+    file.var[idx]
+end

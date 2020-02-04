@@ -210,7 +210,8 @@ function LVE(surf::TwoDSurf,curfield::TwoDFlowField,nsteps::Int64 = 500,dtstar::
             cd = cn*sin(alpha) - cs*cos(alpha)
             # Cm moment
             ndem = ndem * surf.c # change ndem to moment ndem
-            cm = -sum( dp[j]*ds[j]*(vor_loc[j,1]-surf.pvt) for j = 1:length(dp) ) / ndem
+            # Cm = Cmz + Cmx
+            cm = -sum( dp[j]*ds[j]*cosd(cam_slope[j])*(vor_loc[j,1]-surf.pvt) for j = 1:length(dp) ) / ndem + sum( dp[j]*ds[j]*sind(cam_slope[j])*vor_loc[j,2] for j = 1:length(dp) ) / ndem
 
             mat = hcat(mat,[t, surf.kinem.alpha*180/pi, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm]) # Pressures and loads
 

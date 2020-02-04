@@ -42,6 +42,38 @@ function loadGeo(geo = "")
     end
 end
 
+function fileInput(name = "")
+    exts = ["dat","txt"] # valid file extensions
+    while true
+        if name == ""
+            name = ask("File Name: ")
+        end
+        if lowercase(name) == "exit" || lowercase(name) == ""
+            break
+        end
+        parts = split(name,".")
+        if occursin("/",name) # can change in the future to look for available folders
+            errorHandler(name,"$name must not be inside a folder.")
+
+        elseif length(parts) > 2 # extra periods
+            errorHandler(name,"$name is an invalid file name.")
+
+        elseif sum(parts[end] .== exts) == 0 # not a valid extention
+            errorHandler(name,"$(parts[end]) is an invalid extension.")
+
+        else
+            # potentially change for asking for which column is which
+            mat = DelimitedFiles.readdlm(name)
+            t = mat[:,1]
+            a = mat[:,2].*pi/180
+            h = mat[:,3]
+            u = mat[:,4]
+            return t,a,h,u,name
+        end
+        name = ""
+    end
+end
+
 function modef(motype = "")
     # Create alphadef/pdef/udef motion vectors
 
@@ -157,7 +189,7 @@ end
 function gotoOper(cmds)
     # Cheack whether there are enough inputs to move to operation stage (2)
     o = false
-    notdef = [k for (k,v) in cmds if v=="---"]
+    notdef = [k for (k,v) in cmds if v=="---" && k != "motionfile"]
     if length(notdef) > 1 # incomplete intitilization
         prompt = join(notdef[1:end-1], ", ")
         prompt = "$prompt, and $(notdef[end]) have not been defined."

@@ -14,13 +14,14 @@ function runUI()
     delvort = UnsteadyFlowSolvers.delNone()
     nsteps = 0 # pre-define global vars
     trange = collect(1:10)
+    lockTime = false
     mat = []
     frames = []
 
     ## Dictonary of Cmdmands
     # Stage 1 commands
-    list1 = ["airfoil","ndiv","lespcrit","alphadef","oper","pvt","runtime","pdef","veldef","dt","rho","cambercalc"]
-    help1 = ["Define airfoil designation: coordinate file or FlatPlate","Define airfoil panel division count","Define critical LESP value for LEV shedding","Define pitch motion parameters","Change to operation phase","Define airfoil pivot location","Define simulation run time","Define plunge motion parameters","Define velocity profile parameters","Define time step","Define operating density","Define camber calculation method"]
+    list1 = ["airfoil","ndiv","lespcrit","alphadef","oper","pvt","runtime","pdef","veldef","dt","rho","cambercalc","motionfile"]
+    help1 = ["Define airfoil designation: coordinate file or FlatPlate","Define airfoil panel division count","Define critical LESP value for LEV shedding","Define pitch motion parameters","Change to operation phase","Define airfoil pivot location","Define simulation run time","Define plunge motion parameters","Define velocity profile parameters","Define time step","Define operating density","Define camber calculation method","Use a file to describe the motion"]
     help1 = hcat(list1,help1)
     help1[1,1] = "load" # overwrite to show command
     help1 = sortslices(help1,dims = 1)
@@ -130,22 +131,30 @@ function runUI()
                     if o != nothing ; commandDict.s1[usrCmd] = o end
 
                 elseif usrCmd == "dt" # Set time step
-                    o = svPrompt("f", "Time Step: ", subCmd)
-                    if o != nothing
-                        commandDict.s1[usrCmd] = o
-                        if commandDict.s1["runtime"] != "---"
-                            nsteps, trange = iterCalc(commandDict.s1["runtime"],o)
-                            println(" The simulation will take $nsteps iterations.")
+                    if !lockTime
+                        o = svPrompt("f", "Time Step: ", subCmd)
+                        if o != nothing
+                            commandDict.s1[usrCmd] = o
+                            if commandDict.s1["runtime"] != "---"
+                                nsteps, trange = iterCalc(commandDict.s1["runtime"],o)
+                                println(" The simulation will take $nsteps iterations.")
+                            end
                         end
+                    else
+                        errorHandler(1,"The file '$(commandDict.s1["motionfile"])' prevents this from being changed.")
                     end
 
                 elseif usrCmd == "runtime" # Set total time
-                     o = svPrompt("f", "Total Time: ", subCmd)
-                     if o != nothing
-                         commandDict.s1[usrCmd] = o
-                         nsteps, trange = iterCalc(o,commandDict.s1["dt"])
-                         println(" The simulation will take $nsteps iterations.")
-                     end
+                    if !lockTime
+                         o = svPrompt("f", "Total Time: ", subCmd)
+                         if o != nothing
+                             commandDict.s1[usrCmd] = o
+                             nsteps, trange = iterCalc(o,commandDict.s1["dt"])
+                             println(" The simulation will take $nsteps iterations.")
+                         end
+                     else
+                         errorHandler(1,"The file '$(commandDict.s1["motionfile"])' prevents this from being changed.")
+                    end
 
                 elseif usrCmd == "rho" # Set density
                     o = svPrompt("f", "Density [kg/m^3]: ", subCmd)
@@ -158,6 +167,28 @@ function runUI()
                         makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
                     end
 
+                elseif usrCmd == "motionfile" # load time, alphadef, h, and vel from file
+                    t,a,h,u,fn = fileInput(subCmd)
+                    if t != nothing
+                        commandDict.s1["motionfile"] = fn
+
+                        alphadef = FileDef(t,a)
+                        commandDict.s1["alphadef"] = "file"
+
+                        pdef = FileDef(t,h)
+                        commandDict.s1["pdef"] = "file"
+
+                        udef = FileDef(t,u)
+                        commandDict.s1["veldef"] = "file"
+
+                        commandDict.s1["dt"] = t[2]-t[1]
+                        commandDict.s1["runtime"] = t[end]
+                        lockTime = true # might need a way to toggle off if file is completely overrided
+
+                        trange = t
+                        makeInitPlot(commandDict.s1,trange,alphadef,pdef,udef)
+                    end
+
                 elseif usrCmd == "alphadef" # Set alpha definition
                     alphavec = modef(subCmd)
                     if alphavec != nothing
@@ -166,7 +197,7 @@ function runUI()
                         commandDict.s1[usrCmd] = "$(alphavec[1])($param)"
                         rt = endTime(alphadef)
                         if rt != "---"
-                            if  commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"]
+                            if  commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"] && !lockTime
                                 commandDict.s1["runtime"] = rt
                                 nsteps, trange = iterCalc(commandDict.s1["runtime"],commandDict.s1["dt"])
                             end
@@ -196,7 +227,7 @@ function runUI()
                         rt = endTime(odef)
 
                         if rt != "---"
-                            if commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"]
+                            if commandDict.s1["runtime"] == "---" || rt > commandDict.s1["runtime"] && !lockTime
                                 commandDict.s1["runtime"] = rt
                                 nsteps, trange = iterCalc(commandDict.s1["runtime"],commandDict.s1["dt"])
                             end
@@ -215,6 +246,7 @@ function runUI()
                     if o
                         stage = 2
                         global kinem = KinemDef(alphadef, pdef, udef)
+                        nsteps = Int(ceil(commandDict.s1["runtime"]/commandDict.s1["dt"]))
                     end
                     close()
                 end

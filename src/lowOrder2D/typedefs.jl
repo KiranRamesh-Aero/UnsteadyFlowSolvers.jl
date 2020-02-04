@@ -110,6 +110,9 @@ struct TwoDSurf
         elseif (typeof(kindef.alpha) == CosDef)
             kinem.alpha = kindef.alpha(0.)
             kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
+        elseif (typeof(kindef.alpha) == FileDef)
+            kinem.alpha = kindef.alpha(0.)
+            kinem.alphadot = ForwardDiff.derivative(kindef.alpha,0.)*uref/c
         end
 
         if (typeof(kindef.h) == EldUpDef)
@@ -130,6 +133,9 @@ struct TwoDSurf
         elseif (typeof(kindef.h) == CosDef)
             kinem.h = kindef.h(0.)*c
             kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
+        elseif (typeof(kindef.h) == FileDef)
+            kinem.h = kindef.h(0.)
+            kinem.hdot = ForwardDiff.derivative(kindef.h,0.)*uref
         end
 
         if (typeof(kindef.u) == EldUpDef)
@@ -142,6 +148,9 @@ struct TwoDSurf
         elseif (typeof(kindef.u) == ConstDef)
             kinem.u = kindef.u(0.)*uref
             kinem.udot = 0.
+        elseif (typeof(kindef.alpha) == FileDef)
+            kinem.u = kindef.u(0.)*uref
+            kinem.udot = ForwardDiff.derivative(kindef.u,0.)*uref*uref/c
         end
 
         for i = 1:ndiv

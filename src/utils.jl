@@ -4,12 +4,22 @@
 Clears all timestamp directories in the current folder
 """
 function cleanWrite()
+
     dirvec = readdir()
-    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
-    for i =1:length(dirresults)
-        rm("$(dirresults[i])", force=true, recursive=true)
+    if "Step Files" in dirvec
+        try
+            rm("Step Files", recursive=true)
+        catch
+            println(" ERROR: Unable to reset 'Step Files' directory")
+        end
+    else
+        dirvec = readdir()
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
+        for i =1:length(dirresults)
+            rm("$(dirresults[i])", force=true, recursive=true)
+        end
+        # rm("*~", force=true)
     end
-    rm("*~", force=true)
 end
 
 
@@ -98,7 +108,7 @@ function simpleTrapz(y::Vector{T}, x::Vector{T}) where {T<:Real}
 end
 
 # Aerofoil camber calculation from coordinate file
-function camber_calc(x::Vector,airfoil::String)
+function camber_calc(x::Vector,airfoil::Union{String,SubString{String}})
     #Determine camber and camber slope on airfoil from airfoil input file
 
     ndiv = length(x);
@@ -147,7 +157,7 @@ function camber_thick_calc(x::Vector,coord_file::String)
         m = parse(Int, coord_file[5])/100.
         p = parse(Int, coord_file[6])/10.
         th = parse(Int, coord_file[7:8])/100.
-        
+
         b1 = 0.2969; b2 = -0.1260; b3 = -0.3516; b4 = 0.2843; b5 = -0.1015
         for i = 2:ndiv
             thick[i] = 5*th*(b1*sqrt(x[i]) + b2*x[i] + b3*x[i]^2 + b4*x[i]^3 + b5*x[i]^4)
@@ -226,4 +236,3 @@ function camber_thick_calc(x::Vector,coord_file::String)
     end
     return thick, thick_slope,rho, cam, cam_slope
 end
-

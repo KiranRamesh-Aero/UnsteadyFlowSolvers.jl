@@ -57,7 +57,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
     mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    
+
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -113,7 +113,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         if wakerollup == 1
             wakeroll(surf, curfield, dt)
         end
-        
+
         # Calculate force and moment coefficients
         cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
 
@@ -159,7 +159,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    
+
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -190,18 +190,18 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
         #Add a TEV with dummy strength
         place_tev(surf,curfield,dt)
-        
+
         #Update incduced velocities on airfoil
         update_indbound(surf, curfield)
-        
+
         #Solve for TEV strength to satisfy Kelvin condition
         kelv = KelvinCondition(surf,curfield)
         soln = nlsolve(not_in_place(kelv), [-0.01])
         curfield.tev[length(curfield.tev)].s = soln.zero[1]
-        
+
         #Update adot
         update_a2a3adot(surf,dt)
-        
+
         lesp = surf.a0[1]
 
         #Check for LESP condition
@@ -215,7 +215,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
             kelvkutta = KelvinKutta(surf,curfield)
             soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
             (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero[1], soln.zero[2]
-            
+
             #set flag for levshedding=on
             surf.levflag[1] = 1
         else
@@ -241,7 +241,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         wakeroll(surf, curfield, dt)
 
         # Calculate force and moment coefficients
-        cl, cd, cm = calc_forces(surf, [curfield.u[1], curfield.w[1]])
+        cl, cd, cm, cn = calc_forces(surf, [curfield.u[1], curfield.w[1]])
 
         # write flow details if required
         if writeflag == 1
@@ -270,7 +270,7 @@ end
 function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
 
     nsurf = length(surf)
-    
+
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
         mat = zeros(0, 7*nsurf+1)
@@ -287,7 +287,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
     mat = mat'
 
     dt = dtstar*minimum(map(q->q.c/q.uref, surf))
-    
+
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -301,12 +301,12 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
             end
         end
     end
-    
+
     lesp = zeros(nsurf)
     cl = zeros(nsurf)
     cd = zeros(nsurf)
     cm = zeros(nsurf)
-    
+
     # time stepping
     for istep = 1:nsteps
         #Udpate current time
@@ -318,11 +318,11 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         for is = 1:nsurf
             #Update kinematic parameters
             update_kinem(surf[is], t)
-            
+
             #Update bound vortex positions
             update_boundpos(surf[is], dt)
         end
-        
+
         #Add TEVs with dummy strength
         place_tev(surf,curfield,dt)
 
@@ -337,26 +337,26 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
             end
         end
 
-        
+
         #Solve for TEV strength to satisfy Kelvin condition
         kelv = KelvinConditionMult(surf,curfield)
         soln = nlsolve(not_in_place(kelv), ones(nsurf)*-0.01)
 
         for i = 1:nsurf
             curfield.tev[end-nsurf+i].s = soln.zero[i]
-            
+
             #Update adot
             update_a2a3adot(surf[i],dt)
-            
+
             lesp[i] = surf[i].a0[1]
         end
-        
+
         shed_ind = Int[]
-        
+
         #Check for LESP condition
         for i = 1:nsurf
-            if (abs(lesp[i])>surf[i].lespcrit[1])                
-                
+            if (abs(lesp[i])>surf[i].lespcrit[1])
+
                 push!(shed_ind, i)
             end
         end
@@ -366,11 +366,11 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
             #2D iteration if LESP_crit is exceeded
             #Add LEVs with dummy strength
             place_lev(surf,curfield,dt,shed_ind)
-            
+
             #Solve for TEV and LEV strengths to satisfy Kelvin condition and Kutta condition at leading edge
             kelvkutta = KelvinKuttaMult(surf,curfield,shed_ind)
             soln = nlsolve(not_in_place(kelvkutta), -0.01*ones(nshed+nsurf))
-            
+
             for i = 1:nsurf
                 if i in shed_ind
                     curfield.tev[end-nsurf+i].s = soln.zero[i]
@@ -378,15 +378,15 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
                     surf[i].levflag[1] = 1
                 else
                     curfield.tev[end-nsurf+i].s = soln.zero[i]
-                    surf[i].levflag[1] = 0 
+                    surf[i].levflag[1] = 0
                 end
             end
         else
             for i = 1:nsurf
                 surf[i].levflag[1] = 0
-            end 
+            end
         end
-        
+
         for i = 1:nsurf
             #Set previous values of aterm to be used for derivatives in next time step
             surf[i].a0prev[1] = surf[i].a0[1]
@@ -394,20 +394,20 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
                 surf[i].aprev[ia] = surf[i].aterm[ia]
             end
         end
-        
+
         # Delete or merge vortices if required
         mean_bndx = sum(map(q->q.bnd_x[Int(round(q.ndiv/2))], surf))/nsurf
         mean_bndz = sum(map(q->q.bnd_z[Int(round(q.ndiv/2))], surf))/nsurf
         controlVortCount(delvort, mean_bndx, mean_bndz, curfield)
-        
+
         # free wake rollup
         wakeroll(surf, curfield, dt)
-        
+
         # Calculate force and moment coefficients
         for i = 1:nsurf
             cl[i], cd[i], cm[i] = calc_forces(surf[i], [curfield.u[1], curfield.w[1]])
         end
-        
+
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
@@ -415,7 +415,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
                 writeStamp(dirname, t, surf, curfield)
             end
         end
-        
+
         # for writing in resultsSummary
         matvect = [t;]
         for is = 1:nsurf
@@ -423,7 +423,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
                                 surf[is].kinem.u, surf[is].a0[1], cl[is], cd[is], cm[is]]]
         end
         mat = hcat(mat,matvect)
-        
+
     end
 
 mat = mat'
@@ -456,7 +456,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
     mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    
+
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -665,7 +665,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
     mat = mat'
 
     dt = dtstar*surf.c/surf.uref
-    
+
     # if writeflag is on, determine the timesteps to write at
     if writeflag == 1
         writeArray = Int64[]
@@ -681,19 +681,19 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
     end
 
 
-    
+
     cl = 0.
     cm = 0.
-    
+
     #Intialise flowfield
-    
+
     for istep = 1:nsteps
         #Udpate current time
         t = t + dt
 
         #Update external flowfield
         update_externalvel(curfield, t)
-        
+
         #Update kinematic parameters (based on 2DOF response)
         update_kinem2DOF(surf, strpar, kinem, dt, cl, cm)
 
@@ -705,7 +705,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
 
         #Update incduced velocities on airfoil
         update_indbound(surf, curfield)
-        
+
         #Solve for TEV strength to satisfy Kelvin condition
         kelv = KelvinCondition(surf,curfield)
         soln = nlsolve(not_in_place(kelv), [-0.01])
@@ -714,7 +714,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
         #Update adot
         #update_a2a3adot(surf,dt)
         update_atermdot(surf, dt)
-        
+
         lesp = surf.a0[1]
 
         #Check for LESP condition
@@ -729,7 +729,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
             kelvkutta = KelvinKutta(surf,curfield)
             soln = nlsolve(not_in_place(kelvkutta), [-0.01; 0.01])
             (curfield.tev[length(curfield.tev)].s, curfield.lev[length(curfield.lev)].s) = soln.zero[1], soln.zero[2]
-            
+
             #set flag for levshedding=on
             surf.levflag[1] = 1
         else
@@ -738,7 +738,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
 
         #Update rest of Fourier terms
         update_a2toan(surf)
-        
+
         #Set previous values of aterm to be used for derivatives in next time step
         surf.a0prev[1] = surf.a0[1]
         for ia = 1:surf.naterm
@@ -764,14 +764,14 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
                 writeStamp(dirname, t, surf, curfield)
             end
         end
-        
+
         # for writing in resultsSummary
         mat = hcat(mat,[t, surf.kinem.alpha, surf.kinem.h, surf.kinem.u, surf.a0[1], cl, cd, cm])
-        
+
     end
-    
+
     mat = mat'
-    
+
     f = open("resultsSummary", "w")
     Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
     DelimitedFiles.writedlm(f, mat)
@@ -779,4 +779,3 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
 
     mat, surf, curfield
 end
-

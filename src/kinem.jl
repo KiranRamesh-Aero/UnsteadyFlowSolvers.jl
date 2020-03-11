@@ -74,6 +74,36 @@ function (eld::EldRampReturnDef)(tt)
 
 end
 
+struct EldRampReturntstartDef <: MotionDef
+    amp :: Float64
+    K :: Float64
+    a :: Float64
+    tstart :: Float64
+end
+
+function (eld::EldRampReturntstartDef)(tt)
+    fr = eld.K/(pi*abs(eld.amp));
+    t1 = eld.tstart
+    t2 = t1 + (1. /(2*pi*fr));
+    t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
+    t4 = t3 + (1. /(2*pi*fr));
+    t5 = t4+t1;
+
+    nstep = round(Int,t5/0.015) + 1
+    g = zeros(nstep)
+    t = zeros(nstep)
+
+    for i = 1:nstep
+        t[i] = (i-1.)*0.015
+        g[i] = log((cosh(eld.a*(t[i] - t1))*cosh(eld.a*(t[i] - t4)))/(cosh(eld.a*(t[i] - t2))*cosh(eld.a*(t[i] - t3))))
+    end
+    maxg = maximum(g);
+
+    gg = log((cosh(eld.a*(tt - t1))*cosh(eld.a*(tt - t4)))/(cosh(eld.a*(tt - t2))*cosh(eld.a*(tt - t3))))
+
+    return eld.amp*gg/(maxg);
+
+end
 
 struct ConstDef <: MotionDef
     amp :: Float64
@@ -216,4 +246,17 @@ function (eld::EldUpInttstartDef)(t)
       amp = 0.
     end
     amp
+end
+
+# Takes a vector of time-ordered data from an input file
+struct FileDef <: MotionDef
+    tvec :: Vector{Float64}
+    var :: Vector{Float64}
+end
+
+function (file::FileDef)(t)
+    # Find index of closest t to tvec
+    idx = argmin(abs.(file.tvec.- t))
+    # return var at index
+    file.var[idx]
 end

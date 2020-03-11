@@ -1,0 +1,15 @@
+Airfoil: bin/airfoil.dat
+Reynolds#: 1e5
+Mach: .5
+
+ChangePanels: true
+Panels: 200
+ChangeIterations: true
+Iterations: 200
+
+AlphaStart: 0
+AlphaEnd: 60
+AlphaStep: 1
+
+XfoilPath: bin\xfoil.exe
+PolarFile: bin\polar.txt

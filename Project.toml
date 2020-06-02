@@ -1,7 +1,7 @@
 name = "UnsteadyFlowSolvers.jl"
 uuid = "20356848-0d88-5e31-a494-d68914b75c92"
 authors = ["Kiran Ramesh <kiran.ramesh@glasgow.ac.uk>"]
-version = "0.8.1"
+version = "0.8.4"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

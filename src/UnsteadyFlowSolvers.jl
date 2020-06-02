@@ -14,13 +14,13 @@ import NLsolve: nlsolve, not_in_place, only_fj!
 
 import Statistics: mean
 
+import Plots: @layout
+
 import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
     xticks, yticks, subplot, subplot2grid, legend, axis, savefig,
     close, tight_layout, clf
 
 import SpecialFunctions: besselh, besselk
-
-import Plots: @layout
 
 import LaTeXStrings: @L_str
 

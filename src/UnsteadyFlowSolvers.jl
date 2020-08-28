@@ -37,6 +37,7 @@ export
     EldUptstartDef,
     ConstDef,
     EldRampReturnDef,
+    EldRampReturntstartDef,
     EldUpIntDef,
     EldUpInttstartDef,
     SinDef,

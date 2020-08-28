@@ -49,7 +49,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary",header = true)
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -133,7 +133,7 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
     mat = mat'
 
     f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
@@ -151,7 +151,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary",header = true)
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -259,7 +259,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat = mat'
 
     f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
     DelimitedFiles.writedlm(f, mat)
     close(f)
 
@@ -279,7 +279,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary",header = true)
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -429,7 +429,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
 mat = mat'
 
 f = open("resultsSummary", "w")
-Serialization.serialize(f, ["#time \t", "alpha -1 (deg) \t", "h/c -1 \t", "u/uref -1 \t", "A0 -1 \t", "Cl -1 \t", "Cd -2\t", "Cm -2 \t", "alpha -2 ...\n"])
+println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
 DelimitedFiles.writedlm(f, mat)
 close(f)
 
@@ -448,7 +448,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary",header=true)
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -639,7 +639,7 @@ end
 mat = mat'
 
 f = open("resultsSummary", "w")
-Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
 DelimitedFiles.writedlm(f, mat)
 close(f)
 
@@ -657,7 +657,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
         dirvec = readdir()
         dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = DelimitedFiles.readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary",header=true)
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -773,7 +773,7 @@ function ldvm2DOF(surf::TwoDSurf, curfield::TwoDFlowField, strpar::TwoDOFPar, ki
     mat = mat'
 
     f = open("resultsSummary", "w")
-    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
     DelimitedFiles.writedlm(f, mat)
     close(f)
 

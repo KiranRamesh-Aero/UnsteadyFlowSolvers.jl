@@ -81,6 +81,13 @@ function find_tstep(kin:: EldRampReturnDef)
     return dtstar
 end
 
+# added EldRampReturntstartDef by Joe
+function find_tstep(kin:: EldRampReturntstartDef)
+    dtstar = 1.
+    dtstar = minimum([0.015*0.2/kin.K 0.015])
+    return dtstar
+end
+
 function find_tstep(kin :: BendingDef)
     dtstar = 15
     amp = evaluate(kin.spl, kin.spl.t[end])

@@ -1,3 +1,4 @@
+
 function viewVort2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matrix{Float64})
     scatter(tev[:,2], tev[:,3], s=5, c=tev[:,1], edgecolors="none")
     sc = scatter(lev[:,2], lev[:,3], s=5, c=lev[:,1], edgecolors="none")
@@ -29,7 +30,7 @@ function viewVortConnect2D(tev::Matrix{Float64}, lev::Matrix{Float64}, bv::Matri
 end
 
 function makeVortPlots2D(tt = "all")
-# tt is a target time to make the plot for. It will choose the closest time available
+ # tt is a target time to make the plot for. It will choose the closest time available
     try
         cd("Step Files")
     catch
@@ -54,18 +55,18 @@ function makeVortPlots2D(tt = "all")
 
     if multsurfflag == 0 #single surface
 
-        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+        tev = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
         lev =   try
-            DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+            DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
         catch
             zeros(0,3)
         end
-        bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
-
-        xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
-        zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
-        xmax = maximum([tev[:,2];lev[:,2];])
-        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+        bv = DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
+        #tupletest = minimum([UnsteadyFlowSolvers.tev[:,2];UnsteadyFlowSolvers.lev[:,2];UnsteadyFlowSolvers.bv[:,2]])
+        xmin = minimum([tev[:,2];lev[:,2];bv[:,2]])
+        zmin = minimum([tev[:,3];lev[:,3];bv[:,3]])
+        xmax = maximum([tev[:,2];lev[:,2]])
+        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3]])
 
         cd("../..")
 
@@ -85,13 +86,13 @@ function makeVortPlots2D(tt = "all")
             if dirresults[i] != 0
                 dirstr="$(dirresults[i])"
                 cd(dirstr)
-                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+                tev= DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
                 lev =   try
-                    DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                    DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
                 catch
                     zeros(0,3)
                 end
-                bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+                bv= DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
 
                 viewVort2D(tev, lev, bv)
                 axis([xmin-1, xmax+1, zmin-1, zmax+1])
@@ -112,9 +113,9 @@ function makeVortPlots2D(tt = "all")
 
     else #multiple surfaces
 
-        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
         lev =   try
-            DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+            DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
         catch
             zeros(0,3)
         end
@@ -126,16 +127,16 @@ function makeVortPlots2D(tt = "all")
 
             end
         end
-        bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
+        bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
         for i = 2:nsurf
-            bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)
+            bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
             bv = [bv;bvt;]
         end
 
-        xmin = minimum([tev[:,2];lev[:,2];bv[:,2];])
-        zmin = minimum([tev[:,3];lev[:,3];bv[:,3];])
-        xmax = maximum([tev[:,2];lev[:,2];])
-        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+        xmin = minimum([tev[:,2];lev[:,2];bv[:,2]])
+        zmin = minimum([tev[:,3];lev[:,3];bv[:,3]])
+        xmax = maximum([tev[:,2];lev[:,2]])
+        zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3]])
 
         cd("..")
 
@@ -147,15 +148,15 @@ function makeVortPlots2D(tt = "all")
             if dirresults[i] != 0
                 dirstr="$(dirresults[i])"
                 cd(dirstr)
-                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
                 lev =   try
-                    DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                    DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
                 catch
                     zeros(0,3)
                 end
-                bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64, header=true)
+                bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
                 for i = 2:nsurf
-                    bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64, header=true)
+                    bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
                     bv = [bv;bvt;]
                 end
                 viewVort2D(tev, lev, bv)
@@ -170,6 +171,7 @@ function makeVortPlots2D(tt = "all")
 end
 
 function makeForcePlots2D(mat = "")
+
     dirvec = readdir()
     if "forcePlots" in dirvec
         rm("forcePlots", recursive=true)
@@ -177,10 +179,10 @@ function makeForcePlots2D(mat = "")
     mkdir("forcePlots")
 
     if mat == ""
-        mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+       mat = DelimitedFiles.readdlm("resultsSummary", Float64,  skipstart = 1)
     end
 
-    if length(mat[1,:]) == 8 #only 1 surface
+    if length(mat[1,:])==8 #only 1 surface
         t = mat[:,1]
         alpha = mat[:,2]*180/pi
         h = mat[:,3]
@@ -195,7 +197,7 @@ function makeForcePlots2D(mat = "")
         zmin = minimum(alpha) - 0.1*abs(minimum(alpha))
         zmax = maximum(alpha) + 0.1*abs(maximum(alpha))
         axis([xmin, xmax, zmin, zmax])
-        xlabel(L"$t^*$")
+        xlabel("t*")
         ylabel(L"$\alpha$ (deg)")
         savefig("forcePlots/pitch.png")
         close()
@@ -206,7 +208,7 @@ function makeForcePlots2D(mat = "")
         zmin = minimum(h) - 0.1*abs(minimum(h))
         zmax = maximum(h) + 0.1*abs(maximum(h))
         axis([xmin, xmax, zmin, zmax])
-        xlabel(L"$t^*$")
+        xlabel("t*")
         ylabel(L"$h/c$")
         savefig("forcePlots/plunge.png")
         close()
@@ -218,7 +220,7 @@ function makeForcePlots2D(mat = "")
         zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
         zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
         axis([xmin, xmax, zmin, zmax])
-        xlabel(L"$t^*$")
+        xlabel("t*")
         ylabel(L"$C_l$")
         savefig("forcePlots/cl.png")
         close()
@@ -230,7 +232,7 @@ function makeForcePlots2D(mat = "")
         zmin = minimum(cd[range]) - 0.1*abs(minimum(cd[range]))
         zmax = maximum(cd[range]) + 0.1*abs(maximum(cd[range]))
         axis([xmin, xmax, zmin, zmax])
-        xlabel(L"$t^*$")
+        xlabel("t*")
         ylabel(L"$C_d$")
         savefig("forcePlots/cd.png")
         close()
@@ -242,7 +244,7 @@ function makeForcePlots2D(mat = "")
         zmin = minimum(cm[range]) - 0.1*abs(minimum(cm[range]))
         zmax = maximum(cm[range]) + 0.1*abs(maximum(cm[range]))
         axis([xmin, xmax, zmin, zmax])
-        xlabel(L"$t^*$")
+        xlabel("t*")
         ylabel(L"$C_m$")
         savefig("forcePlots/cm.png")
         close()
@@ -266,7 +268,7 @@ function makeForcePlots2D(mat = "")
             zmin = minimum(alpha) - 0.1*abs(minimum(alpha))
             zmax = maximum(alpha) + 0.1*abs(maximum(alpha))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$\alpha$ (deg)")
             savefig("forcePlots/pitch-$i.png")
             close()
@@ -277,7 +279,7 @@ function makeForcePlots2D(mat = "")
             zmin = minimum(h) - 0.1*abs(minimum(h))
             zmax = maximum(h) + 0.1*abs(maximum(h))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$h/c$")
             savefig("forcePlots/plunge-$i.png")
             close()
@@ -289,7 +291,7 @@ function makeForcePlots2D(mat = "")
             zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
             zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$C_l$")
             savefig("forcePlots/cl-$i.png")
             close()
@@ -301,7 +303,7 @@ function makeForcePlots2D(mat = "")
             zmin = minimum(cd[range]) - 0.1*abs(minimum(cd[range]))
             zmax = maximum(cd[range]) + 0.1*abs(maximum(cd[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$C_d$")
             savefig("forcePlots/cd-$i.png")
             close()
@@ -313,7 +315,7 @@ function makeForcePlots2D(mat = "")
             zmin = minimum(cm[range]) - 0.1*abs(minimum(cm[range]))
             zmax = maximum(cm[range]) + 0.1*abs(maximum(cm[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$C_m$")
             savefig("forcePlots/cm-$i.png")
             close()
@@ -325,7 +327,7 @@ end
 
 function checkConverge(k::Float64)
 
-    mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+    mat = DelimitedFiles.readdlm("resultsSummary", '\t', Float64,  skipstart = 1)
 
     T = pi/k
 
@@ -356,7 +358,7 @@ function checkConverge(k::Float64)
     zmax = maximum(mat[:,6])
     axis([xmin, xmax, zmin, zmax])
 
-    xlabel(L"$t^*$")
+    xlabel("t*")
     ylabel(L"$C_l$")
     savefig("forcePlots/cl-convergence.png")
     close()
@@ -376,7 +378,7 @@ function checkConverge(k::Float64)
     zmax = maximum(mat[:,7])
     axis([xmin, xmax, zmin, zmax])
 
-    xlabel(L"$t^*$")
+    xlabel("t*")
     ylabel(L"$C_d$")
     savefig("forcePlots/cd-convergence.png")
     close()
@@ -396,7 +398,7 @@ function checkConverge(k::Float64)
     zmax = maximum(mat[:,8])
     axis([xmin, xmax, zmin, zmax])
 
-    xlabel(L"$t^*$")
+    xlabel("t*")
     ylabel(L"$C_m$")
     savefig("forcePlots/cm-convergence.png")
     close()
@@ -406,7 +408,7 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
 # tt is a target time to make the plot for. It will choose the closest time available
 
     if mat == ""
-        mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+        mat = DelimitedFiles.readdlm("resultsSummary", '\t', Float64,  skipstart = 1)
     end
 
     t = mat[:,1]
@@ -439,18 +441,18 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
         error("this plot function is only written for single surface")
     end
 
-    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    tev = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
     lev =   try
-        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+        DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)[1]
     catch
         zeros(0,3)
     end
-    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    bv = DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
 
-    xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
-    zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
-    xmaxv = maximum([tev[:,2];lev[:,2];])
-    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    xminv = minimum([tev[:,2];lev[:,2];bv[:,2]])
+    zminv = minimum([tev[:,3];lev[:,3];bv[:,3]])
+    xmaxv = maximum([tev[:,2];lev[:,2]])
+    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3]])
 
     cd("../..")
     if tt == "all"
@@ -484,7 +486,7 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
             zmin = minimum(alpha[range]) - 0.1*abs(minimum(alpha[range]))
             zmax = maximum(alpha[range]) + 0.1*abs(maximum(alpha[range]))
             axis([xmin, xmax, zmin, zmax])
-            #xlabel(L"$t^*$")
+            #xlabel("t*")
             xticks([])
             ylabel(L"$\alpha (deg)$")
 
@@ -497,7 +499,7 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
             zmin = minimum(h[range]) - 0.1*abs(minimum(h[range]))
             zmax = maximum(h[range]) + 0.1*abs(maximum(h[range]))
             axis([xmin, xmax, zmin, zmax])
-            #xlabel(L"$t^*$")
+            #xlabel("t*")
             xticks([])
             ylabel(L"$h$")
 
@@ -510,7 +512,7 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
             zmin = minimum(u[range]) - 0.1*abs(minimum(u[range]))
             zmax = maximum(u[range]) + 0.1*abs(maximum(u[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$u$")
 
             subplot2grid((6, 2), (0, 1), rowspan=3)
@@ -522,17 +524,17 @@ function makeKinemClVortPlots2D(mat = "", tt = "all")
             zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
             zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$C_l$")
 
             subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
-            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            tev= DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
             lev =   try
-                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
             catch
                 zeros(0,3)
             end
-            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            bv = DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
 
@@ -557,7 +559,7 @@ end
 function makeKinemVelVortPlots2D(mat = "",tt = "all")
 
     if mat == ""
-        mat, _ = DelimitedFiles.readdlm("resultsSummary", '\t', Float64, header=true)
+        mat = DelimitedFiles.readdlm("resultsSummary", '\t', Float64,  skipstart = 1)
     end
 
     t = mat[:,1]
@@ -591,18 +593,18 @@ function makeKinemVelVortPlots2D(mat = "",tt = "all")
         error("this plot function is only written for single surface")
     end
 
-    tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+    tev = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
     lev =   try
-        DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+        DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
     catch
         zeros(0,3)
     end
-    bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+    bv = DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
 
-    xminv = minimum([tev[:,2];lev[:,2];bv[:,2];])
-    zminv = minimum([tev[:,3];lev[:,3];bv[:,3];])
-    xmaxv = maximum([tev[:,2];lev[:,2];])
-    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3];])
+    xminv = minimum([tev[:,2];lev[:,2];bv[:,2]])
+    zminv = minimum([tev[:,3];lev[:,3];bv[:,3]])
+    xmaxv = maximum([tev[:,2];lev[:,2]])
+    zmaxv = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3]])
 
     cd("../..")
 
@@ -634,7 +636,7 @@ function makeKinemVelVortPlots2D(mat = "",tt = "all")
             zmin = minimum(alpha[range]) - 0.1*abs(minimum(alpha[range]))
             zmax = maximum(alpha[range]) + 0.1*abs(maximum(alpha[range]))
             axis([xmin, xmax, zmin, zmax])
-            #xlabel(L"$t^*$")
+            #xlabel("t*")
             xticks([])
             ylabel(L"$\alpha (deg)$")
 
@@ -647,7 +649,7 @@ function makeKinemVelVortPlots2D(mat = "",tt = "all")
             zmin = minimum(h[range]) - 0.1*abs(minimum(h[range]))
             zmax = maximum(h[range]) + 0.1*abs(maximum(h[range]))
             axis([xmin, xmax, zmin, zmax])
-            #xlabel(L"$t^*$")
+            #xlabel("t*")
             xticks([])
             ylabel(L"$h$")
 
@@ -660,7 +662,7 @@ function makeKinemVelVortPlots2D(mat = "",tt = "all")
             zmin = minimum(u[range]) - 0.1*abs(minimum(u[range]))
             zmax = maximum(u[range]) + 0.1*abs(maximum(u[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$u$")
 
             subplot2grid((6, 2), (0, 1), rowspan=3)
@@ -672,17 +674,17 @@ function makeKinemVelVortPlots2D(mat = "",tt = "all")
             zmin = minimum(cl[range]) - 0.1*abs(minimum(cl[range]))
             zmax = maximum(cl[range]) + 0.1*abs(maximum(cl[range]))
             axis([xmin, xmax, zmin, zmax])
-            xlabel(L"$t^*$")
+            xlabel("t*")
             ylabel(L"$C_l$")
 
             subplot2grid((6, 2), (3, 0), rowspan=3, colspan=2)
-            tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64, header=true)
+            tev = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
             lev =   try
-                DelimitedFiles.readdlm("lev", '\t', Float64, header=true)[1]
+                DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
             catch
                 zeros(0,3)
             end
-            bv, _ = DelimitedFiles.readdlm("boundv", '\t', Float64, header=true)
+            bv = DelimitedFiles.readdlm("boundv", '\t', Float64,  skipstart = 1)
             viewVort2D(tev, lev, bv)
             axis([xminv-1, xmaxv+1, zminv-1, zmaxv+1])
 
@@ -751,7 +753,7 @@ function initPlot(A,C,t,a,h,u)
         plot(t,h, color = "black") # height
         plot(t,u, color = "blue") # velocity
         plot(t,a, color = "red") # alpha
-        xlabel(L"$t^*$")
+        xlabel("t*")
         legend(["Height","Velocity","Alpha [deg]"])
         title("Motion")
     end

@@ -1,4 +1,4 @@
-name = "UnsteadyFlowSolvers.jl"
+name = "UnsteadyFlowSolvers"
 uuid = "20356848-0d88-5e31-a494-d68914b75c92"
 authors = ["Kiran Ramesh <kiran.ramesh@glasgow.ac.uk>"]
 version = "0.8.4"
@@ -16,6 +16,7 @@ PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 
 [compat]
 julia = "≥ 1.0.0"

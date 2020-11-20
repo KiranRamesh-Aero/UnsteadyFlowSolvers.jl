@@ -373,6 +373,12 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
 
             for i = 1:nsurf
                 if i in shed_ind
+                    if shed_ind != [1] && length(shed_ind)==1 #incase LEV only formed on 2nd surface
+                    surf[i].levflag[1] = 1
+                    i=i-1
+                    curfield.tev[end-nsurf+i].s = soln.zero[i]
+                    curfield.lev[end-nsurf+shed_ind[i]].s = soln.zero[nsurf+i]
+                else
                     curfield.tev[end-nsurf+i].s = soln.zero[i]
                     curfield.lev[end-nsurf+shed_ind[i]].s = soln.zero[nsurf+i]
                     surf[i].levflag[1] = 1

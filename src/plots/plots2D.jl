@@ -113,7 +113,7 @@ function makeVortPlots2D(tt = "all")
 
     else #multiple surfaces
 
-        tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
+        tev= DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
         lev =   try
             DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
         catch
@@ -127,9 +127,9 @@ function makeVortPlots2D(tt = "all")
 
             end
         end
-        bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
+        bv= DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
         for i = 2:nsurf
-            bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
+            bvt = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
             bv = [bv;bvt;]
         end
 
@@ -139,36 +139,40 @@ function makeVortPlots2D(tt = "all")
         zmax = maximum([bv[:,2];tev[:,3];lev[:,3];bv[:,3]])
 
         cd("..")
-
+    if tt == "all"
+            dirvec = readdir()
         if "vortPlots" in dirvec
             rm("vortPlots", recursive=true)
         end
-        mkdir("vortPlots")
+
+        cd("..")
+        mkpath("vortPlots")
+        cd("Step Files")
         for i=1:length(dirresults)
             if dirresults[i] != 0
                 dirstr="$(dirresults[i])"
                 cd(dirstr)
-                tev, _ = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
+                tev = DelimitedFiles.readdlm("tev", '\t', Float64,  skipstart = 1)
                 lev =   try
                     DelimitedFiles.readdlm("lev", '\t', Float64,  skipstart = 1)
                 catch
                     zeros(0,3)
                 end
-                bv, _ = DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
+                bv= DelimitedFiles.readdlm("boundv-1", '\t', Float64,  skipstart = 1)
                 for i = 2:nsurf
-                    bvt, _ = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
+                    bvt = DelimitedFiles.readdlm("boundv-$i", '\t', Float64,  skipstart = 1)
                     bv = [bv;bvt;]
                 end
                 viewVort2D(tev, lev, bv)
                 axis([xmin-1, xmax+1, zmin-1, zmax+1])
-                savefig("../vortPlots/$(dirresults[i]).png")
+                savefig("../../vortPlots/$(dirresults[i]).png")
                 close()
                 cd("..")
             end
         end
     end
-    cd("..")
 end
+    cd("..")
 
 function makeForcePlots2D(mat = "")
 

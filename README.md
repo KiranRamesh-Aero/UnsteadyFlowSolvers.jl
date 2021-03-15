@@ -2,11 +2,9 @@
 [![Coverage Status](https://coveralls.io/repos/github/KiranUofG/UnsteadyFlowSolvers.jl/badge.svg?branch=master)](https://coveralls.io/github/KiranUofG/UnsteadyFlowSolvers.jl?branch=master)
 
 This package (abbreviated UNSflow) is a library of low-order solvers for unsteady aerodynamics
-and aeroelasticity managed by Dr. Kiran Ramesh at the University of Glasgow. The solvers
-are written in Julia, are based on the discrete-vortex method and cater to various
+and aeroelasticity. The solvers are written in Julia, are based on the discrete-vortex method and cater to various
 applications.
 
-This project is currently supported by EPSRC grant EP/R008035/1.
 
 [Julia](http://julialang.org) is a new high-level, high-performance dynamic programming
 language for technical computing. Julia’s novel features are a

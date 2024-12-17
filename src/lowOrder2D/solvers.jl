@@ -382,6 +382,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
                     curfield.tev[end-nsurf+i].s = soln.zero[i]
                     curfield.lev[end-nsurf+shed_ind[i]].s = soln.zero[nsurf+i]
                     surf[i].levflag[1] = 1
+                end
                 else
                     curfield.tev[end-nsurf+i].s = soln.zero[i]
                     surf[i].levflag[1] = 0
@@ -433,7 +434,7 @@ function ldvm(surf::Vector{TwoDSurf}, curfield::TwoDFlowField, nsteps::Int64 = 5
     end
 
 mat = mat'
-
+    
 f = open("resultsSummary", "w")
 println(f,"#time \t","alpha(deg) \t","h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm ")
 DelimitedFiles.writedlm(f, mat)
@@ -447,7 +448,7 @@ end
 function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtstar::Float64 = 0.015, startflag = 0, writeflag = 0, writeInterval = 1000., delvort = delNone(); maxwrite = 50, nround=6)
 
     # If a restart directory is provided, read in the simulation data
-    if startflag == 0
+    if startflag == 0ml
         mat = zeros(0, 8)
         t = 0.
     elseif startflag == 1
